@@ -1,8 +1,7 @@
 // --- Gemini API設定 ---
 // スクリプトプロパティからAPIキーを読み込む
 const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
-
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${API_KEY}`;
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index').setTitle('Methane AI Agent');
