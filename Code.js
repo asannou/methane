@@ -23,7 +23,14 @@ function callGenerativeAI(userPrompt, projectContent) {
     systemPrompt += "```\n" + file.source + "\n```\n\n";
   });
   systemPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
-  systemPrompt += "## あなたのタスク\n- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n- レスポンスは必ず、以下のJSON形式のみで返してください。\n- 変更が不要なファイルはレスポンスに含めないでください。\n- JSON以外の説明や前置き、言い訳は一切不要です。\n\nレスポンス形式の例:\n```json\n{\"files\": [{\"name\": \"コード\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
+  systemPrompt += "## あなたのタスク\n";
+  systemPrompt += "- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n";
+  systemPrompt += "- レスポンスは必ず、以下のJSON形式のみで返してください。\n";
+  systemPrompt += "- 重要:\nファイル名は、上記「既存のファイル一覧」で提示されたものを、一字一句変えずにそのまま使用してください。翻訳や変更は絶対にしないでください。\n";
+  systemPrompt += "- 変更が不要なファイルはレスポンスに含めないでください。\n";
+  systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
+  systemPrompt += "レスポンス形式の例:\n";
+  systemPrompt += "`json\n{\"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n`";
 
   // Gemini APIに送信するリクエストボディを作成
   const requestBody = {
