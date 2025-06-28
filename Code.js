@@ -17,41 +17,54 @@ function processPrompt(formObject) {
   console.log(`プロンプト: ${prompt}`);
 
   try {
-    // Apps Script APIを呼び出すための準備
     const accessToken = ScriptApp.getOAuthToken();
-    const url = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
     
-    const options = {
+    // --- ステップ1: 現在のプロジェクト内容を取得する (GETリクエスト) ---
+    const getOptions = {
       method: 'get',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
-      muteHttpExceptions: true // APIエラーを例外としてスローさせず、レスポンスとして受け取る
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      muteHttpExceptions: true
     };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    const getResponseCode = getResponse.getResponseCode();
+    const getResponseBody = getResponse.getContentText();
 
-    // Apps Script APIを呼び出して、プロジェクトの内容を取得
-    const response = UrlFetchApp.fetch(url, options);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
+    if (getResponseCode !== 200) {
+      throw new Error(`スクリプト内容の取得に失敗しました。 Status: ${getResponseCode}. Response: ${getResponseBody}`);
+    }
+    const projectContent = JSON.parse(getResponseBody);
 
-    if (responseCode !== 200) {
-      console.error(`API Error: ${responseBody}`);
-      throw new Error(`Failed to fetch script content. Status: ${responseCode}. Response: ${responseBody}`);
+    // --- ステップ2: AIによる処理をシミュレーションし、コードを修正する ---
+    // 本来はここでLLMを呼び出しますが、今回は「コード.gs」に新しい関数を追記する処理をハードコードします。
+    const targetFile = projectContent.files.find(file => file.name === 'コード');
+    if (!targetFile) {
+      throw new Error('プロジェクトに "コード.gs" ファイルが見つかりません。');
     }
 
-    const content = JSON.parse(responseBody);
-    
-    // 取得したファイルの内容を整形して文字列にする
-    let filesContent = `--- Project Files for Script ID: ${scriptId} ---\n\n`;
-    content.files.forEach(file => {
-      filesContent += `--- File: ${file.name} (${file.type}) ---\n`;
-      filesContent += `${file.source}\n\n`;
-    });
+    // 古いソースコードに、新しい関数を追記する
+    const newFunction = `\n\n// Methaneがプロンプト「${prompt}」を基に追加しました\nfunction helloFromMethane() {\n  Logger.log("Hello, World! この関数はMethane AI Agentによって追加されました。");\n}`;
+    targetFile.source += newFunction;
 
-    // TODO: ここでfilesContentとpromptをLLMに渡して新しいコードを生成する
+    // --- ステップ3: 修正した内容でプロジェクト全体を更新する (PUTリクエスト) ---
+    const putOptions = {
+      method: 'put',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      contentType: 'application/json',
+      payload: JSON.stringify(projectContent), // 修正したプロジェクト構造全体を送信する
+      muteHttpExceptions: true
+    };
 
-    // 現時点では、取得したファイルの内容をそのまま返す
-    return filesContent;
+    const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
+    const putResponseCode = putResponse.getResponseCode();
+    const putResponseBody = putResponse.getContentText();
+
+    if (putResponseCode !== 200) {
+      throw new Error(`スクリプトの更新に失敗しました。 Status: ${putResponseCode}. Response: ${putResponseBody}`);
+    }
+
+    console.log('スクリプトの更新に成功しました。');
+    return `スクリプト (ID: ${scriptId}) の更新に成功しました。「コード.gs」に新しい関数 "helloFromMethane" を追加しました。`;
 
   } catch (e) {
     console.error(e);
