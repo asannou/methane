@@ -18,7 +18,7 @@ function callGenerativeAI(userPrompt, projectContent) {
   // AIに渡すための詳細な指示書（システムプロンプト）を作成
   let systemPrompt = "あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、修正後のファイル内容を生成してください。\n\n";
   systemPrompt += "## 既存のファイル一覧\n";
-  projectPrompt.files.forEach(file => {
+  projectContent.files.forEach(file => {
     const fileExtension = file.type === 'SERVER_JS' ? 'gs' : (file.type === 'JSON' ? 'json' : 'html');
     systemPrompt += `### ファイル名: ${file.name}.${fileExtension}\n`;
     systemPrompt += "```\n" + file.source + "\n```\n\n";
