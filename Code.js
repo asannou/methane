@@ -1,42 +1,65 @@
+// --- Gemini API設定 ---
+// スクリプトプロパティからAPIキーを読み込む
+const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
+
+
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index').setTitle('Methane AI Agent');
 }
 
 /**
- * AIモデル（シミュレーション）を呼び出す関数
+ * Gemini APIを呼び出す関数
  * @param {string} userPrompt - ユーザーが入力したプロンプト
  * @param {object} projectContent - 対象プロジェクトの全ファイル情報
- * @returns {object} - AIからのレスポンスを模したオブジェクト
+ * @returns {object} - AIが生成した修正後のファイル情報を含むオブジェクト
  */
 function callGenerativeAI(userPrompt, projectContent) {
-  // AIに渡すための詳細な指示書（システムプロンプト）を作成する
+  // AIに渡すための詳細な指示書（システムプロンプト）を作成
   let systemPrompt = "あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、修正後のファイル内容を生成してください。\n\n";
   systemPrompt += "## 既存のファイル一覧\n";
-  projectContent.files.forEach(file => {
-    systemPrompt += `### ファイル名: ${file.name}.${file.type === 'SERVER_JS' ? 'gs' : 'html'}\n`;
+  projectPrompt.files.forEach(file => {
+    const fileExtension = file.type === 'SERVER_JS' ? 'gs' : (file.type === 'JSON' ? 'json' : 'html');
+    systemPrompt += `### ファイル名: ${file.name}.${fileExtension}\n`;
     systemPrompt += "```\n" + file.source + "\n```\n\n";
   });
   systemPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
-  systemPrompt += "## あなたのタスク\n上記の指示に従って、変更が必要なファイルの新しいソースコードをJSON形式で返してください。変更しないファイルは含めないでください。\n例: {\"files\": [{\"name\": \"コード\", \"source\": \"...新しいソース...\"}]}";
+  systemPrompt += "## あなたのタスク\n- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n- レスポンスは必ず、以下のJSON形式のみで返してください。\n- 変更が不要なファイルはレスポンスに含めないでください。\n- JSON以外の説明や前置き、言い訳は一切不要です。\n\nレスポンス形式の例:\n```json\n{\"files\": [{\"name\": \"コード\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
 
-  console.log("AIへの指示書:\n" + systemPrompt);
-
-  // --- ここからAI呼び出しのシミュレーション ---
-  // 本来は UrlFetchApp で Gemini API を呼び出す
-  
-  // 今回は、ユーザープロンプトに関わらず、「スプレッドシートのA1セルに現在時刻を書き込む関数」を返すように固定する
-  const aiResponseJson = {
-    "files": [
-      {
-        "name": "コード",
-        "source": `function myFunction() {\n  \n}\n\n// Methaneがプロンプト「${userPrompt}」を基に追加しました\nfunction recordCurrentTime() {\n  SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getRange(\"A1\").setValue(new Date());\n}`
-      }
-    ]
+  // Gemini APIに送信するリクエストボディを作成
+  const requestBody = {
+    "contents": [{
+      "parts": [{ "text": systemPrompt }]
+    }],
+    "generationConfig": {
+      "response_mime_type": "application/json",
+    }
   };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(requestBody),
+    muteHttpExceptions: true
+  };
+
+  // Gemini APIを呼び出す
+  console.log("Gemini APIにリクエストを送信します...");
+  const response = UrlFetchApp.fetch(API_URL, options);
+  const responseCode = response.getResponseCode();
+  const responseBody = response.getContentText();
+
+  if (responseCode !== 200) {
+    throw new Error(`Gemini APIエラー (Status: ${responseCode}): ${responseBody}`);
+  }
   
-  console.log("AIからの応答（シミュレーション）:\n" + JSON.stringify(aiResponseJson, null, 2));
-  return aiResponseJson;
-  // --- シミュレーションここまで ---
+  // レスポンスから生成されたテキスト部分を抽出
+  const jsonResponse = JSON.parse(responseBody);
+  const generatedText = jsonResponse.candidates[0].content.parts[0].text;
+  console.log("Geminiからの応答:\n" + generatedText);
+
+  // AIが生成したJSON文字列をパースして返す
+  return JSON.parse(generatedText);
 }
 
 
@@ -44,28 +67,31 @@ function processPrompt(formObject) {
   const scriptId = formObject.scriptId;
   const prompt = formObject.prompt;
 
+  if (!API_KEY) {
+    return "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。";
+  }
+
   try {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
     
-    // ステップ1: 現在のプロジェクト内容を取得
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    // ステップ2: AIを呼び出して、修正後のコードを取得
     const aiResponse = callGenerativeAI(prompt, projectContent);
 
-    // ステップ3: AIの応答を基に、プロジェクト内容を更新
     aiResponse.files.forEach(updatedFile => {
       const targetFile = projectContent.files.find(file => file.name === updatedFile.name);
       if (targetFile) {
         targetFile.source = updatedFile.source;
+      } else {
+        // AIが新しいファイルを作成するように指示した場合
+        projectContent.files.push(updatedFile);
       }
     });
 
-    // ステップ4: 修正した内容でプロジェクト全体を更新
     const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
     if (putResponse.getResponseCode() !== 200) throw new Error(`スクリプトの更新に失敗: ${putResponse.getContentText()}`);
