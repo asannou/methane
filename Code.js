@@ -1,4 +1,4 @@
-// --- Gemini API設定 ---
+// --- Gemini API Configuration ---
 // スクリプトプロパティからAPIキーを読み込む
 const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${API_KEY}`;
@@ -38,7 +38,7 @@ function callGenerativeAI(userPrompt, projectContent) {
       "parts": [{ "text": systemPrompt }]
     }],
     "generationConfig": {
-      "response_mime_type": "application/json",
+      "response_mime_type": "application/json"
     }
   };
 
