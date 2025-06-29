@@ -144,7 +144,7 @@ function processPrompt(formObject) {
     const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
 
     // 元のファイルとAIが提案したファイルをフロントエンドに返す
-    return { 
+    return {
       status: 'proposal',
       scriptId: scriptId,
       originalFiles: projectContent.files,
@@ -214,6 +214,24 @@ function applyProposedChanges(scriptId, proposedFiles) {
 }
 
 /**
+ * Google Cloud PlatformプロジェクトIDを設定します。
+ * @param {string} gcpProjectId - 設定するGCPプロジェクトID
+ * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
+ */
+function setGcpProjectId(gcpProjectId) {
+  if (!gcpProjectId || gcpProjectId.trim() === '') {
+    return { status: 'error', message: 'GCPプロジェクトIDは空にできません。' };
+  }
+  try {
+    PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId.trim());
+    return { status: 'success', message: `GCPプロジェクトID '${gcpProjectId.trim()}' が正常に設定されました。` };
+  } catch (e) {
+    console.error("GCPプロジェクトIDの設定中にエラーが発生しました:", e);
+    return { status: 'error', message: `GCPプロジェクトIDの設定エラー: ${e.message}` };
+  }
+}
+
+/**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
  * @param {string} targetScriptId - ログを取得するApps ScriptのID
  * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
@@ -223,33 +241,42 @@ function getScriptLogs(targetScriptId) {
   const currentScriptId = ScriptApp.getScriptId();
 
   try {
-    // 1. 現在のスクリプトのGCPプロジェクトIDを取得
-    // 'https://script.googleapis.com/v1/projects/{scriptId}' エンドポイントから、
-    // レスポンスの 'name' フィールド（例: 'projects/your-gcp-project-id/scripts/your-script-id'）をパース
-    const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
-    const metadataOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const metadataResponse = UrlFetchApp.fetch(currentScriptMetadataUrl, metadataOptions);
-    
-    if (metadataResponse.getResponseCode() !== 200) {
-      throw new Error(`現在のスクリプトのメタデータ取得に失敗: ${metadataResponse.getContentText()}`);
-    }
-    const metadata = JSON.parse(metadataResponse.getContentText());
+    let gcpProjectId = PropertiesService.getScriptProperties().getProperty('GCP_PROJECT_ID');
 
-    // defensive check for metadata.name before calling .match()
-    // スクリプトのメタデータに 'name' プロパティがない、または形式が不正な場合のエラーハンドリングを改善
-    if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
-      console.error("Received metadata:", metadata);
-      const userGuidance = "スクリプトのGCPプロジェクトIDを特定できませんでした。これは、現在のApps Scriptプロジェクトが標準のGoogle Cloudプロジェクトにリンクされていない場合に発生することがあります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）から、Google Cloud Platformプロジェクトを明示的にリンクしてみてください。詳細は以下のメタデータをご確認ください：\n" + JSON.stringify(metadata, null, 2);
-      throw new Error(userGuidance);
-    }
+    if (!gcpProjectId) {
+      console.log("Script propertiesにGCPプロジェクトIDが見つかりません。メタデータから取得を試みます。");
+      // 1. 現在のスクリプトのGCPプロジェクトIDを取得
+      // 'https://script.googleapis.com/v1/projects/{scriptId}' エンドポイントから、
+      // レスポンスの 'name' フィールド（例: 'projects/your-gcp-project-id/scripts/your-script-id'）をパース
+      const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
+      const metadataOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+      const metadataResponse = UrlFetchApp.fetch(currentScriptMetadataUrl, metadataOptions);
+      
+      if (metadataResponse.getResponseCode() !== 200) {
+        throw new Error(`現在のスクリプトのメタデータ取得に失敗: ${metadataResponse.getContentText()}`);
+      }
+      const metadata = JSON.parse(metadataResponse.getContentText());
 
-    const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
-    if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
-      // このケースは通常、上記のチェックで捕捉されるはずだが、念のため残しておく
-      throw new Error("現在のスクリプトのGCPプロジェクトIDを、メタデータから正しく抽出できませんでした。");
+      // defensive check for metadata.name before calling .match()
+      // スクリプトのメタデータに 'name' プロパティがない、または形式が不正な場合のエラーハンドリングを改善
+      if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
+        console.error("Received metadata:", metadata);
+        const userGuidance = "スクリプトのGCPプロジェクトIDを特定できませんでした。これは、現在のApps Scriptプロジェクトが標準のGoogle Cloudプロジェクトにリンクされていない場合に発生することがあります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）から、Google Cloud Platformプロジェクトを明示的にリンクするか、ウェブUIで手動で設定してください。";
+        throw new Error(userGuidance);
+      }
+
+      const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
+      if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
+        // このケースは通常、上記のチェックで捕捉されるはずだが、念のため残しておく
+        throw new Error("現在のスクリプトのGCPプロジェクトIDを、メタデータから正しく抽出できませんでした。");
+      }
+      gcpProjectId = gcpProjectIdMatch[1];
+      // 成功した場合、PropertiesServiceに保存して次回以降の取得を高速化
+      PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId);
+      console.log("メタデータからGCPプロジェクトIDを取得し、保存しました:", gcpProjectId);
+    } else {
+      console.log("Script propertiesからGCPプロジェクトIDを取得しました:", gcpProjectId);
     }
-    const gcpProjectId = gcpProjectIdMatch[1];
-    console.log("現在のGCPプロジェクトID:", gcpProjectId);
 
     // 2. Cloud Logging APIリクエストを構築
     const loggingApiUrl = 'https://logging.googleapis.com/v2/entries:list';
@@ -270,7 +297,7 @@ function getScriptLogs(targetScriptId) {
       muteHttpExceptions: true
     };
 
-    console.log(`スクリプトID ${targetScriptId} のログを取得中...`);
+    console.log(`スクリプトID ${targetScriptId} のログをGCPプロジェクト ${gcpProjectId} から取得中...`);
     const response = UrlFetchApp.fetch(loggingApiUrl, options);
     const responseCode = response.getResponseCode();
     const responseBody = response.getContentText();

@@ -78,6 +78,18 @@
 
   <hr>
 
+  <h2>Google Cloud Project ID Configuration</h2>
+  <p>ログ取得には、このApps ScriptがリンクされているGoogle Cloud Projectが必要です。APIで自動取得できない場合に備え、GCPプロジェクトIDを手動で設定してください。</p>
+  <label for="gcpProjectId">GCP Project ID:</label>
+  <input type="text" id="gcpProjectId" name="gcpProjectId">
+  <button type="button" id="saveGcpProjectIdButton">Save GCP Project ID</button>
+  <div id="gcp-save-result-container" style="display:none;">
+    <h3>Save Result:</h3>
+    <pre id="gcp-save-result"></pre>
+  </div>
+
+  <hr>
+
   <h2>Get Script Logs</h2>
   <form id="log-form">
     <p>Using the Script ID entered above.</p>
@@ -119,12 +131,26 @@
       if (savedScriptId) {
         scriptIdInput.value = savedScriptId;
       }
+
+      // NEW: Load GCP Project ID from localStorage
+      const gcpProjectIdInput = document.getElementById('gcpProjectId');
+      const savedGcpProjectId = localStorage.getItem('gcpProjectId');
+      if (savedGcpProjectId) {
+        gcpProjectIdInput.value = savedGcpProjectId;
+      }
     });
 
     // --- New: Helper function to save scriptId to localStorage ---
     function saveScriptIdToLocalStorage(id) {
         if (id) {
             localStorage.setItem('targetScriptId', id);
+        }
+    }
+
+    // NEW: Helper function to save gcpProjectId to localStorage
+    function saveGcpProjectIdToLocalStorage(id) {
+        if (id) {
+            localStorage.setItem('gcpProjectId', id);
         }
     }
 
@@ -203,7 +229,7 @@
         prompt: document.getElementById('prompt').value
       };
 
-      // --- New: Save scriptId to localStorage ---
+      // --- Save scriptId to localStorage ---
       saveScriptIdToLocalStorage(formData.scriptId);
 
       google.script.run
@@ -247,7 +273,7 @@
         return;
       }
 
-      // --- New: Save scriptId to localStorage before applying changes ---
+      // --- Save scriptId to localStorage before applying changes ---
       saveScriptIdToLocalStorage(currentProposal.scriptId);
 
       const applyButton = this;
@@ -276,6 +302,33 @@
         .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles);
     });
 
+    // NEW: Event Listener for Save GCP Project ID
+    document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
+      const gcpProjectIdInput = document.getElementById('gcpProjectId');
+      const gcpProjectId = gcpProjectIdInput.value.trim();
+      const saveResultContainer = document.getElementById('gcp-save-result-container');
+      const saveResultText = document.getElementById('gcp-save-result');
+
+      saveResultContainer.style.display = 'block';
+      saveResultText.textContent = 'Saving...';
+
+      if (!gcpProjectId) {
+        saveResultText.textContent = 'Error: GCP Project ID cannot be empty.';
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          saveResultText.textContent = response.message;
+          if (response.status === 'success') {
+            saveGcpProjectIdToLocalStorage(gcpProjectId); // Save to localStorage on success
+          }
+        })
+        .withFailureHandler(function(error) {
+          saveResultText.textContent = 'Error saving GCP Project ID: ' + error.message;
+        })
+        .setGcpProjectId(gcpProjectId);
+    });
 
     document.getElementById('log-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -288,7 +341,7 @@
 
       const scriptId = document.getElementById('scriptId').value;
 
-      // --- New: Save scriptId to localStorage when getting logs ---
+      // --- Save scriptId to localStorage when getting logs ---
       saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
