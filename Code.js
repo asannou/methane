@@ -360,10 +360,20 @@ function deployScript(scriptId, description = '') {
 
     // 3. デプロイAPIのペイロードを正しく構築する
     const deploymentRequestBody = {
-      "versionNumber": versionNumber, // 作成したばかりのバージョン番号を指定
-      "description": description
-      // `entryPoints`はDeploymentConfigでは指定しません。
-      // ウェブアプリの設定は、このバージョンに紐づくappsscript.jsonから自動的に読み込まれます。
+      "deploymentConfig": { // deploymentConfigでラップする必要がある
+        "versionNumber": versionNumber,
+        "manifestFileName": "appsscript" // マニフェストファイル名は固定
+      },
+      "description": description,
+      "entryPoints": [ // ウェブアプリとしてデプロイするために必要
+        {
+          "entryPointType": "WEB_APP",
+          "webApp": {
+            "executeAs": webappConfig.executeAs,
+            "access": webappConfig.access
+          }
+        }
+      ]
     };
 
     const deployOptions = {
@@ -386,19 +396,17 @@ function deployScript(scriptId, description = '') {
     const deploymentResult = JSON.parse(responseBody);
     console.log("デプロイ成功:", deploymentResult);
 
-    // ログに報告されたTypeErrorを解決するため、デプロイ結果からWebアプリURLを安全に抽出するように修正
+    // デプロイ結果からWebアプリURLを安全に抽出するように修正
     let webappUrl;
-    try {
-      webappUrl = deploymentResult.entryPoints?.[0]?.webApp?.url;
-    } catch (e) {
-      // ログに報告されたTypeErrorを捕捉し、URLをundefinedとして扱う
-      console.warn("ウェブアプリURLの抽出中に予期せぬエラーが発生しました:", e);
-      webappUrl = undefined;
+    if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
+      const entryPoint = deploymentResult.entryPoints[0];
+      if (entryPoint.webApp && typeof entryPoint.webApp === 'object' && entryPoint.webApp.url) {
+        webappUrl = entryPoint.webApp.url;
+      }
     }
 
     if (!webappUrl) {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした:", deploymentResult);
-      // エラーとしてではなく、URLがないことをユーザーに伝える形にする
       return {
         status: 'success',
         message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。',
