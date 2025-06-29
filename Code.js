@@ -330,14 +330,12 @@ function deployScript(scriptId, description = '') {
     }
     const appsscriptConfig = JSON.parse(appsscriptJsonFile.source);
     
-    const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
+    // webapp設定はAPI呼び出しのpayloadに直接含めるべきではないため、この行とそれに関連する"webapp"フィールドを削除
+    // const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
 
     const requestBody = {
-      "description": description,
-      "webapp": {
-        "executeAs": webappSettings.executeAs,
-        "access": webappSettings.access
-      }
+      "description": description
+      // "webapp"フィールドはここには不要
     };
 
     const options = {
@@ -407,7 +405,9 @@ function fixErrorsFromLogs(targetScriptId) {
     // 3. AIに渡すプロンプトを生成
     let aiPrompt = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
     aiPrompt += `修正は、エラーを解消し、既存の機能性を損なわないように、可能な限り最小限にしてください。\n\n`;
-    aiPrompt += `## エラーログ\n\`\`\`\n${logs}\n\`\`\`\n\n`;
+    aiPrompt += `## エラーログ\n
+${logs}\n
+`;
     aiPrompt += `## あなたのタスク\n上記のログと既存のファイルに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
     aiPrompt += `提案は必ずJSON形式で、修正が必要なファイルのみを含めてください。\n`;
     aiPrompt += `ファイル名、タイプ、ソースを正確に指定してください。`;
