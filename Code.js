@@ -361,16 +361,9 @@ function deployScript(scriptId, description = '') {
     // 3. デプロイAPIのペイロードを正しく構築する
     const deploymentRequestBody = {
       "versionNumber": versionNumber, // 作成したばかりのバージョン番号を指定
-      "description": description,
-      "entryPoints": [
-        {
-          "entryPointType": "WEB_APP",
-          "webApp": {
-            "executeAs": webappConfig.executeAs,
-            "access": webappConfig.access
-          }
-        }
-      ]
+      "description": description
+      // `entryPoints`はDeploymentConfigでは指定しません。
+      // ウェブアプリの設定は、このバージョンに紐づくappsscript.jsonから自動的に読み込まれます。
     };
 
     const deployOptions = {
