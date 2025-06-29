@@ -73,13 +73,18 @@ function callGenerativeAI(userPrompt, projectContent) {
   return JSON.parse(generatedText);
 }
 
-
+/**
+ * AIによるスクリプト変更の提案を生成し、フロントエンドに返します。
+ * 実際の変更は行いません。
+ * @param {object} formObject - フォームデータ { scriptId: string, prompt: string }
+ * @returns {object} - AIが提案した変更、元のファイル、スクリプトIDを含むオブジェクト
+ */
 function processPrompt(formObject) {
   const scriptId = formObject.scriptId;
   const prompt = formObject.prompt;
 
   if (!API_KEY) {
-    return "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。";
+    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
   }
 
   try {
@@ -88,59 +93,85 @@ function processPrompt(formObject) {
 
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
-    if (getResponse.getResponseCode() !== 200) throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+    if (getResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+    }
     const projectContent = JSON.parse(getResponse.getContentText());
 
     // AIを呼び出す
     const aiResponse = callGenerativeAI(prompt, projectContent);
 
-    // AI応答の処理をtry-catchで囲み、不正なJSON/構造に対応
-    try {
-      // AI応答が期待される形式であるか最低限チェック
-      if (!aiResponse || !Array.isArray(aiResponse.files)) {
-        // console.log("AI応答の形式が不正です: ", aiResponse);
-        throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
-      }
-
-      // ファイルの更新または追加
-      aiResponse.files.forEach(updatedFile => {
-        // AI応答に含まれる各ファイルオブジェクトの最低限の構造チェック
-        if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
-             console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", updatedFile);
-             return; // この不正なファイルオブジェクトはスキップ
-        }
-
-        const targetFile = projectContent.files.find(file => file.name === updatedFile.name);
-        if (targetFile) {
-          // 既存ファイルのソースを更新 (タイプは維持)
-          targetFile.source = updatedFile.source;
-          // AIが既存ファイル名を維持するように指示されているため、type変更は想定しない
-        } else {
-          // AIが既存にないファイル名を返した場合（指示には反するが、エラーとして扱う）
-          // 既存ファイル名の使用を指示しているため、ここに到達しないことを期待する。
-          // 万一ここに到達した場合はエラーとする。
-          throw new Error(`AIが既存にないファイル名 '${updatedFile.name}' を返しました。既存ファイルのみ更新可能です。`);
-        }
-      });
-
-      // スクリプト内容を更新
-      const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
-      const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
-      if (putResponse.getResponseCode() !== 200) throw new Error(`スクリプトの更新に失敗: ${putResponse.getContentText()}`);
-
-      return `スクリプト (ID: ${scriptId}) の更新に成功しました。AIの提案に基づき、ファイルを更新しました。`;
-
-    } catch (aiProcessingError) {
-      // AI応答のパースエラー（callGenerativeAIからのスロー）、
-      // aiResponseオブジェクトの構造不正、ファイル処理中のエラーなどを捕捉
-      console.error("AI応答の処理エラー:", aiProcessingError);
-      return `Error processing AI response: ${aiProcessingError.message}`; // UIにAI関連のエラーとして表示
+    // AI応答の形式を最低限チェック
+    if (!aiResponse || !Array.isArray(aiResponse.files)) {
+      throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
     }
 
-  } catch (generalError) {
-    // API呼び出し、スクリプトサービス連携、その他の予期しないエラーを捕捉
-    console.error("General processing error:", generalError);
-    return `Error: ${generalError.message}`; // UIに一般的なエラーとして表示
+    // 元のファイルとAIが提案したファイルをフロントエンドに返す
+    return {
+      status: 'proposal',
+      scriptId: scriptId,
+      originalFiles: projectContent.files,
+      proposedFiles: aiResponse.files,
+      message: "AIからの提案が生成されました。内容を確認し、適用してください。"
+    };
+
+  } catch (error) {
+    console.error("AI提案生成中にエラーが発生しました:", error);
+    return { status: 'error', message: `AI提案生成エラー: ${error.message}` };
+  }
+}
+
+/**
+ * ユーザーが承認したAIの提案に基づいてスクリプトファイルを更新します。
+ * @param {string} scriptId - 更新対象のスクリプトID
+ * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列
+ * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
+ */
+function applyProposedChanges(scriptId, proposedFiles) {
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+
+    // 既存のスクリプト内容を再度取得（念のため最新の状態を反映）
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    if (getResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプト内容の再取得に失敗: ${getResponse.getContentText()}`);
+    }
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    // AIの提案に基づいてprojectContentを更新
+    proposedFiles.forEach(updatedFile => {
+      // AI応答に含まれる各ファイルオブジェクトの最低限の構造チェック
+      if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
+           console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", updatedFile);
+           return; // この不正なファイルオブジェクトはスキップ
+      }
+
+      const targetFile = projectContent.files.find(file => file.name === updatedFile.name);
+      if (targetFile) {
+        // 既存ファイルのソースを更新 (タイプは維持)
+        targetFile.source = updatedFile.source;
+        // AIが既存ファイル名を維持するように指示されているため、type変更は想定しない
+      } else {
+        // 新規ファイルは追加しない方針なのでエラーとする
+        // 指示に「既存ファイルのみ更新可能」とあるため
+        throw new Error(`AIが既存にないファイル名 '${updatedFile.name}' を返しました。既存ファイルのみ更新可能です。`);
+      }
+    });
+
+    // スクリプト内容を更新
+    const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
+    const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
+    if (putResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプトの更新に失敗: ${putResponse.getContentText()}`);
+    }
+
+    return { status: 'success', message: `スクリプト (ID: ${scriptId}) の更新に成功しました。AIの提案が適用されました。` };
+
+  } catch (error) {
+    console.error("スクリプト適用中にエラーが発生しました:", error);
+    return { status: 'error', message: `スクリプト適用エラー: ${error.message}` };
   }
 }
 
@@ -185,7 +216,7 @@ function getScriptLogs(targetScriptId) {
       "resourceNames": [
         `projects/${gcpProjectId}`
       ],
-      "filter": `resource.type="app_script_function" AND labels.script.googleapis.com/script_id="${targetScriptId}"`,
+      "filter": `resource.type="app_script_function" AND labels.script.googleapis.com/script_id="${targetScriptId}" `,
       "orderBy": "timestamp desc",
       "pageSize": 50
     };
@@ -209,7 +240,7 @@ function getScriptLogs(targetScriptId) {
 
     const logsData = JSON.parse(responseBody);
     if (!logsData.entries || logsData.entries.length === 0) {
-      return "指定されたスクリプトIDのログがこのプロジェクトでは見つかりませんでした。";
+      return "指定されたスクリプトIDのログがこのプロジェクトでは見つかりませんでした。\n";
     }
 
     let formattedLogs = "--- 最新のログ ---\n";

@@ -6,7 +6,7 @@
   body { font-family: sans-serif; margin: 20px; }
   input, textarea, button { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
   textarea { height: 150px; }
-  pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+  pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; } /* Added overflow-x */
 
   /* Spinner styles */
   .spinner {
@@ -23,6 +23,28 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+
+  /* Layout for diff-like display */
+  .file-comparison {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background-color: #f9f9f9;
+  }
+  .file-comparison div {
+    flex: 1;
+    margin: 0 5px;
+  }
+  .file-comparison h4 {
+    margin-top: 0;
+  }
+  .file-comparison pre {
+    height: 200px; /* Fixed height for scrollable pre */
+    overflow-y: scroll;
+    border: 1px solid #ccc;
+  }
 </style>
 </head>
 <body>
@@ -32,15 +54,25 @@
     <input type="text" id="scriptId" name="scriptId" required>
     <label for="prompt">Prompt:</label>
     <textarea id="prompt" name="prompt" required></textarea>
-    <button type="submit">Execute</button>
+    <button type="submit" id="proposeChangesButton">Propose Changes</button>
   </form>
 
-  <!-- Loading spinner -->
+  <!-- Loading spinner for proposal -->
   <div id="loading-spinner" class="spinner" style="display:none;"></div>
 
-  <div id="result-container" style="display:none;">
-    <h2>Result:</h2>
-    <pre id="result"></pre>
+  <!-- Proposal Review Section -->
+  <div id="proposal-container" style="display:none;">
+    <h2>AI Proposed Changes:</h2>
+    <p>以下の変更がAIから提案されました。内容を確認し、問題なければ「Apply Changes」ボタンをクリックして適用してください。</p>
+    <div id="proposed-files-display">
+      <!-- File comparisons will be inserted here by JavaScript -->
+    </div>
+    <button type="button" id="applyChangesButton" style="display:none;">Apply Changes</button>
+    <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
+    <div id="apply-result-container" style="display:none;">
+      <h3>Apply Result:</h3>
+      <pre id="apply-result"></pre>
+    </div>
   </div>
 
   <hr>
@@ -60,14 +92,77 @@
   </div>
 
   <script>
+    let currentProposal = null; // Store the AI's proposal globally for applyChanges
+
+    // Function to display file comparison
+    function displayFileComparison(originalFiles, proposedFiles) {
+      const displayArea = document.getElementById('proposed-files-display');
+      displayArea.innerHTML = ''; // Clear previous content
+
+      if (!originalFiles || !proposedFiles) {
+        displayArea.innerHTML = '<p>No files to compare or invalid proposal data.</p>';
+        return;
+      }
+
+      // Filter to only include files that are proposed by AI. 
+      // If AI proposes a file with identical content, it will still be shown.
+      proposedFiles.forEach(proposedFile => {
+        const name = proposedFile.name;
+        const originalFile = originalFiles.find(f => f.name === name);
+
+        const fileComparisonDiv = document.createElement('div');
+        fileComparisonDiv.className = 'file-comparison';
+
+        const originalContentDiv = document.createElement('div');
+        // The backend `applyProposedChanges` explicitly disallows new files (throws error if original not found)
+        // So, this 'No original file' case should ideally not happen if AI follows instructions, 
+        // but is handled gracefully in UI just in case.
+        originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(originalFile ? originalFile.type : proposedFile.type)} (Original)</h4><pre>${originalFile ? escapeHtml(originalFile.source) : '<em>(No original file, proposed as new)</em>'}</pre>`;
+        
+        const proposedContentDiv = document.createElement('div');
+        proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(proposedFile.type)} (Proposed)</h4><pre>${escapeHtml(proposedFile.source)}</pre>`;
+        
+        fileComparisonDiv.appendChild(originalContentDiv);
+        fileComparisonDiv.appendChild(proposedContentDiv);
+        displayArea.appendChild(fileComparisonDiv);
+      });
+
+      if (displayArea.innerHTML === '') {
+          displayArea.innerHTML = '<p>AI did not propose any changes to existing files.</p>';
+      }
+    }
+
+    function getFileExtension(type) {
+      switch (type) {
+        case 'SERVER_JS': return 'gs';
+        case 'JSON': return 'json';
+        case 'HTML': return 'html';
+        default: return 'txt';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.appendChild(document.createTextNode(text));
+      return div.innerHTML;
+    }
+
+    // Event Listener for Propose Changes (original submit)
     document.getElementById('agent-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const form = this;
-      const submitButton = form.querySelector('button');
-      const spinner = document.getElementById('loading-spinner'); // Get spinner element
+      const proposeButton = document.getElementById('proposeChangesButton');
+      const spinner = document.getElementById('loading-spinner');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
 
-      submitButton.disabled = true; // Disable button
-      spinner.style.display = 'block'; // Show spinner
+      proposeButton.disabled = true;
+      spinner.style.display = 'block';
+      proposalContainer.style.display = 'none'; // Hide previous proposal
+      applyButton.style.display = 'none'; // Hide apply button
+      applyResultContainer.style.display = 'none'; // Hide apply result
+      document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
 
       const formData = {
         scriptId: document.getElementById('scriptId').value,
@@ -76,19 +171,70 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          document.getElementById('result').textContent = response;
-          document.getElementById('result-container').style.display = 'block';
-          submitButton.disabled = false; // Re-enable button
-          spinner.style.display = 'none'; // Hide spinner
+          spinner.style.display = 'none';
+          proposeButton.disabled = false;
+
+          if (response.status === 'proposal') {
+            currentProposal = response; // Store the proposal
+            displayFileComparison(response.originalFiles, response.proposedFiles);
+            proposalContainer.style.display = 'block';
+            applyButton.style.display = 'block'; // Show apply button
+            document.getElementById('apply-result').textContent = response.message; // Display initial message
+            applyResultContainer.style.display = 'block';
+          } else if (response.status === 'error') {
+            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+          } else {
+            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+          }
         })
         .withFailureHandler(function(error) {
-          document.getElementById('result').textContent = 'Error: ' + error.message;
-          document.getElementById('result-container').style.display = 'block';
-          submitButton.disabled = false; // Re-enable button
-          spinner.style.display = 'none'; // Hide spinner
+          spinner.style.display = 'none';
+          proposeButton.disabled = false;
+          document.getElementById('apply-result').textContent = 'Error calling AI: ' + error.message;
+          document.getElementById('apply-result-container').style.display = 'block';
+          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
         })
         .processPrompt(formData);
     });
+
+    // Event Listener for Apply Changes
+    document.getElementById('applyChangesButton').addEventListener('click', function() {
+      if (!currentProposal) {
+        document.getElementById('apply-result').textContent = 'Error: No proposal to apply.';
+        document.getElementById('apply-result-container').style.display = 'block';
+        return;
+      }
+
+      const applyButton = this;
+      const applySpinner = document.getElementById('apply-loading-spinner');
+      const applyResultText = document.getElementById('apply-result');
+
+      applyButton.disabled = true;
+      applySpinner.style.display = 'block';
+      applyResultText.textContent = 'Applying changes...'; // Clear previous message
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          applySpinner.style.display = 'none';
+          applyButton.disabled = false;
+          applyResultText.textContent = response.message;
+          // Clear proposal and hide apply button after successful application
+          currentProposal = null;
+          document.getElementById('applyChangesButton').style.display = 'none';
+          document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
+        })
+        .withFailureHandler(function(error) {
+          applySpinner.style.display = 'none';
+          applyButton.disabled = false;
+          applyResultText.textContent = 'Error applying changes: ' + error.message;
+        })
+        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles);
+    });
+
 
     document.getElementById('log-form').addEventListener('submit', function(e) {
       e.preventDefault();
