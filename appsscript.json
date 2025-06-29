@@ -5,7 +5,8 @@
   "runtimeVersion": "V8",
   "oauthScopes": [
     "https://www.googleapis.com/auth/script.projects",
-    "https://www.googleapis.com/auth/script.external_request"
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/logging.read"
   ],
   "webapp": {
     "executeAs": "USER_DEPLOYING",

@@ -43,6 +43,22 @@
     <pre id="result"></pre>
   </div>
 
+  <hr>
+
+  <h2>Get Script Logs</h2>
+  <form id="log-form">
+    <label for="logScriptId">Target Script ID for Logs:</label>
+    <input type="text" id="logScriptId" name="logScriptId" required>
+    <button type="submit" id="getLogsButton">Get Logs</button>
+  </form>
+
+  <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
+
+  <div id="log-result-container" style="display:none;">
+    <h3>Logs:</h3>
+    <pre id="log-result"></pre>
+  </div>
+
   <script>
     document.getElementById('agent-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -72,6 +88,33 @@
           spinner.style.display = 'none'; // Hide spinner
         })
         .processPrompt(formData);
+    });
+
+    document.getElementById('log-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const submitButton = form.querySelector('#getLogsButton');
+      const spinner = document.getElementById('log-loading-spinner');
+
+      submitButton.disabled = true;
+      spinner.style.display = 'block';
+
+      const scriptId = document.getElementById('logScriptId').value;
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          document.getElementById('log-result').textContent = response;
+          document.getElementById('log-result-container').style.display = 'block';
+          submitButton.disabled = false;
+          spinner.style.display = 'none';
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('log-result').textContent = 'Error: ' + error.message;
+          document.getElementById('log-result-container').style.display = 'block';
+          submitButton.disabled = false;
+          spinner.style.display = 'none';
+        })
+        .getScriptLogs(scriptId);
     });
   </script>
 </body>

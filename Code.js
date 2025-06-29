@@ -143,3 +143,87 @@ function processPrompt(formObject) {
     return `Error: ${generalError.message}`; // UIに一般的なエラーとして表示
   }
 }
+
+/**
+ * 指定されたApps ScriptのログをCloud Loggingから取得する関数
+ * @param {string} targetScriptId - ログを取得するApps ScriptのID
+ * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
+ */
+function getScriptLogs(targetScriptId) {
+  const accessToken = ScriptApp.getOAuthToken();
+  const currentScriptId = ScriptApp.getScriptId();
+
+  try {
+    // 1. 現在のスクリプトのGCPプロジェクトIDを取得
+    // 'https://script.googleapis.com/v1/projects/{scriptId}' エンドポイントから、
+    // レスポンスの 'name' フィールド（例: 'projects/your-gcp-project-id/scripts/your-script-id'）をパース
+    const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
+    const metadataOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const metadataResponse = UrlFetchApp.fetch(currentScriptMetadataUrl, metadataOptions);
+    
+    if (metadataResponse.getResponseCode() !== 200) {
+      throw new Error(`現在のスクリプトのメタデータ取得に失敗: ${metadataResponse.getContentText()}`);
+    }
+    const metadata = JSON.parse(metadataResponse.getContentText());
+    const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
+    if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
+      throw new Error("現在のスクリプトのGCPプロジェクトIDを特定できませんでした。");
+    }
+    const gcpProjectId = gcpProjectIdMatch[1];
+    console.log("現在のGCPプロジェクトID:", gcpProjectId);
+
+    // 2. Cloud Logging APIリクエストを構築
+    const loggingApiUrl = 'https://logging.googleapis.com/v2/entries:list';
+    const requestBody = {
+      "resourceNames": [
+        `projects/${gcpProjectId}`
+      ],
+      "filter": `resource.type="app_script_function" AND labels.script.googleapis.com/script_id="${targetScriptId}"`, // Apps Scriptログに特化したフィルタ
+      "orderBy": "timestamp desc",
+      "pageSize": 50 // 最近の50件のログを取得
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(requestBody),
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      muteHttpExceptions: true
+    };
+
+    console.log(`スクリプトID ${targetScriptId} のログを取得中...`);
+    const response = UrlFetchApp.fetch(loggingApiUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode !== 200) {
+      throw new Error(`Cloud Logging APIエラー (ステータス: ${responseCode}): ${responseBody}`);
+    }
+
+    const logsData = JSON.parse(responseBody);
+    if (!logsData.entries || logsData.entries.length === 0) {
+      return "指定されたスクリプトIDのログがこのプロジェクトでは見つかりませんでした。";
+    }
+
+    let formattedLogs = "--- 最新のログ ---\n";
+    logsData.entries.forEach(entry => {
+      const timestamp = new Date(entry.timestamp).toLocaleString();
+      let logPayload = '';
+      if (entry.textPayload) {
+        logPayload = entry.textPayload;
+      } else if (entry.jsonPayload) {
+        logPayload = JSON.stringify(entry.jsonPayload, null, 2);
+      } else if (entry.protoPayload) {
+        // protoPayloadは複雑な場合があるため、JSON文字列化を試みる
+        logPayload = JSON.stringify(entry.protoPayload, null, 2);
+      }
+      formattedLogs += `[${timestamp}] ${entry.severity || 'INFO'}: ${logPayload}\n`;
+    });
+
+    return formattedLogs;
+
+  } catch (e) {
+    console.error("ログ取得中にエラーが発生しました:", e);
+    return `ログ取得エラー: ${e.message}`;
+  }
+}
