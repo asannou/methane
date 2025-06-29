@@ -241,15 +241,46 @@
 
         const originalContentDiv = document.createElement('div');
         const originalCodeFormatted = originalFile ? formatCodeWithLineNumbers(originalFile.source) : { lineNumbersHtml: '<em></em>', codeContentHtml: '<em>(No original file, proposed as new)</em>' };
-        originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(originalFile ? originalFile.type : proposedFile.type)} (Original)</h4>\n          <pre>\n            <div class="line-numbers-col">${originalCodeFormatted.lineNumbersHtml}</div>\n            <div class="code-content-col">${originalCodeFormatted.codeContentHtml}</div>\n          </pre>`;
+        originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(originalFile ? originalFile.type : proposedFile.type)} (Original)</h4><pre class="scroll-sync-target">
+            <div class="line-numbers-col">${originalCodeFormatted.lineNumbersHtml}</div>
+            <div class="code-content-col">${originalCodeFormatted.codeContentHtml}</div>
+          </pre>`;
         
         const proposedContentDiv = document.createElement('div');
         const proposedCodeFormatted = formatCodeWithLineNumbers(proposedFile.source);
-        proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(proposedFile.type)} (Proposed)</h4>\n          <pre>\n            <div class="line-numbers-col">${proposedCodeFormatted.lineNumbersHtml}</div>\n            <div class="code-content-col">${proposedCodeFormatted.codeContentHtml}</div>\n          </pre>`;
+        proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(proposedFile.type)} (Proposed)</h4><pre class="scroll-sync-target">
+            <div class="line-numbers-col">${proposedCodeFormatted.lineNumbersHtml}</div>
+            <div class="code-content-col">${proposedCodeFormatted.codeContentHtml}</div>
+          </pre>`;
         
         fileComparisonDiv.appendChild(originalContentDiv);
         fileComparisonDiv.appendChild(proposedContentDiv);
         displayArea.appendChild(fileComparisonDiv);
+
+        // Get the two <pre> elements within this specific comparison block for scroll synchronization
+        const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
+        if (preElements.length === 2) {
+            const pre1 = preElements[0];
+            const pre2 = preElements[1];
+
+            let isSyncing = false; // Flag to prevent infinite recursion between scroll events
+
+            pre1.addEventListener('scroll', function() {
+                if (!isSyncing) {
+                    isSyncing = true;
+                    pre2.scrollTop = pre1.scrollTop;
+                    isSyncing = false;
+                }
+            });
+
+            pre2.addEventListener('scroll', function() {
+                if (!isSyncing) {
+                    isSyncing = true;
+                    pre1.scrollTop = pre2.scrollTop;
+                    isSyncing = false;
+                }
+            });
+        }
       });
 
       if (displayArea.innerHTML === '') {
