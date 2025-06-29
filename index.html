@@ -90,6 +90,24 @@
     <pre id="log-result"></pre>
   </div>
 
+  <hr>
+
+  <h2>Deploy Script</h2>
+  <form id="deploy-form">
+    <p>Using the Script ID entered above.</p>
+    <label for="deploymentDescription">Deployment Description (Optional):</label>
+    <input type="text" id="deploymentDescription" name="deploymentDescription">
+    <p>This will deploy the current HEAD version as a new Web App deployment, using the Web App settings defined in <code>appsscript.json</code>.</p>
+    <button type="submit" id="deployButton">Create New Web App Deployment</button>
+  </form>
+
+  <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
+
+  <div id="deploy-result-container" style="display:none;">
+    <h3>Deployment Result:</h3>
+    <pre id="deploy-result"></pre>
+  </div>
+
   <script>
     let currentProposal = null; // Store the AI's proposal globally for applyChanges
 
@@ -285,6 +303,46 @@
           spinner.style.display = 'none';
         })
         .getScriptLogs(scriptId);
+    });
+
+    // Event Listener for Deploy Script
+    document.getElementById('deploy-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const submitButton = form.querySelector('#deployButton');
+      const spinner = document.getElementById('deploy-loading-spinner');
+      const resultContainer = document.getElementById('deploy-result-container');
+      const resultText = document.getElementById('deploy-result');
+
+      submitButton.disabled = true;
+      spinner.style.display = 'block';
+      resultContainer.style.display = 'none';
+      resultText.textContent = '';
+
+      const scriptId = document.getElementById('scriptId').value;
+      const description = document.getElementById('deploymentDescription').value;
+
+      // Save scriptId to localStorage when deploying
+      saveScriptIdToLocalStorage(scriptId);
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          spinner.style.display = 'none';
+          submitButton.disabled = false;
+          resultContainer.style.display = 'block';
+          if (response.status === 'success') {
+            resultText.textContent = `${response.message}\nDeployment ID: ${response.deploymentId}\nWeb App URL: ${response.webappUrl}`;
+          } else {
+            resultText.textContent = `Error: ${response.message}`;
+          }
+        })
+        .withFailureHandler(function(error) {
+          spinner.style.display = 'none';
+          submitButton.disabled = false;
+          resultContainer.style.display = 'block';
+          resultText.textContent = `Error deploying script: ${error.message}`;
+        })
+        .deployScript(scriptId, description);
     });
   </script>
 </body>

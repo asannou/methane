@@ -265,3 +265,77 @@ function getScriptLogs(targetScriptId) {
     return `ログ取得エラー: ${e.message}`;
   }
 }
+
+/**
+ * スクリプトを新しいウェブアプリとしてデプロイします。
+ * HEADバージョンを使用し、appsscript.jsonに定義された設定を適用します。
+ * @param {string} scriptId - デプロイするスクリプトのID
+ * @param {string} description - デプロイの説明（オプション）
+ * @returns {object} - デプロイ結果（成功/失敗、デプロイID、URL）
+ */
+function deployScript(scriptId, description = '') {
+  const accessToken = ScriptApp.getOAuthToken();
+  const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
+
+  try {
+    // appsscript.json から webapp 設定を取得
+    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    if (getResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプト内容の取得に失敗 (appsscript.json): ${getResponse.getContentText()}`);
+    }
+    const projectContent = JSON.parse(getResponse.getContentText());
+    const appsscriptJsonFile = projectContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
+    if (!appsscriptJsonFile) {
+        throw new Error("appsscript.json が見つかりません。デプロイ設定を読み込めません。");
+    }
+    const appsscriptConfig = JSON.parse(appsscriptJsonFile.source);
+    
+    // Default webapp settings from appsscript.json
+    const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
+
+    const requestBody = {
+      "deploymentConfig": {
+        "description": description,
+        "manifestFilename": "appsscript", // Apps Script projects always use appsscript.json
+        "webapp": {
+          "executeAs": webappSettings.executeAs,
+          "access": webappSettings.access
+        }
+        // versionNumberを省略するとHEADがデプロイされる
+      }
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(requestBody),
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      muteHttpExceptions: true
+    };
+
+    console.log(`スクリプトID ${scriptId} をデプロイ中...`);
+    const response = UrlFetchApp.fetch(deploymentsApiUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode !== 200) {
+      throw new Error(`デプロイAPIエラー (ステータス: ${responseCode}): ${responseBody}`);
+    }
+
+    const deploymentResult = JSON.parse(responseBody);
+    console.log("デプロイ成功:", deploymentResult);
+
+    return {
+      status: 'success',
+      message: 'デプロイが正常に完了しました。',
+      deploymentId: deploymentResult.deploymentId,
+      webappUrl: deploymentResult.webapp.url // This URL is provided for web app deployments
+    };
+
+  } catch (e) {
+    console.error("デプロイ中にエラーが発生しました:", e);
+    return { status: 'error', message: `デプロイエラー: ${e.message}` };
+  }
+}
