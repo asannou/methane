@@ -6,7 +6,18 @@
   body { font-family: sans-serif; margin: 20px; }
   input, textarea, button { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
   textarea { height: 150px; }
-  pre { background-color: #f4f4f4; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; } /* Added overflow-x */
+  /* Updated pre styles for better code display */
+  pre {
+    background-color: #f4f4f4;
+    padding: 10px;
+    border-radius: 4px;
+    white-space: pre-wrap; /* Allows wrapping for long lines */
+    word-wrap: break-word;
+    overflow-x: auto;
+    font-family: monospace; /* Ensure monospaced font for code */
+    font-size: 0.9em; /* Slightly smaller font for dense code */
+    line-height: 1.4; /* Better line spacing */
+  }
 
   /* Spinner styles */
   .spinner {
@@ -41,10 +52,39 @@
     margin-top: 0;
   }
   .file-comparison pre {
-    height: 200px; /* Fixed height for scrollable pre */
+    height: 250px; /* Increased height for more lines */
     overflow-y: scroll;
     border: 1px solid #ccc;
+    padding: 0; /* Remove padding from pre itself as content will have it */
+    display: flex; /* Use flexbox for line numbers */
   }
+
+  /* Styles for line numbers */
+  .line-numbers-col {
+    background-color: #eee;
+    color: #888;
+    padding: 10px 5px;
+    text-align: right;
+    user-select: none;
+    flex-shrink: 0;
+    width: 30px; /* Adjusted width for line numbers */
+    border-right: 1px solid #ddd;
+    font-family: monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+  }
+  .code-content-col {
+    padding: 10px;
+    flex-grow: 1;
+    font-family: monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+  }
+
+  /* Specific diff line highlighting (basic, for future potential) */
+  /* .diff-line-added { background-color: #e6ffe6; } */
+  /* .diff-line-removed { background-color: #ffe6e6; } */
+
 </style>
 </head>
 <body>
@@ -165,6 +205,19 @@
         }
     }
 
+    // NEW: Function to format code with line numbers
+    function formatCodeWithLineNumbers(code) {
+      if (!code) return { lineNumbersHtml: '', codeContentHtml: '' };
+      const lines = code.split('\n');
+      let lineNumbersHtml = '';
+      let codeContentHtml = '';
+      lines.forEach((line, index) => {
+        lineNumbersHtml += `<div>${index + 1}</div>`;
+        codeContentHtml += `<div>${escapeHtml(line) || '&nbsp;'}</div>`; // Use &nbsp; for empty lines to maintain height
+      });
+      return { lineNumbersHtml, codeContentHtml };
+    }
+
     // Function to display file comparison
     function displayFileComparison(originalFiles, proposedFiles) {
       const displayArea = document.getElementById('proposed-files-display');
@@ -185,13 +238,12 @@
         fileComparisonDiv.className = 'file-comparison';
 
         const originalContentDiv = document.createElement('div');
-        // The backend `applyProposedChanges` explicitly disallows new files (throws error if original not found)
-        // So, this 'No original file' case should ideally not happen if AI follows instructions,
-        // but is handled gracefully in UI just in case.
-        originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(originalFile ? originalFile.type : proposedFile.type)} (Original)</h4><pre>${originalFile ? escapeHtml(originalFile.source) : '<em>(No original file, proposed as new)</em>'}</pre>`;
+        const originalCodeFormatted = originalFile ? formatCodeWithLineNumbers(originalFile.source) : { lineNumbersHtml: '<em></em>', codeContentHtml: '<em>(No original file, proposed as new)</em>' };
+        originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(originalFile ? originalFile.type : proposedFile.type)} (Original)</h4>\n          <pre>\n            <div class="line-numbers-col">${originalCodeFormatted.lineNumbersHtml}</div>\n            <div class="code-content-col">${originalCodeFormatted.codeContentHtml}</div>\n          </pre>`;
         
         const proposedContentDiv = document.createElement('div');
-        proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(proposedFile.type)} (Proposed)</h4><pre>${escapeHtml(proposedFile.source)}</pre>`;
+        const proposedCodeFormatted = formatCodeWithLineNumbers(proposedFile.source);
+        proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(proposedFile.type)} (Proposed)</h4>\n          <pre>\n            <div class="line-numbers-col">${proposedCodeFormatted.lineNumbersHtml}</div>\n            <div class="code-content-col">${proposedCodeFormatted.codeContentHtml}</div>\n          </pre>`;
         
         fileComparisonDiv.appendChild(originalContentDiv);
         fileComparisonDiv.appendChild(proposedContentDiv);
