@@ -543,13 +543,13 @@ function listAppsScriptProjects() {
     // Fetch files, limit to a reasonable number (e.g., 200)
     let response = Drive.Files.list({
       q: query,
-      fields: 'items(id,title)', // Requesting id and title fields
+      fields: 'files(id, name)', // Changed from 'items(id,title)' for Drive API v3
       maxResults: 200 // Limit the number of results to prevent excessive load
     });
 
-    const projects = (response.items || []).map(file => ({
+    const projects = (response.files || []).map(file => ({ // Changed from response.items to response.files
       id: file.id,       // For standalone scripts, file ID is the script ID. For bound scripts, this is the container ID.
-      title: file.title  // File title, typically the project name
+      title: file.name  // Changed from file.title to file.name for Drive API v3
     }));
 
     return { status: 'success', projects: projects };
