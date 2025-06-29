@@ -93,6 +93,22 @@
   <script>
     let currentProposal = null; // Store the AI's proposal globally for applyChanges
 
+    // --- New: Load scriptId from localStorage on page load ---
+    document.addEventListener('DOMContentLoaded', function() {
+      const scriptIdInput = document.getElementById('scriptId');
+      const savedScriptId = localStorage.getItem('targetScriptId');
+      if (savedScriptId) {
+        scriptIdInput.value = savedScriptId;
+      }
+    });
+
+    // --- New: Helper function to save scriptId to localStorage ---
+    function saveScriptIdToLocalStorage(id) {
+        if (id) {
+            localStorage.setItem('targetScriptId', id);
+        }
+    }
+
     // Function to display file comparison
     function displayFileComparison(originalFiles, proposedFiles) {
       const displayArea = document.getElementById('proposed-files-display');
@@ -168,6 +184,9 @@
         prompt: document.getElementById('prompt').value
       };
 
+      // --- New: Save scriptId to localStorage ---
+      saveScriptIdToLocalStorage(formData.scriptId);
+
       google.script.run
         .withSuccessHandler(function(response) {
           spinner.style.display = 'none';
@@ -208,6 +227,9 @@
         return;
       }
 
+      // --- New: Save scriptId to localStorage before applying changes ---
+      saveScriptIdToLocalStorage(currentProposal.scriptId);
+
       const applyButton = this;
       const applySpinner = document.getElementById('apply-loading-spinner');
       const applyResultText = document.getElementById('apply-result');
@@ -245,6 +267,9 @@
       spinner.style.display = 'block';
 
       const scriptId = document.getElementById('scriptId').value;
+
+      // --- New: Save scriptId to localStorage when getting logs ---
+      saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
         .withSuccessHandler(function(response) {
