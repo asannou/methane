@@ -165,7 +165,7 @@ function applyProposedChanges(scriptId, proposedFiles) {
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        throw new Error(`スクリプト内容の再取得に失敗: ${getResponse.getContentText()}`);
+        return { status: 'error', message: `スクリプト内容の再取得に失敗: ${getResponse.getContentText()}`, apiErrorDetails: JSON.parse(getResponse.getContentText() || '{}') };
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
@@ -179,6 +179,7 @@ function applyProposedChanges(scriptId, proposedFiles) {
       if (targetFile) {
         targetFile.source = updatedFile.source;
       } else {
+        // This is a critical error for the apply function, should be reported clearly
         throw new Error(`AIが既存にないファイル名 '${updatedFile.name}' を返しました。既存ファイルのみ更新可能です。`);
       }
     });
@@ -186,7 +187,12 @@ function applyProposedChanges(scriptId, proposedFiles) {
     const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
     if (putResponse.getResponseCode() !== 200) {
-        throw new Error(`スクリプトの更新に失敗: ${putResponse.getContentText()}`);
+        return { 
+            status: 'error', 
+            message: `スクリプトの更新に失敗しました。(HTTP ${putResponse.getResponseCode()})`, 
+            apiErrorDetails: JSON.parse(putResponse.getContentText() || '{}'),
+            fullErrorText: putResponse.getContentText() // Provide full text for debugging
+        };
     }
 
     return { status: 'success', message: `スクリプト (ID: ${scriptId}) の更新に成功しました。AIの提案が適用されました。` };

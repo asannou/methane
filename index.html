@@ -113,6 +113,8 @@
     <div id="apply-result-container" style="display:none;">
       <h3>Apply Result:</h3>
       <pre id="apply-result"></pre>
+      <!-- NEW BUTTON for fixing errors after apply failure -->
+      <button type="button" id="fixApplyErrorsButton" style="display:none;">Fix Apply Errors with AI</button>
     </div>
   </div>
 
@@ -279,12 +281,14 @@
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton'); // Get the new button
 
       proposeButton.disabled = true;
       spinner.style.display = 'block';
       proposalContainer.style.display = 'none'; // Hide previous proposal
       applyButton.style.display = 'none'; // Hide apply button
       applyResultContainer.style.display = 'none'; // Hide apply result
+      fixApplyErrorsButton.style.display = 'none'; // Hide fix button
       document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
 
       const formData = {
@@ -342,27 +346,106 @@
       const applyButton = this;
       const applySpinner = document.getElementById('apply-loading-spinner');
       const applyResultText = document.getElementById('apply-result');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton'); // Get the new button
 
       applyButton.disabled = true;
+      fixApplyErrorsButton.style.display = 'none'; // Hide it initially
       applySpinner.style.display = 'block';
       applyResultText.textContent = 'Applying changes...'; // Clear previous message
 
       google.script.run
-        .withSuccessHandler(function(response) {
+        .withSuccessHandler(function(response) { // This handler will now get both success and error objects
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
-          applyResultText.textContent = response.message;
-          // Clear proposal and hide apply button after successful application
-          currentProposal = null;
-          document.getElementById('applyChangesButton').style.display = 'none';
-          document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
+          
+          if (response.status === 'success') {
+            applyResultText.textContent = response.message;
+            currentProposal = null; // Clear proposal
+            document.getElementById('applyChangesButton').style.display = 'none';
+            document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
+            fixApplyErrorsButton.style.display = 'none'; // Ensure button is hidden on success
+          } else { // response.status === 'error'
+            let errorMessage = response.message;
+            if (response.fullErrorText) { // Display full API response if available
+                errorMessage += '\nAPI Response: ' + response.fullErrorText;
+            } else if (response.apiErrorDetails) {
+                errorMessage += '\nAPI Details: ' + JSON.stringify(response.apiErrorDetails, null, 2);
+            }
+            applyResultText.textContent = errorMessage;
+            fixApplyErrorsButton.style.display = 'block'; // Show the "Fix Apply Errors" button
+          }
         })
-        .withFailureHandler(function(error) {
+        .withFailureHandler(function(error) { // This catches uncaught exceptions from backend
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
-          applyResultText.textContent = 'Error applying changes: ' + error.message;
+          applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
+          fixApplyErrorsButton.style.display = 'block'; // Show the "Fix Apply Errors" button
         })
         .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles);
+    });
+
+    // NEW: Event Listener for Fix Apply Errors button
+    document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
+      const scriptId = document.getElementById('scriptId').value;
+      if (!scriptId) {
+        document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
+        document.getElementById('apply-result-container').style.display = 'block';
+        return;
+      }
+
+      // Re-use the existing fix errors logic
+      const fixButton = this; // The fixApplyErrorsButton itself
+      const spinner = document.getElementById('fix-loading-spinner'); // Re-use the existing fix spinner
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+      const proposeChangesButton = document.getElementById('proposeChangesButton'); // Also disable this temporarily
+
+      fixButton.disabled = true;
+      proposeChangesButton.disabled = true; // Disable other primary action button
+      spinner.style.display = 'block';
+      proposalContainer.style.display = 'none'; // Hide previous proposal
+      applyButton.style.display = 'none'; // Hide apply button
+      applyResultContainer.style.display = 'none'; // Hide apply result (temporarily, will be re-populated)
+      document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
+
+      // Save scriptId to localStorage
+      saveScriptIdToLocalStorage(scriptId);
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          spinner.style.display = 'none';
+          fixButton.disabled = false; // Enable this button (fixApplyErrorsButton)
+          proposeChangesButton.disabled = false; // Re-enable other primary action button
+
+          if (response.status === 'proposal') {
+            currentProposal = response; // Store the new proposal
+            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
+            displayFileComparison(response.originalFiles, response.proposedFiles);
+            proposalContainer.style.display = 'block';
+            applyButton.style.display = 'block'; // Show apply button for the new proposal
+            document.getElementById('apply-result').textContent = response.message; // Display initial message
+            applyResultContainer.style.display = 'block';
+            fixButton.style.display = 'none'; // Hide this button as a new proposal is ready
+          } else if (response.status === 'error') {
+            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+          } else {
+            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+          }
+        })
+        .withFailureHandler(function(error) {
+          spinner.style.display = 'none';
+          fixButton.disabled = false; // Enable this button (fixApplyErrorsButton)
+          proposeChangesButton.disabled = false; // Re-enable other primary action button
+          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
+          document.getElementById('apply-result-container').style.display = 'block';
+          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
+        })
+        .fixErrorsFromLogs(scriptId);
     });
 
     // NEW: Event Listener for Save GCP Project ID
@@ -432,12 +515,14 @@
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton'); // Also hide this
 
       fixButton.disabled = true;
       spinner.style.display = 'block';
       proposalContainer.style.display = 'none'; // Hide previous proposal
       applyButton.style.display = 'none'; // Hide apply button
       applyResultContainer.style.display = 'none'; // Hide apply result
+      fixApplyErrorsButton.style.display = 'none'; // Hide the specific apply error fix button
       document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
 
       const scriptId = document.getElementById('scriptId').value;
