@@ -79,8 +79,7 @@
 
   <h2>Get Script Logs</h2>
   <form id="log-form">
-    <label for="logScriptId">Target Script ID for Logs:</label>
-    <input type="text" id="logScriptId" name="logScriptId" required>
+    <p>Using the Script ID entered above.</p>
     <button type="submit" id="getLogsButton">Get Logs</button>
   </form>
 
@@ -245,7 +244,7 @@
       submitButton.disabled = true;
       spinner.style.display = 'block';
 
-      const scriptId = document.getElementById('logScriptId').value;
+      const scriptId = document.getElementById('scriptId').value;
 
       google.script.run
         .withSuccessHandler(function(response) {
