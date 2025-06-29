@@ -408,7 +408,7 @@ function deployScript(scriptId, description = '') {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
-    // --- 新しいロジック: 古いウェブアプリデプロイメントをアーカイブ（削除）する --- 
+    // --- 新しいロジック: 古いウェブアプリデプロイメントをアーカイブ（削除）する ---
     console.log("古いウェブアプリデプロイメントをアーカイブ中...");
     const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
     const listOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
@@ -438,7 +438,7 @@ function deployScript(scriptId, description = '') {
         }
       });
     }
-    // --- 新しいロジック終了 --- 
+    // --- 新しいロジック終了 ---
 
     if (!webappUrl) {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
@@ -556,10 +556,14 @@ function listAppsScriptProjects() {
 
   } catch (e) {
     console.error("ドライブAPIによるApps Scriptプロジェクトのリスト中にエラーが発生しました:", e);
-    // Provide a more specific error message if Drive API is not enabled or scopes are missing
-    if (e.message.includes("API call to drive.files.list failed with error")) {
-      return { status: 'error', message: `Apps Scriptプロジェクトの取得に失敗しました。Drive API (Advanced Service) がこのApps Scriptプロジェクトで有効になっているか、およびappsscript.jsonに適切なOAuthスコープ (https://www.googleapis.com/auth/drive.readonly) が設定されているか確認してください。エラー: ${e.message}` };
+    let userMessage = `Apps Scriptプロジェクトのリストエラー: ${e.message}`;
+
+    if (e.name === 'ReferenceError' && e.message.includes("Drive is not defined")) {
+      userMessage = `Apps Scriptプロジェクトの取得に失敗しました。Drive API (Advanced Service) がこのApps Scriptプロジェクトで有効になっていない可能性があります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）>「Advanced Google Services」から「Drive API」を有効にし、このプロジェクトに関連付けられているか確認してください。また、appsscript.jsonに適切なOAuthスコープ (https://www.googleapis.com/auth/drive.readonly) が設定されていることを確認してください。`;
+    } else if (e.message.includes("API call to drive.files.list failed with error")) {
+      // This is for cases where Drive is defined but the API call itself failed (e.g., permission issue)
+      userMessage = `Apps Scriptプロジェクトの取得に失敗しました。Drive API (Advanced Service) がこのApps Scriptプロジェクトで有効になっているか、およびappsscript.jsonに適切なOAuthスコープ (https://www.googleapis.com/auth/drive.readonly) が設定されているか確認してください。エラー: ${e.message}`;
     }
-    return { status: 'error', message: `Apps Scriptプロジェクトのリストエラー: ${e.message}` };
+    return { status: 'error', message: userMessage };
   }
 }
