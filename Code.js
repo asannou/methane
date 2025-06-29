@@ -511,6 +511,15 @@ function listAppsScriptProjects() {
 
     if (responseCode !== 200) {
       console.error(`Apps Script Projects API Error (Status: ${responseCode}): ${responseBody}`);
+      
+      // NEW: Specific handling for 404 Not Found error with the given body content
+      if (responseCode === 404 && responseBody.includes("404. That’s an error.") && responseBody.includes("The requested URL /v1/projects was not found on this server.")) {
+          return { 
+              status: 'error', 
+              message: "Apps Scriptプロジェクトの取得に失敗しました。考えられる原因として、Google CloudプロジェクトでApps Script APIが有効になっていないか、APIキーの権限が不足している可能性があります。Google Cloud Console (console.cloud.google.com) にて、対象のプロジェクトで「Google Apps Script API」を検索し、有効化されていることを確認してください。また、適切なOAuthスコープが設定されているか確認してください。" 
+          };
+      }
+      
       return { status: 'error', message: `Apps Scriptプロジェクトの取得に失敗しました: ${responseBody}` };
     }
 
