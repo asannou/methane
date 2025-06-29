@@ -301,15 +301,17 @@ function deployScript(scriptId, description = '') {
     const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
 
     const requestBody = {
-      "deploymentConfig": {
-        "description": description,
-        "manifestFilename": "appsscript", // Apps Script projects always use appsscript.json
-        "webapp": {
-          "executeAs": webappSettings.executeAs,
-          "access": webappSettings.access
+      "description": description,
+      "entryPoints": [
+        {
+          "entryPointType": "WEB_APP",
+          "webapp": {
+            "executeAs": webappSettings.executeAs,
+            "access": webappSettings.access
+          }
         }
-        // versionNumberを省略するとHEADがデプロイされる
-      }
+      ]
+      // versionNumberを省略するとHEADがデプロイされる
     };
 
     const options = {
