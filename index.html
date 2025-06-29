@@ -337,29 +337,18 @@
       const displayArea = document.getElementById('proposed-files-display');
       displayArea.innerHTML = ''; // Clear previous content
 
-      if (!originalFiles && !proposedFiles) {
-        displayArea.innerHTML = '<p>No files to compare or invalid proposal data.</p>';
+      if (!proposedFiles || proposedFiles.length === 0) {
+        displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
         return;
       }
 
-      // Get all unique file names that are either in original or proposed
-      const allFileNames = new Set([
-        ...(originalFiles || []).map(f => f.name),
-        ...(proposedFiles || []).map(f => f.name)
-      ]);
+      proposedFiles.forEach(proposedFile => {
+          const name = proposedFile.name;
+          const fileType = proposedFile.type; // Get type from the proposed file
 
-      if (allFileNames.size === 0) {
-          displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
-          return;
-      }
-
-      allFileNames.forEach(name => {
           const originalFile = (originalFiles || []).find(f => f.name === name);
-          const proposedFile = (proposedFiles || []).find(f => f.name === name);
-
           const originalSource = originalFile ? originalFile.source : '';
-          const proposedSource = proposedFile ? proposedFile.source : '';
-          const fileType = (originalFile || proposedFile).type; // Get type from either, assuming consistent type for same file name
+          const proposedSource = proposedFile.source;
 
           const diffHtmlData = generateFormattedDiffPanels(originalSource, proposedSource);
 
@@ -409,10 +398,6 @@
               });
           }
       });
-
-      if (displayArea.innerHTML === '') {
-          displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
-      }
     }
 
     function getFileExtension(type) {
@@ -703,10 +688,6 @@
             applyResultContainer.style.display = 'block';
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
-          } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block'; // Show container to display error
           }
