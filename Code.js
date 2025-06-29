@@ -338,42 +338,36 @@ function deployScript(scriptId, description = '') {
     const versionNumber = versionResult.versionNumber;
     console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
-    // 2. appsscript.jsonからwebapp設定を取得する
-    const currentScriptId = ScriptApp.getScriptId(); // 現在のスクリプト自身のID
-    const manifestUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}/content`;
-    const getManifestOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const getManifestResponse = UrlFetchApp.fetch(manifestUrl, getManifestOptions);
-    if (getManifestResponse.getResponseCode() !== 200) {
-        throw new Error(`マニフェストファイルの取得に失敗: ${getManifestResponse.getContentText()}`);
-    }
-    const manifestContent = JSON.parse(getManifestResponse.getContentText());
-    const appsscriptJsonFile = manifestContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
-    if (!appsscriptJsonFile) {
-        throw new Error("appsscript.jsonファイルが見つかりませんでした。");
-    }
-    const manifest = JSON.parse(appsscriptJsonFile.source);
-    const webappConfig = manifest.webapp;
+    // appsscript.jsonからwebapp設定を取得する（デプロイAPIには直接渡さないが、確認のため）
+    // const currentScriptId = ScriptApp.getScriptId(); // 現在のスクリプト自身のID
+    // const manifestUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}/content`;
+    // const getManifestOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    // const getManifestResponse = UrlFetchApp.fetch(manifestUrl, getManifestOptions);
+    // if (getManifestResponse.getResponseCode() !== 200) {
+    //     throw new Error(`マニフェストファイルの取得に失敗: ${getManifestResponse.getContentText()}`);
+    // }
+    // const manifestContent = JSON.parse(getManifestResponse.getContentText());
+    // const appsscriptJsonFile = manifestContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
+    // if (!appsscriptJsonFile) {
+    //     throw new Error("appsscript.jsonファイルが見つかりませんでした。");
+    // }
+    // const manifest = JSON.parse(appsscriptJsonFile.source);
+    // const webappConfig = manifest.webapp;
 
-    if (!webappConfig) {
-        throw new Error("appsscript.jsonにwebapp設定が見つかりません。ウェブアプリとしてデプロイするには必要です。");
-    }
+    // if (!webappConfig) {
+    //     throw new Error("appsscript.jsonにwebapp設定が見つかりません。ウェブアプリとしてデプロイするには必要です。");
+    // }
 
     // 3. デプロイAPIのペイロードを正しく構築する
+    // ログのエラー「Unknown name "entryPoints": Cannot find field.」を解決するため、
+    // createDeployment APIのペイロードからentryPointsを削除します。
+    // entryPointsはレスポンスに含まれるプロパティであり、リクエストボディには含めません。
     const deploymentRequestBody = {
-      "deploymentConfig": { // deploymentConfigでラップする必要がある
+      "deploymentConfig": { 
         "versionNumber": versionNumber,
-        "manifestFileName": "appsscript" // マニフェストファイル名は固定
+        "manifestFileName": "appsscript" 
       },
-      "description": description,
-      "entryPoints": [ // ウェブアプリとしてデプロイするために必要
-        {
-          "entryPointType": "WEB_APP",
-          "webApp": {
-            "executeAs": webappConfig.executeAs,
-            "access": webappConfig.access
-          }
-        }
-      ]
+      "description": description
     };
 
     const deployOptions = {
@@ -400,8 +394,15 @@ function deployScript(scriptId, description = '') {
     let webappUrl;
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
       const entryPoint = deploymentResult.entryPoints[0];
+      // `entryPoint.webApp` が存在し、オブジェクトであり、さらに `url` プロパティを持つことを確認
       if (entryPoint.webApp && typeof entryPoint.webApp === 'object' && entryPoint.webApp.url) {
         webappUrl = entryPoint.webApp.url;
+      } else if (entryPoint.webApp && typeof entryPoint.webApp === 'object') {
+        // webAppオブジェクトはあるがURLがない場合（デバッグ用）
+        console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", entryPoint.webApp);
+      } else {
+        // webAppオブジェクト自体がない場合（デバッグ用）
+        console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", entryPoint);
       }
     }
 
