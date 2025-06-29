@@ -12,5 +12,14 @@
     "https://www.googleapis.com/auth/logging.read",
     "https://www.googleapis.com/auth/script.deployments",
     "https://www.googleapis.com/auth/drive.readonly"
-  ]
+  ],
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {
+        "userSymbol": "Drive",
+        "version": "v3",
+        "serviceId": "drive"
+      }
+    ]
+  }
 }
