@@ -386,8 +386,16 @@ function deployScript(scriptId, description = '') {
     const deploymentResult = JSON.parse(responseBody);
     console.log("デプロイ成功:", deploymentResult);
 
-    // ログに表示されている応答構造に合わせて webappUrl の取得パスを修正
-    const webappUrl = deploymentResult.entryPoints?.[0]?.webApp?.url;
+    // ログに報告されたTypeErrorを解決するため、デプロイ結果からWebアプリURLを安全に抽出するように修正
+    let webappUrl;
+    try {
+      webappUrl = deploymentResult.entryPoints?.[0]?.webApp?.url;
+    } catch (e) {
+      // ログに報告されたTypeErrorを捕捉し、URLをundefinedとして扱う
+      console.warn("ウェブアプリURLの抽出中に予期せぬエラーが発生しました:", e);
+      webappUrl = undefined;
+    }
+
     if (!webappUrl) {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした:", deploymentResult);
       // エラーとしてではなく、URLがないことをユーザーに伝える形にする
