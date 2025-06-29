@@ -135,7 +135,7 @@ function processPrompt(formObject) {
 
     const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
 
-    return {
+    return { 
       status: 'proposal',
       scriptId: scriptId,
       originalFiles: projectContent.files,
@@ -316,6 +316,7 @@ function getScriptLogs(targetScriptId) {
  * @returns {object} - デプロイ結果（成功/失敗、デプロイID、URL）
  */
 function deployScript(scriptId, description = '') {
+  console.log("deployScript function called. Script ID:", scriptId, "Description:", description);
   const accessToken = ScriptApp.getOAuthToken();
   const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
@@ -323,18 +324,27 @@ function deployScript(scriptId, description = '') {
   try {
     // 1. 新しいバージョンを作成する
     console.log("新しいスクリプトバージョンを作成中...");
+    const createVersionPayload = { description: `Deployment version created by Methane AI Agent: ${description}` };
+    console.log("バージョン作成リクエストペイロード:", JSON.stringify(createVersionPayload));
+
     const createVersionOptions = {
       method: 'post',
       contentType: 'application/json',
       headers: { 'Authorization': `Bearer ${accessToken}` },
-      payload: JSON.stringify({ description: `Deployment version created by Methane AI Agent: ${description}` }), // Version description
+      payload: JSON.stringify(createVersionPayload),
       muteHttpExceptions: true
     };
     const createVersionResponse = UrlFetchApp.fetch(versionsApiUrl, createVersionOptions);
-    if (createVersionResponse.getResponseCode() !== 200) {
-      throw new Error(`バージョン作成APIエラー (ステータス: ${createVersionResponse.getResponseCode()}): ${createVersionResponse.getContentText()}`);
+    const createVersionResponseCode = createVersionResponse.getResponseCode();
+    const createVersionResponseBody = createVersionResponse.getContentText();
+
+    console.log(`バージョン作成API応答 - ステータス: ${createVersionResponseCode}, ボディ: ${createVersionResponseBody}`);
+
+    if (createVersionResponseCode !== 200) {
+      throw new Error(`バージョン作成APIエラー (ステータス: ${createVersionResponseCode}): ${createVersionResponseBody}`);
     }
-    const versionResult = JSON.parse(createVersionResponse.getContentText());
+    const versionResult = JSON.parse(createVersionResponseBody);
+    console.log("解析されたバージョン作成応答データ:", versionResult);
     const versionNumber = versionResult.versionNumber;
     console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
@@ -369,6 +379,7 @@ function deployScript(scriptId, description = '') {
       },
       "description": description
     };
+    console.log("デプロイリクエストペイロード:", JSON.stringify(deploymentRequestBody));
 
     const deployOptions = {
       method: 'post',
@@ -383,21 +394,25 @@ function deployScript(scriptId, description = '') {
     const responseCode = response.getResponseCode();
     const responseBody = response.getContentText();
 
+    console.log(`デプロイAPI応答 - ステータス: ${responseCode}, ボディ: ${responseBody}`);
+
     if (responseCode !== 200) {
       throw new Error(`デプロイAPIエラー (ステータス: ${responseCode}): ${responseBody}`);
     }
 
     const deploymentResult = JSON.parse(responseBody);
-    console.log("デプロイ成功:", deploymentResult);
+    console.log("デプロイ成功応答データ:", deploymentResult);
 
     // デプロイ結果からWebアプリURLを安全に抽出するように修正
     let webappUrl;
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
+      console.log("デプロイ応答のentryPointsプロパティ:", JSON.stringify(deploymentResult.entryPoints));
       const entryPoint = deploymentResult.entryPoints[0];
       // `entryPoint.webApp` が存在し、オブジェクトであり、さらに `url` プロパティを持つことを確認
       // Optional Chaining を使用して、`TypeError: Cannot read properties of undefined (reading 'url')` を回避
       if (entryPoint?.webApp?.url) {
         webappUrl = entryPoint.webApp.url;
+        console.log("WebアプリURLをentryPointから抽出しました:", webappUrl);
       } else if (entryPoint?.webApp) {
         // webAppオブジェクトはあるがURLがない場合
         console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", entryPoint.webApp);
@@ -405,10 +420,12 @@ function deployScript(scriptId, description = '') {
         // webAppオブジェクト自体がない場合
         console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", entryPoint);
       }
+    } else {
+      console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
     if (!webappUrl) {
-      console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした:", deploymentResult);
+      console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", deploymentResult);
       return {
         status: 'success',
         message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。',
