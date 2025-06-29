@@ -527,51 +527,39 @@ function fixErrorsFromLogs(targetScriptId) {
 }
 
 /**
- * Lists Apps Script projects accessible to the user.
+ * Lists Apps Script projects accessible to the user using Google Drive API.
  * @returns {object} An object containing 'status' and either 'projects' (Array<object>) or 'message'.
  */
 function listAppsScriptProjects() {
-  const accessToken = ScriptApp.getOAuthToken();
-  const apiUrl = 'https://script.googleapis.com/v1/projects'; // This lists standalone projects
-  
-  const options = {
-    method: 'get',
-    headers: { 'Authorization': `Bearer ${accessToken}` },
-    muteHttpExceptions: true
-  };
-
   try {
-    const response = UrlFetchApp.fetch(apiUrl, options);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
+    // Using Drive API (Advanced Service) to list script files
+    // Requires 'Drive API' to be enabled in Advanced Google Services (Resources > Advanced Google services...)
+    // Requires 'https://www.googleapis.com/auth/drive.readonly' scope in appsscript.json
+    console.log("ドライブAPIを使用してApps Scriptプロジェクトをリスト中...");
+    
+    // Filter for Apps Script files that are not trashed
+    const query = 'mimeType = "application/vnd.google-apps.script" and trashed = false';
+    
+    // Fetch files, limit to a reasonable number (e.g., 200)
+    let response = Drive.Files.list({
+      q: query,
+      fields: 'items(id,title)', // Requesting id and title fields
+      maxResults: 200 // Limit the number of results to prevent excessive load
+    });
 
-    if (responseCode !== 200) {
-      console.error(`Apps Script Projects API Error (Status: ${responseCode}): ${responseBody}`);
-      
-      // NEW: Specific handling for 404 Not Found error with the given body content
-      if (responseCode === 404 && responseBody.includes("404. That’s an error.") && responseBody.includes("The requested URL /v1/projects was not found on this server.")) {
-          return { 
-              status: 'error', 
-              message: "Apps Scriptプロジェクトの取得に失敗しました。考えられる原因として、Google CloudプロジェクトでApps Script APIが有効になっていないか、APIキーの権限が不足している可能性があります。Google Cloud Console (console.cloud.google.com) にて、対象のプロジェクトで「Google Apps Script API」を検索し、有効化されていることを確認してください。また、適切なOAuthスコープが設定されているか確認してください。" 
-          };
-      }
-      
-      return { status: 'error', message: `Apps Scriptプロジェクトの取得に失敗しました: ${responseBody}` };
-    }
-
-    const projectsData = JSON.parse(responseBody);
-    console.log("Projects data:", JSON.stringify(projectsData, null, 2));
-
-    const projects = (projectsData.projects || []).map(p => ({
-      id: p.scriptId,
-      title: p.title || p.scriptId // Use title if available, otherwise scriptId
+    const projects = (response.items || []).map(file => ({
+      id: file.id,       // For standalone scripts, file ID is the script ID. For bound scripts, this is the container ID.
+      title: file.title  // File title, typically the project name
     }));
 
     return { status: 'success', projects: projects };
 
   } catch (e) {
-    console.error("Apps Scriptプロジェクトのリスト中にエラーが発生しました:", e);
+    console.error("ドライブAPIによるApps Scriptプロジェクトのリスト中にエラーが発生しました:", e);
+    // Provide a more specific error message if Drive API is not enabled or scopes are missing
+    if (e.message.includes("API call to drive.files.list failed with error")) {
+      return { status: 'error', message: `Apps Scriptプロジェクトの取得に失敗しました。Drive API (Advanced Service) がこのApps Scriptプロジェクトで有効になっているか、およびappsscript.jsonに適切なOAuthスコープ (https://www.googleapis.com/auth/drive.readonly) が設定されているか確認してください。エラー: ${e.message}` };
+    }
     return { status: 'error', message: `Apps Scriptプロジェクトのリストエラー: ${e.message}` };
   }
 }
-
