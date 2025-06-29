@@ -30,7 +30,8 @@ function callGenerativeAI(userPrompt, projectContent) {
   systemPrompt += "- 変更が不要なファイルはレスポンスに含めないでください。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
-  systemPrompt += "```json\n{\"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
+  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
+  systemPrompt += "- 'purpose'フィールドには、提案された変更の全体的な目的や理由を、ユーザーが理解しやすいように簡潔に説明してください。\n";
 
   // Gemini APIに送信するリクエストボディを作成
   const requestBody = {
@@ -106,12 +107,16 @@ function processPrompt(formObject) {
       throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
     }
 
+    // Capture the purpose if provided by AI
+    const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
+
     // 元のファイルとAIが提案したファイルをフロントエンドに返す
     return {
       status: 'proposal',
       scriptId: scriptId,
       originalFiles: projectContent.files,
       proposedFiles: aiResponse.files,
+      purpose: proposalPurpose,
       message: "AIからの提案が生成されました。内容を確認し、適用してください。"
     };
 
