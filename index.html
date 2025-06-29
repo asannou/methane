@@ -98,6 +98,7 @@
       <button type="button" id="loadProjectsButton" style="width: auto; margin-bottom: 0;">Load Projects</button>
     </div>
     <input type="text" id="scriptIdManualInput" placeholder="Or paste Script ID here (overrides selection)" style="margin-bottom: 10px;">
+    <div id="scriptEditorLinkContainer" style="margin-bottom: 10px;"></div>
 
     <label for="prompt">Prompt:</label>
     <textarea id="prompt" name="prompt" required></textarea>
@@ -207,6 +208,18 @@
         }
     }
 
+    // NEW: Function to update the script editor link
+    function updateScriptEditorLink() {
+      const scriptId = getEffectiveScriptId();
+      const linkContainer = document.getElementById('scriptEditorLinkContainer');
+      if (scriptId) {
+        const editorUrl = `https://script.google.com/home/projects/${scriptId}/edit`;
+        linkContainer.innerHTML = `<strong>Editor Link:</strong> <a href="${editorUrl}" target="_blank">${editorUrl}</a>`;
+      } else {
+        linkContainer.innerHTML = '';
+      }
+    }
+
     // Function to load projects and populate the dropdown
     function loadProjectsIntoDropdown(selectedId = null) {
         const scriptIdSelect = document.getElementById('scriptIdSelect');
@@ -229,6 +242,7 @@
                     if (selectedId) {
                         scriptIdSelect.value = selectedId; // Set selected if saved ID was passed
                     }
+                    updateScriptEditorLink(); // Update link after loading projects
                 } else {
                     alert('Failed to load Apps Script projects: ' + response.message);
                 }
@@ -258,7 +272,12 @@
 
       // Auto-load projects on page load
       loadProjectsIntoDropdown(savedScriptId); // Pass the saved ID so it tries to pre-select
+      updateScriptEditorLink(); // Initial update after loading saved ID
     });
+
+    // Event Listeners for Script ID changes
+    document.getElementById('scriptIdSelect').addEventListener('change', updateScriptEditorLink);
+    document.getElementById('scriptIdManualInput').addEventListener('input', updateScriptEditorLink);
 
     // NEW: Function to format code with line numbers
     function formatCodeWithLineNumbers(code) {
@@ -382,6 +401,7 @@
 
       // --- Save scriptId to localStorage ---
       saveScriptIdToLocalStorage(formData.scriptId);
+      updateScriptEditorLink(); // Update link as script ID might be manually entered
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -426,6 +446,7 @@
 
       // --- Save scriptId to localStorage before applying changes ---
       saveScriptIdToLocalStorage(currentProposal.scriptId);
+      updateScriptEditorLink(); // Update link based on the script being applied to
 
       const applyButton = this;
       const applySpinner = document.getElementById('apply-loading-spinner');
@@ -491,10 +512,12 @@
       proposalContainer.style.display = 'none'; // Hide previous proposal
       applyButton.style.display = 'none'; // Hide apply button
       applyResultContainer.style.display = 'none'; // Hide apply result (temporarily, will be re-populated)
+      fixApplyErrorsButton.style.display = 'none'; // Hide the specific apply error fix button
       document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
 
       // Save scriptId to localStorage
       saveScriptIdToLocalStorage(scriptId);
+      updateScriptEditorLink(); // Update link as script ID might be used for fix
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -573,6 +596,7 @@
 
       // --- Save scriptId to localStorage when getting logs ---
       saveScriptIdToLocalStorage(scriptId);
+      updateScriptEditorLink(); // Update link as script ID might be used for logs
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -613,6 +637,7 @@
 
       // Save scriptId to localStorage
       saveScriptIdToLocalStorage(scriptId);
+      updateScriptEditorLink(); // Update link as script ID might be used for fix
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -666,6 +691,7 @@
 
       // Save scriptId to localStorage when deploying
       saveScriptIdToLocalStorage(scriptId);
+      updateScriptEditorLink(); // Update link as script ID might be used for deploy
 
       google.script.run
         .withSuccessHandler(function(response) {
