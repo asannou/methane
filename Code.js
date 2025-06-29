@@ -306,8 +306,8 @@ function getScriptLogs(targetScriptId) {
 }
 
 /**
- * スクリプトを新しいウェブアプリとしてデプロイします。
- * HEADバージョンを使用し、appsscript.jsonに定義された設定を適用します。
+ * スクリプトの新しいバージョンを作成し、それを新しいウェブアプリとしてデプロイします。
+ * appsscript.jsonに定義されたウェブアプリ設定を適用します。
  * @param {string} scriptId - デプロイするスクリプトのID
  * @param {string} description - デプロイの説明（オプション）
  * @returns {object} - デプロイ結果（成功/失敗、デプロイID、URL）
@@ -317,25 +317,16 @@ function deployScript(scriptId, description = '') {
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
-    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
-    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
-    if (getResponse.getResponseCode() !== 200) {
-        throw new Error(`スクリプト内容の取得に失敗 (appsscript.json): ${getResponse.getContentText()}`);
-    }
-    const projectContent = JSON.parse(getResponse.getContentText());
-    const appsscriptJsonFile = projectContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
-    if (!appsscriptJsonFile) {
-        throw new Error("appsscript.json が見つかりません。デプロイ設定を読み込めません。");
-    }
-    const appsscriptConfig = JSON.parse(appsscriptJsonFile.source);
-    
-    // webapp設定はAPI呼び出しのpayloadに直接含めるべきではないため、この行とそれに関連する"webapp"フィールドを削除
-    // const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
+    // デプロイには新しいバージョン番号が必要なため、まず新しいバージョンを作成する
+    console.log("新しいスクリプトバージョンを作成中...");
+    const version = ScriptApp.newVersion(); // 新しいバージョンを作成
+    const versionNumber = version.getVersionNumber(); // そのバージョン番号を取得
+    console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
     const requestBody = {
+      "versionNumber": versionNumber, // 作成したばかりのバージョン番号を指定
       "description": description
-      // "webapp"フィールドはここには不要
+      // "webapp"フィールドはここには不要。appsscript.jsonで定義されている設定が自動的に適用される。
     };
 
     const options = {
@@ -346,7 +337,7 @@ function deployScript(scriptId, description = '') {
       muteHttpExceptions: true
     };
 
-    console.log(`スクリプトID ${scriptId} をデプロイ中...`);
+    console.log(`スクリプトID ${scriptId} のバージョン ${versionNumber} をデプロイ中...`);
     const response = UrlFetchApp.fetch(deploymentsApiUrl, options);
     const responseCode = response.getResponseCode();
     const responseBody = response.getContentText();
@@ -405,9 +396,7 @@ function fixErrorsFromLogs(targetScriptId) {
     // 3. AIに渡すプロンプトを生成
     let aiPrompt = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
     aiPrompt += `修正は、エラーを解消し、既存の機能性を損なわないように、可能な限り最小限にしてください。\n\n`;
-    aiPrompt += `## エラーログ\n
-${logs}\n
-`;
+    aiPrompt += `## エラーログ\n\n${logs}\n\n`;
     aiPrompt += `## あなたのタスク\n上記のログと既存のファイルに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
     aiPrompt += `提案は必ずJSON形式で、修正が必要なファイルのみを含めてください。\n`;
     aiPrompt += `ファイル名、タイプ、ソースを正確に指定してください。`;
