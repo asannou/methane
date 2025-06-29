@@ -1,5 +1,4 @@
-const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index').setTitle('Methane AI Agent');
@@ -96,7 +95,11 @@ function callGenerativeAI(userPrompt, projectContent) {
 
   console.log("Geminiからの応答:\n" + generatedText);
 
-  return JSON.parse(generatedText);
+  try {
+    return JSON.parse(generatedText);
+  } catch (e) {
+    throw new Error(`AIからのJSON応答の解析に失敗しました: ${e.message}. 受信したテキスト（先頭500文字）: ${generatedText.substring(0, 500)}...`);
+  }
 }
 
 /**
@@ -323,10 +326,30 @@ function deployScript(scriptId, description = '') {
     const versionNumber = version.getVersionNumber(); // そのバージョン番号を取得
     console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
+    // appsscript.jsonからwebapp設定を取得する
+    const currentScriptId = ScriptApp.getScriptId(); // 現在のスクリプト自身のID
+    const manifestUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}/content`;
+    const getManifestOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getManifestResponse = UrlFetchApp.fetch(manifestUrl, getManifestOptions);
+    if (getManifestResponse.getResponseCode() !== 200) {
+        throw new Error(`マニフェストファイルの取得に失敗: ${getManifestResponse.getContentText()}`);
+    }
+    const manifestContent = JSON.parse(getManifestResponse.getContentText());
+    const appsscriptJsonFile = manifestContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
+    if (!appsscriptJsonFile) {
+        throw new Error("appsscript.jsonファイルが見つかりませんでした。");
+    }
+    const manifest = JSON.parse(appsscriptJsonFile.source);
+    const webappConfig = manifest.webapp;
+
+    if (!webappConfig) {
+        throw new Error("appsscript.jsonにwebapp設定が見つかりません。ウェブアプリとしてデプロイするには必要です。");
+    }
+
     const requestBody = {
       "versionNumber": versionNumber, // 作成したばかりのバージョン番号を指定
-      "description": description
-      // "webapp"フィールドはここには不要。appsscript.jsonで定義されている設定が自動的に適用される。
+      "description": description,
+      "webapp": webappConfig // ここにwebappフィールドを含める必要がある
     };
 
     const options = {
