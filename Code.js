@@ -402,6 +402,7 @@ function deployScript(scriptId, description = '') {
 
     const deploymentResult = JSON.parse(responseBody);
     console.log("デプロイ成功応答データ:", deploymentResult);
+    console.log("deploymentResult:", deploymentResult); // デバッグログを追加
 
     // デプロイ結果からWebアプリURLを安全に抽出するように修正
     let webappUrl;
