@@ -372,3 +372,66 @@ function deployScript(scriptId, description = '') {
     return { status: 'error', message: `デプロイエラー: ${e.message}` };
   }
 }
+
+/**
+ * スクリプトログに基づいてAIにエラー修正を提案させます。
+ * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID
+ * @returns {object} - AIが提案した変更、元のファイル、スクリプトIDを含むオブジェクト
+ */
+function fixErrorsFromLogs(targetScriptId) {
+  if (!API_KEY) {
+    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
+  }
+  if (!targetScriptId || targetScriptId.trim() === '') {
+    return { status: 'error', message: "Error: スクリプトIDが指定されていません。" };
+  }
+
+  try {
+    // 1. ログを取得
+    const logs = getScriptLogs(targetScriptId);
+    // getScriptLogs はエラーメッセージも文字列として返す可能性があるため、それをチェック
+    if (logs.startsWith("ログ取得エラー:") || logs.startsWith("指定されたスクリプトIDに関連する")) {
+        return { status: 'error', message: logs }; // エラーメッセージやログなしメッセージをそのまま返す
+    }
+
+    // 2. 対象スクリプトの全ファイル内容を取得
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    if (getResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+    }
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    // 3. AIに渡すプロンプトを生成
+    let aiPrompt = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
+    aiPrompt += `修正は、エラーを解消し、既存の機能性を損なわないように、可能な限り最小限にしてください。\n\n`;
+    aiPrompt += `## エラーログ\n\`\`\`\n${logs}\n\`\`\`\n\n`;
+    aiPrompt += `## あなたのタスク\n上記のログと既存のファイルに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
+    aiPrompt += `提案は必ずJSON形式で、修正が必要なファイルのみを含めてください。\n`;
+    aiPrompt += `ファイル名、タイプ、ソースを正確に指定してください。`;
+
+    // 4. Gemini APIを呼び出し
+    const aiResponse = callGenerativeAI(aiPrompt, projectContent);
+
+    if (!aiResponse || !Array.isArray(aiResponse.files)) {
+      throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
+    }
+
+    const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
+
+    return {
+      status: 'proposal', // processPrompt と同じステータス
+      scriptId: targetScriptId,
+      originalFiles: projectContent.files, // 元のファイルも返す
+      proposedFiles: aiResponse.files,
+      purpose: proposalPurpose,
+      message: "AIからのエラー修正提案が生成されました。内容を確認し、適用してください。"
+    };
+
+  } catch (error) {
+    console.error("エラー修正提案生成中にエラーが発生しました:", error);
+    return { status: 'error', message: `エラー修正提案生成エラー: ${error.message}` };
+  }
+}
