@@ -111,7 +111,7 @@ function processPrompt(formObject) {
     const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
 
     // 元のファイルとAIが提案したファイルをフロントエンドに返す
-    return {
+    return { 
       status: 'proposal',
       scriptId: scriptId,
       originalFiles: projectContent.files,
@@ -205,7 +205,13 @@ function getScriptLogs(targetScriptId) {
     // defensive check for metadata.name before calling .match()
     if (!metadata || typeof metadata.name !== 'string') {
       console.error("Received metadata:", metadata); // Log the problematic metadata
-      throw new Error("スクリプトのメタデータに 'name' プロパティが見つからないか、不正な形式です。ログ取得を続行できません。");
+      let errorMessage = "スクリプトのメタデータに 'name' プロパティが見つからないか、不正な形式です。ログ取得を続行できません。";
+      if (metadata) {
+        errorMessage += ` 受信したメタデータ: ${JSON.stringify(metadata)}`;
+      } else {
+        errorMessage += ` 受信したメタデータは null または undefined でした。`;
+      }
+      throw new Error(errorMessage);
     }
 
     const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
