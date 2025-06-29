@@ -386,11 +386,24 @@ function deployScript(scriptId, description = '') {
     const deploymentResult = JSON.parse(responseBody);
     console.log("デプロイ成功:", deploymentResult);
 
+    // ログに表示されている応答構造に合わせて webappUrl の取得パスを修正
+    const webappUrl = deploymentResult.entryPoints?.[0]?.webApp?.url;
+    if (!webappUrl) {
+      console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした:", deploymentResult);
+      // エラーとしてではなく、URLがないことをユーザーに伝える形にする
+      return {
+        status: 'success',
+        message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。',
+        deploymentId: deploymentResult.deploymentId,
+        webappUrl: 'URL not found in response'
+      };
+    }
+
     return {
       status: 'success',
       message: 'デプロイが正常に完了しました。',
       deploymentId: deploymentResult.deploymentId,
-      webappUrl: deploymentResult.webapp.url
+      webappUrl: webappUrl
     };
 
   } catch (e) {
