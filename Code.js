@@ -1,5 +1,3 @@
-// --- Gemini API Configuration ---
-// スクリプトプロパティからAPIキーを読み込む
 const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
 
@@ -14,7 +12,6 @@ function doGet() {
  * @returns {object} - AIが生成した修正後のファイル情報を含むオブジェクト
  */
 function callGenerativeAI(userPrompt, projectContent) {
-  // AIに渡すための詳細な指示書（システムプロンプト）を作成
   let systemPrompt = "あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、修正後のファイル内容を生成してください。\n\n";
   systemPrompt += "## 既存のファイル一覧\n";
   projectContent.files.forEach(file => {
@@ -26,14 +23,15 @@ function callGenerativeAI(userPrompt, projectContent) {
   systemPrompt += "## あなたのタスク\n";
   systemPrompt += "- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n";
   systemPrompt += "- レスポンスは必ず、以下のJSON形式のみで返してください。\n";
-  systemPrompt += "- 重要:\nファイル名は、上記「既存のファイル一覧」で提示されたものを、一字一句変えずにそのまま使用してください。翻訳や変更は絶対にしないでください。\n";
-  systemPrompt += "- 変更が不要なファイルはレスポンスに含めないでください。\n";
+  systemPrompt += "- 重要:\n";
+  systemPrompt += "  - ファイル名は、上記「既存のファイル一覧」で提示されたものを、一字一句変えずにそのまま使用してください。翻訳や変更は絶対にしないでください。\n";
+  systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
+  systemPrompt += "  - 生成するソースコードの内容は、指示に関係のない改行、インデント、空白文字などを勝手に変更したり除去したりせず、可能な限り元のフォーマットを維持してください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
   systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
   systemPrompt += "- 'purpose'フィールドには、提案された変更の全体的な目的や理由を、ユーザーが理解しやすいように簡潔に説明してください。\n";
 
-  // Gemini APIに送信するリクエストボディを作成
   const requestBody = {
     "contents": [{
       "parts": [{ "text": systemPrompt }]
@@ -83,7 +81,6 @@ function callGenerativeAI(userPrompt, projectContent) {
     muteHttpExceptions: true
   };
 
-  // Gemini APIを呼び出す
   console.log("Gemini APIにリクエストを送信します...");
   const response = UrlFetchApp.fetch(API_URL, options);
   const responseCode = response.getResponseCode();
@@ -93,17 +90,12 @@ function callGenerativeAI(userPrompt, projectContent) {
     throw new Error(`Gemini APIエラー (Status: ${responseCode}): ${responseBody}`);
   }
 
-  // レスポンスから生成されたテキスト部分を抽出
   const jsonResponse = JSON.parse(responseBody);
-  // Generated text might be wrapped in markdown code block
   let generatedText = jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  // Attempt to clean up markdown JSON block
   generatedText = generatedText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
 
   console.log("Geminiからの応答:\n" + generatedText);
 
-  // AIが生成したJSON文字列をパースして返す
-  // ここでのJSON.parseが失敗する可能性があるが、これはprocessPrompt側で捕捉する
   return JSON.parse(generatedText);
 }
 
@@ -132,18 +124,14 @@ function processPrompt(formObject) {
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    // AIを呼び出す
     const aiResponse = callGenerativeAI(prompt, projectContent);
 
-    // AI応答の形式を最低限チェック
     if (!aiResponse || !Array.isArray(aiResponse.files)) {
       throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
     }
 
-    // Capture the purpose if provided by AI
     const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
 
-    // 元のファイルとAIが提案したファイルをフロントエンドに返す
     return {
       status: 'proposal',
       scriptId: scriptId,
@@ -170,7 +158,6 @@ function applyProposedChanges(scriptId, proposedFiles) {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
-    // 既存のスクリプト内容を再度取得（念のため最新の状態を反映）
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
@@ -178,27 +165,20 @@ function applyProposedChanges(scriptId, proposedFiles) {
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    // AIの提案に基づいてprojectContentを更新
     proposedFiles.forEach(updatedFile => {
-      // AI応答に含まれる各ファイルオブジェクトの最低限の構造チェック
       if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
            console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", updatedFile);
-           return; // この不正なファイルオブジェクトはスキップ
+           return;
       }
 
       const targetFile = projectContent.files.find(file => file.name === updatedFile.name);
       if (targetFile) {
-        // 既存ファイルのソースを更新 (タイプは維持)
         targetFile.source = updatedFile.source;
-        // AIが既存ファイル名を維持するように指示されているため、type変更は想定しない
       } else {
-        // 新規ファイルは追加しない方針なのでエラーとする
-        // 指示に「既存ファイルのみ更新可能」とあるため
         throw new Error(`AIが既存にないファイル名 '${updatedFile.name}' を返しました。既存ファイルのみ更新可能です。`);
       }
     });
 
-    // スクリプト内容を更新
     const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
     if (putResponse.getResponseCode() !== 200) {
@@ -233,7 +213,7 @@ function setGcpProjectId(gcpProjectId) {
 
 /**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
- * @param {string} targetScriptId - ログを取得するApps ScriptのID
+ * @param {string} targetScriptId - ログを取得するApps ScriptのID (このIDはGCPプロジェクト内の全てのApps Scriptログを取得するために使用されません)
  * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
  */
 function getScriptLogs(targetScriptId) {
@@ -245,9 +225,6 @@ function getScriptLogs(targetScriptId) {
 
     if (!gcpProjectId) {
       console.log("Script propertiesにGCPプロジェクトIDが見つかりません。メタデータから取得を試みます。");
-      // 1. 現在のスクリプトのGCPプロジェクトIDを取得
-      // 'https://script.googleapis.com/v1/projects/{scriptId}' エンドポイントから、
-      // レスポンスの 'name' フィールド（例: 'projects/your-gcp-project-id/scripts/your-script-id'）をパース
       const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
       const metadataOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
       const metadataResponse = UrlFetchApp.fetch(currentScriptMetadataUrl, metadataOptions);
@@ -257,8 +234,6 @@ function getScriptLogs(targetScriptId) {
       }
       const metadata = JSON.parse(metadataResponse.getContentText());
 
-      // defensive check for metadata.name before calling .match()
-      // スクリプトのメタデータに 'name' プロパティがない、または形式が不正な場合のエラーハンドリングを改善
       if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
         console.error("Received metadata:", metadata);
         const userGuidance = "スクリプトのGCPプロジェクトIDを特定できませんでした。これは、現在のApps Scriptプロジェクトが標準のGoogle Cloudプロジェクトにリンクされていない場合に発生することがあります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）から、Google Cloud Platformプロジェクトを明示的にリンクするか、ウェブUIで手動で設定してください。";
@@ -267,24 +242,21 @@ function getScriptLogs(targetScriptId) {
 
       const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
       if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
-        // このケースは通常、上記のチェックで捕捉されるはずだが、念のため残しておく
         throw new Error("現在のスクリプトのGCPプロジェクトIDを、メタデータから正しく抽出できませんでした。");
       }
       gcpProjectId = gcpProjectIdMatch[1];
-      // 成功した場合、PropertiesServiceに保存して次回以降の取得を高速化
       PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId);
       console.log("メタデータからGCPプロジェクトIDを取得し、保存しました:", gcpProjectId);
     } else {
       console.log("Script propertiesからGCPプロジェクトIDを取得しました:", gcpProjectId);
     }
 
-    // 2. Cloud Logging APIリクエストを構築
     const loggingApiUrl = 'https://logging.googleapis.com/v2/entries:list';
     const requestBody = {
       "resourceNames": [
         `projects/${gcpProjectId}`
       ],
-      "filter": `resource.type="app_script_function" AND labels.script.googleapis.com/script_id="${targetScriptId}" `,
+      "filter": `resource.type="app_script_function"`,
       "orderBy": "timestamp desc",
       "pageSize": 50
     };
@@ -308,7 +280,7 @@ function getScriptLogs(targetScriptId) {
 
     const logsData = JSON.parse(responseBody);
     if (!logsData.entries || logsData.entries.length === 0) {
-      return "指定されたスクリプトIDのログがこのプロジェクトでは見つかりませんでした。\n";
+      return "指定されたスクリプトIDに関連する、またはGCPプロジェクト全体でApps Scriptのログが見つかりませんでした。\n";
     }
 
     let formattedLogs = "--- 最新のログ ---\n";
@@ -320,7 +292,6 @@ function getScriptLogs(targetScriptId) {
       } else if (entry.jsonPayload) {
         logPayload = JSON.stringify(entry.jsonPayload, null, 2);
       } else if (entry.protoPayload) {
-        // protoPayloadは複雑な場合があるため、JSON文字列化を試みる
         logPayload = JSON.stringify(entry.protoPayload, null, 2);
       }
       formattedLogs += `[${timestamp}] ${entry.severity || 'INFO'}: ${logPayload}\n`;
@@ -346,7 +317,6 @@ function deployScript(scriptId, description = '') {
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
-    // appsscript.json から webapp 設定を取得
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
@@ -360,20 +330,12 @@ function deployScript(scriptId, description = '') {
     }
     const appsscriptConfig = JSON.parse(appsscriptJsonFile.source);
     
-    // Default webapp settings from appsscript.json
-    const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
+    // webapp設定はAPI呼び出しのpayloadに直接含めるべきではないため、この行とそれに関連する"webapp"フィールドを削除
+    // const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
 
-    // ユーザーからの報告されたエラー: "Invalid JSON payload received. Unknown name \"entryPoints\": Cannot find field."
-    // これは、Apps Script Deployments APIが、ウェブアプリデプロイメントに対して 'entryPoints' フィールドを
-    // 認識しない、または異なる形式を期待することを示唆しています。公式ドキュメントと矛盾する場合がありますが、
-    // このエラーを解決するために 'webapp' 設定を直接トップレベルに配置します。
     const requestBody = {
-      "description": description,
-      "webapp": { // 'entryPoints' の代わりに 'webapp' を直接リクエストボディに含める
-        "executeAs": webappSettings.executeAs,
-        "access": webappSettings.access
-      }
-      // versionNumberを省略するとHEADがデプロイされる
+      "description": description
+      // "webapp"フィールドはここには不要
     };
 
     const options = {
@@ -400,11 +362,76 @@ function deployScript(scriptId, description = '') {
       status: 'success',
       message: 'デプロイが正常に完了しました。',
       deploymentId: deploymentResult.deploymentId,
-      webappUrl: deploymentResult.webapp.url // This URL is provided for web app deployments
+      webappUrl: deploymentResult.webapp.url
     };
 
   } catch (e) {
     console.error("デプロイ中にエラーが発生しました:", e);
     return { status: 'error', message: `デプロイエラー: ${e.message}` };
+  }
+}
+
+/**
+ * スクリプトログに基づいてAIにエラー修正を提案させます。
+ * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID
+ * @returns {object} - AIが提案した変更、元のファイル、スクリプトIDを含むオブジェクト
+ */
+function fixErrorsFromLogs(targetScriptId) {
+  if (!API_KEY) {
+    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
+  }
+  if (!targetScriptId || targetScriptId.trim() === '') {
+    return { status: 'error', message: "Error: スクリプトIDが指定されていません。" };
+  }
+
+  try {
+    // 1. ログを取得
+    const logs = getScriptLogs(targetScriptId);
+    // getScriptLogs はエラーメッセージも文字列として返す可能性があるため、それをチェック
+    if (logs.startsWith("ログ取得エラー:") || logs.startsWith("指定されたスクリプトIDに関連する")) {
+        return { status: 'error', message: logs }; // エラーメッセージやログなしメッセージをそのまま返す
+    }
+
+    // 2. 対象スクリプトの全ファイル内容を取得
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    if (getResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+    }
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    // 3. AIに渡すプロンプトを生成
+    let aiPrompt = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
+    aiPrompt += `修正は、エラーを解消し、既存の機能性を損なわないように、可能な限り最小限にしてください。\n\n`;
+    aiPrompt += `## エラーログ\n
+${logs}\n
+`;
+    aiPrompt += `## あなたのタスク\n上記のログと既存のファイルに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
+    aiPrompt += `提案は必ずJSON形式で、修正が必要なファイルのみを含めてください。\n`;
+    aiPrompt += `ファイル名、タイプ、ソースを正確に指定してください。`;
+
+    // 4. Gemini APIを呼び出し
+    const aiResponse = callGenerativeAI(aiPrompt, projectContent);
+
+    if (!aiResponse || !Array.isArray(aiResponse.files)) {
+      throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
+    }
+
+    const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
+
+    return {
+      status: 'proposal', // processPrompt と同じステータス
+      scriptId: targetScriptId,
+      originalFiles: projectContent.files, // 元のファイルも返す
+      proposedFiles: aiResponse.files,
+      purpose: proposalPurpose,
+      message: "AIからのエラー修正提案が生成されました。内容を確認し、適用してください。"
+    };
+
+  } catch (error) {
+    console.error("エラー修正提案生成中にエラーが発生しました:", error);
+    return { status: 'error', message: `エラー修正提案生成エラー: ${error.message}` };
   }
 }

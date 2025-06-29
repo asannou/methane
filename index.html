@@ -105,6 +105,17 @@
 
   <hr>
 
+  <h2>Automated Error Fix from Logs</h2>
+  <p>既存のスクリプトログに基づいて、AIにエラー修正の提案をさせます。提案された変更は上記の「AI Proposed Changes」セクションに表示されます。</p>
+  <form id="fix-errors-form">
+    <p>Using the Script ID entered above.</p>
+    <button type="submit" id="fixErrorsButton">Fix Errors from Logs</button>
+  </form>
+
+  <div id="fix-loading-spinner" class="spinner" style="display:none;"></div>
+
+  <hr>
+
   <h2>Deploy Script</h2>
   <form id="deploy-form">
     <p>Using the Script ID entered above.</p>
@@ -358,6 +369,61 @@
           spinner.style.display = 'none';
         })
         .getScriptLogs(scriptId);
+    });
+
+    // NEW: Event Listener for Fix Errors from Logs
+    document.getElementById('fix-errors-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const fixButton = form.querySelector('#fixErrorsButton');
+      const spinner = document.getElementById('fix-loading-spinner');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+
+      fixButton.disabled = true;
+      spinner.style.display = 'block';
+      proposalContainer.style.display = 'none'; // Hide previous proposal
+      applyButton.style.display = 'none'; // Hide apply button
+      applyResultContainer.style.display = 'none'; // Hide apply result
+      document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
+
+      const scriptId = document.getElementById('scriptId').value;
+
+      // Save scriptId to localStorage
+      saveScriptIdToLocalStorage(scriptId);
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          spinner.style.display = 'none';
+          fixButton.disabled = false;
+
+          if (response.status === 'proposal') {
+            currentProposal = response; // Store the proposal
+            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
+            displayFileComparison(response.originalFiles, response.proposedFiles);
+            proposalContainer.style.display = 'block';
+            applyButton.style.display = 'block'; // Show apply button
+            document.getElementById('apply-result').textContent = response.message; // Display initial message
+            applyResultContainer.style.display = 'block';
+          } else if (response.status === 'error') {
+            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+          } else {
+            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+          }
+        })
+        .withFailureHandler(function(error) {
+          spinner.style.display = 'none';
+          fixButton.disabled = false;
+          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
+          document.getElementById('apply-result-container').style.display = 'block';
+          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
+        })
+        .fixErrorsFromLogs(scriptId);
     });
 
     // Event Listener for Deploy Script
