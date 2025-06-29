@@ -10,7 +10,6 @@
     "https://www.googleapis.com/auth/script.projects",
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/logging.read",
-    "https://www.googleapis.com/auth/script.deployments",
-    "https://www.googleapis.com/auth/script.versions"
+    "https://www.googleapis.com/auth/script.deployments"
   ]
 }
