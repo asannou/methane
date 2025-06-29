@@ -170,7 +170,7 @@ function applyProposedChanges(scriptId, proposedFiles) {
 
     proposedFiles.forEach(updatedFile => {
       if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
-           console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", updatedFile);
+           console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(updatedFile, null, 2));
            return;
       }
 
@@ -238,7 +238,7 @@ function getScriptLogs(targetScriptId) {
       const metadata = JSON.parse(metadataResponse.getContentText());
 
       if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
-        console.error("Received metadata:", metadata);
+        console.error("Received metadata:", JSON.stringify(metadata, null, 2));
         const userGuidance = "スクリプトのGCPプロジェクトIDを特定できませんでした。これは、現在のApps Scriptプロジェクトが標準のGoogle Cloudプロジェクトにリンクされていない場合に発生することがあります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）から、Google Cloud Platformプロジェクトを明示的にリンクするか、ウェブUIで手動で設定してください。";
         throw new Error(userGuidance);
       }
@@ -344,7 +344,7 @@ function deployScript(scriptId, description = '') {
       throw new Error(`バージョン作成APIエラー (ステータス: ${createVersionResponseCode}): ${createVersionResponseBody}`);
     }
     const versionResult = JSON.parse(createVersionResponseBody);
-    console.log("解析されたバージョン作成応答データ:", versionResult);
+    console.log("解析されたバージョン作成応答データ:", JSON.stringify(versionResult, null, 2));
     const versionNumber = versionResult.versionNumber;
     console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
@@ -401,8 +401,8 @@ function deployScript(scriptId, description = '') {
     }
 
     const deploymentResult = JSON.parse(responseBody);
-    console.log("デプロイ成功応答データ:", deploymentResult);
-    console.log("deploymentResult:", deploymentResult); // デバッグログを追加
+    console.log("デプロイ成功応答データ:", JSON.stringify(deploymentResult, null, 2));
+    console.log("deploymentResult:", JSON.stringify(deploymentResult, null, 2)); // デバッグログを追加
 
     // デプロイ結果からWebアプリURLを安全に抽出するように修正
     let webappUrl;
@@ -416,17 +416,17 @@ function deployScript(scriptId, description = '') {
         console.log("WebアプリURLをentryPointから抽出しました:", webappUrl);
       } else if (entryPoint?.webApp) {
         // webAppオブジェクトはあるがURLがない場合
-        console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", entryPoint.webApp);
+        console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", JSON.stringify(entryPoint.webApp, null, 2));
       } else {
         // webAppオブジェクト自体がない場合
-        console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", entryPoint);
+        console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", JSON.stringify(entryPoint, null, 2));
       }
     } else {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
     if (!webappUrl) {
-      console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", deploymentResult);
+      console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
       return {
         status: 'success',
         message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。',
@@ -510,3 +510,4 @@ function fixErrorsFromLogs(targetScriptId) {
     return { status: 'error', message: `エラー修正提案生成エラー: ${error.message}` };
   }
 }
+
