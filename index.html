@@ -9,7 +9,7 @@
   /* Updated pre styles for better code display */
   pre {
     background-color: #f4f4f4;
-    padding: 10px;
+    padding: 0; /* Removed padding from pre itself, apply to inner divs */
     border-radius: 4px;
     white-space: pre-wrap; /* Allows wrapping for long lines */
     word-wrap: break-word;
@@ -17,6 +17,7 @@
     font-family: monospace; /* Ensure monospaced font for code */
     font-size: 0.9em; /* Slightly smaller font for dense code */
     line-height: 1.4; /* Better line spacing */
+    display: flex; /* Use flexbox for line numbers */
   }
 
   /* Spinner styles */
@@ -55,36 +56,43 @@
     height: 250px; /* Increased height for more lines */
     overflow-y: scroll;
     border: 1px solid #ccc;
-    padding: 0; /* Remove padding from pre itself as content will have it */
-    display: flex; /* Use flexbox for line numbers */
+    /* padding: 0; */ /* Already set above for pre */
+    /* display: flex; */ /* Already set above for pre */
   }
 
-  /* Styles for line numbers */
+  /* Styles for line numbers and code content columns */
   .line-numbers-col {
     background-color: #eee;
     color: #888;
-    padding: 10px 5px;
+    /* padding: 10px 5px; */ /* Moved to inner divs */
     text-align: right;
     user-select: none;
     flex-shrink: 0;
-    width: 30px; /* Adjusted width for line numbers */
+    width: 30px;
     border-right: 1px solid #ddd;
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
   }
   .code-content-col {
-    padding: 10px;
+    /* padding: 10px; */ /* Moved to inner divs */
     flex-grow: 1;
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
   }
 
-  /* Specific diff line highlighting (basic, for future potential) */
-  /* .diff-line-added { background-color: #e6ffe6; } */
-  /* .diff-line-removed { background-color: #ffe6e6; } */
+  /* NEW: Styles for individual line divs within the pre blocks */
+  .line-numbers-col > div,
+  .code-content-col > div {
+    padding: 0 5px; /* Apply padding directly to each line div */
+    min-height: 1.4em; /* Ensure consistent height for each line, including empty ones */
+    box-sizing: border-box; /* Include padding in element's total width/height */
+  }
 
+  /* Specific diff line highlighting */
+  .code-content-col > .diff-line-added { background-color: #e6ffe6; } /* Light green for added/new content */
+  .code-content-col > .diff-line-removed { background-color: #ffe6e6; } /* Light red for removed/old content */
 </style>
 </head>
 <body>
@@ -275,17 +283,53 @@
       loadProjectsIntoDropdown(savedScriptId); // Pass the saved ID so it tries to pre-select
     });
 
-    // NEW: Function to format code with line numbers
-    function formatCodeWithLineNumbers(code) {
-      if (!code) return { lineNumbersHtml: '', codeContentHtml: '' };
-      const lines = code.split('\n');
-      let lineNumbersHtml = '';
-      let codeContentHtml = '';
-      lines.forEach((line, index) => {
-        lineNumbersHtml += `<div>${index + 1}</div>`;
-        codeContentHtml += `<div>${escapeHtml(line) || '&nbsp;'}</div>`; // Use &nbsp; for empty lines to maintain height
-      });
-      return { lineNumbersHtml, codeContentHtml };
+    // NEW: Function to generate the formatted HTML for both original and proposed panels for a single file.
+    // This function aims for simple highlighting of changes line-by-line without full diff alignment.
+    function generateFormattedDiffPanels(originalSource, proposedSource) {
+        const originalLines = originalSource ? originalSource.split('\n') : [];
+        const proposedLines = proposedSource ? proposedSource.split('\n') : [];
+
+        let originalLineNumbersHtml = '';
+        let originalCodeContentHtml = '';
+        let proposedLineNumbersHtml = '';
+        let proposedCodeContentHtml = '';
+
+        const maxLength = Math.max(originalLines.length, proposedLines.length);
+
+        for (let i = 0; i < maxLength; i++) {
+            const originalLine = originalLines[i] !== undefined ? originalLines[i] : '';
+            const proposedLine = proposedLines[i] !== undefined ? proposedLines[i] : '';
+
+            let originalLineClass = '';
+            let proposedLineClass = '';
+
+            if (originalLine === proposedLine) {
+                // Lines are identical at this index, no special highlight
+            } else {
+                // Lines are different at this index.
+                // Mark original line as removed and proposed line as added for simplicity.
+                // This is not a true 'modified' state, but highlights the change.
+                if (originalLine !== '') {
+                    originalLineClass = 'diff-line-removed';
+                }
+                if (proposedLine !== '') {
+                    proposedLineClass = 'diff-line-added';
+                }
+            }
+
+            // Add line numbers, handling cases where one side is shorter
+            originalLineNumbersHtml += `<div>${(i < originalLines.length) ? (i + 1) : '&nbsp;'}</div>`;
+            proposedLineNumbersHtml += `<div>${(i < proposedLines.length) ? (i + 1) : '&nbsp;'}</div>`;
+
+            // Add code content with classes, ensuring empty lines also take space
+            originalCodeContentHtml += `<div class="${originalLineClass}">${escapeHtml(originalLine) || '&nbsp;'}</div>`;
+            proposedCodeContentHtml += `<div class="${proposedLineClass}">${escapeHtml(proposedLine) || '&nbsp;'}</div>`;
+        }
+
+        return {
+            originalLineNumbersHtml, originalCodeContentHtml,
+            proposedLineNumbersHtml, proposedCodeContentHtml
+        };
     }
 
     // Function to display file comparison
@@ -293,66 +337,81 @@
       const displayArea = document.getElementById('proposed-files-display');
       displayArea.innerHTML = ''; // Clear previous content
 
-      if (!originalFiles || !proposedFiles) {
+      if (!originalFiles && !proposedFiles) {
         displayArea.innerHTML = '<p>No files to compare or invalid proposal data.</p>';
         return;
       }
 
-      // Filter to only include files that are proposed by AI.
-      // If AI proposes a file with identical content, it will still be shown.
-      proposedFiles.forEach(proposedFile => {
-        const name = proposedFile.name;
-        const originalFile = originalFiles.find(f => f.name === name);
+      // Get all unique file names that are either in original or proposed
+      const allFileNames = new Set([
+        ...(originalFiles || []).map(f => f.name),
+        ...(proposedFiles || []).map(f => f.name)
+      ]);
 
-        const fileComparisonDiv = document.createElement('div');
-        fileComparisonDiv.className = 'file-comparison';
+      if (allFileNames.size === 0) {
+          displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
+          return;
+      }
 
-        const originalContentDiv = document.createElement('div');
-        const originalCodeFormatted = originalFile ? formatCodeWithLineNumbers(originalFile.source) : { lineNumbersHtml: '<em></em>', codeContentHtml: '<em>(No original file, proposed as new)</em>' };
-        originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(originalFile ? originalFile.type : proposedFile.type)} (Original)</h4><pre class="scroll-sync-target">
-            <div class="line-numbers-col">${originalCodeFormatted.lineNumbersHtml}</div>
-            <div class="code-content-col">${originalCodeFormatted.codeContentHtml}</div>
+      allFileNames.forEach(name => {
+          const originalFile = (originalFiles || []).find(f => f.name === name);
+          const proposedFile = (proposedFiles || []).find(f => f.name === name);
+
+          const originalSource = originalFile ? originalFile.source : '';
+          const proposedSource = proposedFile ? proposedFile.source : '';
+          const fileType = (originalFile || proposedFile).type; // Get type from either, assuming consistent type for same file name
+
+          const diffHtmlData = generateFormattedDiffPanels(originalSource, proposedSource);
+
+          const fileComparisonDiv = document.createElement('div');
+          fileComparisonDiv.className = 'file-comparison';
+
+          // Original content display
+          const originalContentDiv = document.createElement('div');
+          originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
+              <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
+              <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
           </pre>`;
-        
-        const proposedContentDiv = document.createElement('div');
-        const proposedCodeFormatted = formatCodeWithLineNumbers(proposedFile.source);
-        proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(proposedFile.type)} (Proposed)</h4><pre class="scroll-sync-target">
-            <div class="line-numbers-col">${proposedCodeFormatted.lineNumbersHtml}</div>
-            <div class="code-content-col">${proposedCodeFormatted.codeContentHtml}</div>
+          
+          // Proposed content display
+          const proposedContentDiv = document.createElement('div');
+          proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
+              <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
+              <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
           </pre>`;
-        
-        fileComparisonDiv.appendChild(originalContentDiv);
-        fileComparisonDiv.appendChild(proposedContentDiv);
-        displayArea.appendChild(fileComparisonDiv);
+          
+          fileComparisonDiv.appendChild(originalContentDiv);
+          fileComparisonDiv.appendChild(proposedContentDiv);
+          displayArea.appendChild(fileComparisonDiv);
 
-        // Get the two <pre> elements within this specific comparison block for scroll synchronization
-        const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
-        if (preElements.length === 2) {
-            const pre1 = preElements[0];
-            const pre2 = preElements[1];
+          // Scroll synchronization
+          const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
+          if (preElements.length === 2) {
+              const pre1 = preElements[0];
+              const pre2 = preElements[1];
 
-            let isSyncing = false; // Flag to prevent infinite recursion between scroll events
+              let isSyncing = false; // Flag to prevent infinite recursion between scroll events
 
-            pre1.addEventListener('scroll', function() {
-                if (!isSyncing) {
-                    isSyncing = true;
-                    pre2.scrollTop = pre1.scrollTop;
-                    isSyncing = false;
-                }
-            });
+              pre1.addEventListener('scroll', function() {
+                  if (!isSyncing) {
+                      isSyncing = true;
+                      pre2.scrollTop = pre1.scrollTop;
+                      isSyncing = false;
+                  }
+              });
 
-            pre2.addEventListener('scroll', function() {
-                if (!isSyncing) {
-                    isSyncing = true;
-                    pre1.scrollTop = pre2.scrollTop;
-                    isSyncing = false;
-                }
-            });
-        }
+              pre2.addEventListener('scroll', function() {
+                  if (!isSyncing) {
+                      isSyncing = true;
+                      pre1.scrollTop = pre2.scrollTop;
+                      isSyncing = false;
+                  }
+              });
+          }
       });
 
       if (displayArea.innerHTML === '') {
-          displayArea.innerHTML = '<p>AI did not propose any changes to existing files.</p>';
+          displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
       }
     }
 
