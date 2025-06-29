@@ -25,7 +25,7 @@ function callGenerativeAI(userPrompt, projectContent) {
   systemPrompt += "- 重要:\n";
   systemPrompt += "  - ファイル名は、上記「既存のファイル一覧」で提示されたものを、一字一句変えずにそのまま使用してください。翻訳や変更は絶対にしないでください。\n";
   systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
-  systemPrompt += "  - 生成するソースコードの内容は、指示に関係のない改行、インデント、空白文字などを勝手に変更したり除去したりせず、可能な限り元のフォーマットを維持してください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
+  systemPrompt += "  - 生成するソースコードの内容は、指示に関係のない改行、インデント、空白文字などを勝手に変更したり除去したりせず、可能な限り元のフォーマットを維持してください。生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
   systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
@@ -93,7 +93,8 @@ function callGenerativeAI(userPrompt, projectContent) {
   let generatedText = jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
   generatedText = generatedText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
 
-  console.log("Geminiからの応答:\n" + generatedText);
+  // ログ出力のサイズが大きすぎる問題を回避するため、出力を制限
+  console.log("Geminiからの応答（抜粋）:\n" + generatedText.substring(0, 2000) + (generatedText.length > 2000 ? "... (後略)" : ""));
 
   try {
     return JSON.parse(generatedText);
@@ -348,35 +349,12 @@ function deployScript(scriptId, description = '') {
     const versionNumber = versionResult.versionNumber;
     console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
-    // appsscript.jsonからwebapp設定を取得する（デプロイAPIには直接渡さないが、確認のため）
-    // const currentScriptId = ScriptApp.getScriptId(); // 現在のスクリプト自身のID
-    // const manifestUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}/content`;
-    // const getManifestOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    // const getManifestResponse = UrlFetchApp.fetch(manifestUrl, getManifestOptions);
-    // if (getManifestResponse.getResponseCode() !== 200) {
-    //     throw new Error(`マニフェストファイルの取得に失敗: ${getManifestResponse.getContentText()}`);
-    // }
-    // const manifestContent = JSON.parse(getManifestResponse.getContentText());
-    // const appsscriptJsonFile = manifestContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
-    // if (!appsscriptJsonFile) {
-    //     throw new Error("appsscript.jsonファイルが見つかりませんでした。");
-    // }
-    // const manifest = JSON.parse(appsscriptJsonFile.source);
-    // const webappConfig = manifest.webapp;
-
-    // if (!webappConfig) {
-    //     throw new Error("appsscript.jsonにwebapp設定が見つかりません。ウェブアプリとしてデプロイするには必要です。");
-    // }
-
     // 3. デプロイAPIのペイロードを正しく構築する
-    // ログのエラー「Unknown name "entryPoints": Cannot find field.」を解決するため、
-    // createDeployment APIのペイロードからentryPointsを削除します。
-    // entryPointsはレスポンスに含まれるプロパティであり、リクエストボディには含めません。
+    // ログのエラー「Unknown name "deploymentConfig": Cannot find field.」を解決するため、
+    // createDeployment APIのペイロードから"deploymentConfig"を削除し、直接プロパティを渡します。
     const deploymentRequestBody = {
-      "deploymentConfig": {
-        "versionNumber": versionNumber,
-        "manifestFileName": "appsscript"
-      },
+      "versionNumber": versionNumber,
+      "manifestFileName": "appsscript",
       "description": description
     };
     console.log("デプロイリクエストペイロード:", JSON.stringify(deploymentRequestBody));
@@ -402,23 +380,18 @@ function deployScript(scriptId, description = '') {
 
     const deploymentResult = JSON.parse(responseBody);
     console.log("デプロイ成功応答データ:", JSON.stringify(deploymentResult, null, 2));
-    console.log("deploymentResult:", JSON.stringify(deploymentResult, null, 2)); // デバッグログを追加
 
     // デプロイ結果からWebアプリURLを安全に抽出するように修正
     let webappUrl;
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
       console.log("デプロイ応答のentryPointsプロパティ:", JSON.stringify(deploymentResult.entryPoints));
       const entryPoint = deploymentResult.entryPoints[0];
-      // `entryPoint.webApp` が存在し、オブジェクトであり、さらに `url` プロパティを持つことを確認
-      // Optional Chaining を使用して、`TypeError: Cannot read properties of undefined (reading 'url')` を回避
       if (entryPoint?.webApp?.url) {
         webappUrl = entryPoint.webApp.url;
         console.log("WebアプリURLをentryPointから抽出しました:", webappUrl);
       } else if (entryPoint?.webApp) {
-        // webAppオブジェクトはあるがURLがない場合
         console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", JSON.stringify(entryPoint.webApp, null, 2));
       } else {
-        // webAppオブジェクト自体がない場合
         console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", JSON.stringify(entryPoint, null, 2));
       }
     } else {
@@ -510,4 +483,3 @@ function fixErrorsFromLogs(targetScriptId) {
     return { status: 'error', message: `エラー修正提案生成エラー: ${error.message}` };
   }
 }
-
