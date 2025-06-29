@@ -154,6 +154,21 @@
 
   <hr>
 
+  <h2>Script Editor URL</h2>
+  <form id="editor-url-form">
+    <p>Using the Script ID entered above.</p>
+    <button type="submit" id="getEditorUrlButton">Show Editor URL</button>
+  </form>
+
+  <div id="editor-url-loading-spinner" class="spinner" style="display:none;"></div>
+
+  <div id="editor-url-result-container" style="display:none;">
+    <h3>Editor URL:</h3>
+    <pre id="editor-url-result"></pre>
+  </div>
+
+  <hr>
+
   <h2>Automated Error Fix from Logs</h2>
   <p>既存のスクリプトログに基づいて、AIにエラー修正の提案をさせます。提案された変更は上記の「AI Proposed Changes」セクションに表示されます。</p>
   <form id="fix-errors-form">
@@ -694,6 +709,53 @@
     // Event listener for Load Projects button
     document.getElementById('loadProjectsButton').addEventListener('click', function() {
         loadProjectsIntoDropdown(getEffectiveScriptId()); // Pass current ID to try and re-select
+    });
+
+    // Event Listener for Show Editor URL button
+    document.getElementById('editor-url-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const submitButton = form.querySelector('#getEditorUrlButton');
+      const spinner = document.getElementById('editor-url-loading-spinner');
+      const resultContainer = document.getElementById('editor-url-result-container');
+      const resultText = document.getElementById('editor-url-result');
+
+      submitButton.disabled = true;
+      spinner.style.display = 'block';
+      resultContainer.style.display = 'none';
+      resultText.textContent = '';
+
+      const scriptId = getEffectiveScriptId();
+
+      // Save scriptId to localStorage when getting editor URL
+      saveScriptIdToLocalStorage(scriptId);
+
+      if (!scriptId) {
+        resultText.textContent = 'Error: スクリプトIDが指定されていません。';
+        resultContainer.style.display = 'block';
+        submitButton.disabled = false;
+        spinner.style.display = 'none';
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          spinner.style.display = 'none';
+          submitButton.disabled = false;
+          resultContainer.style.display = 'block';
+          if (response.startsWith("エラー:")) {
+            resultText.textContent = response;
+          } else {
+            resultText.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
+          }
+        })
+        .withFailureHandler(function(error) {
+          spinner.style.display = 'none';
+          submitButton.disabled = false;
+          resultContainer.style.display = 'block';
+          resultText.textContent = `Error getting editor URL: ${error.message}`;
+        })
+        .getScriptEditorUrl(scriptId);
     });
   </script>
 </body>
