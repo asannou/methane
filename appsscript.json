@@ -3,13 +3,14 @@
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
   "webapp": {
-    "executeAs": "USER_DEPLOYING",
+    "executeAs": "USER_ACCESSING",
     "access": "MYSELF"
   },
   "oauthScopes": [
     "https://www.googleapis.com/auth/script.projects",
     "https://www.googleapis.com/auth/script.external_request",
     "https://www.googleapis.com/auth/logging.read",
-    "https://www.googleapis.com/auth/script.deployments"
+    "https://www.googleapis.com/auth/script.deployments",
+    "https://www.googleapis.com/auth/script.versions"
   ]
 }

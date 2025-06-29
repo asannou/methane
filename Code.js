@@ -317,16 +317,28 @@ function getScriptLogs(targetScriptId) {
  */
 function deployScript(scriptId, description = '') {
   const accessToken = ScriptApp.getOAuthToken();
+  const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
-    // デプロイには新しいバージョン番号が必要なため、まず新しいバージョンを作成する
+    // 1. 新しいバージョンを作成する
     console.log("新しいスクリプトバージョンを作成中...");
-    const version = ScriptApp.newVersion(); // 新しいバージョンを作成
-    const versionNumber = version.getVersionNumber(); // そのバージョン番号を取得
+    const createVersionOptions = {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      payload: JSON.stringify({ description: `Deployment version created by Methane AI Agent: ${description}` }), // Version description
+      muteHttpExceptions: true
+    };
+    const createVersionResponse = UrlFetchApp.fetch(versionsApiUrl, createVersionOptions);
+    if (createVersionResponse.getResponseCode() !== 200) {
+      throw new Error(`バージョン作成APIエラー (ステータス: ${createVersionResponse.getResponseCode()}): ${createVersionResponse.getContentText()}`);
+    }
+    const versionResult = JSON.parse(createVersionResponse.getContentText());
+    const versionNumber = versionResult.versionNumber;
     console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
 
-    // appsscript.jsonからwebapp設定を取得する
+    // 2. appsscript.jsonからwebapp設定を取得する
     const currentScriptId = ScriptApp.getScriptId(); // 現在のスクリプト自身のID
     const manifestUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}/content`;
     const getManifestOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
@@ -346,22 +358,31 @@ function deployScript(scriptId, description = '') {
         throw new Error("appsscript.jsonにwebapp設定が見つかりません。ウェブアプリとしてデプロイするには必要です。");
     }
 
-    const requestBody = {
+    // 3. デプロイAPIのペイロードを正しく構築する
+    const deploymentRequestBody = {
       "versionNumber": versionNumber, // 作成したばかりのバージョン番号を指定
       "description": description,
-      "webapp": webappConfig // ここにwebappフィールドを含める必要がある
+      "entryPoints": [
+        {
+          "entryPointType": "WEB_APP",
+          "webApp": {
+            "executeAs": webappConfig.executeAs,
+            "access": webappConfig.access
+          }
+        }
+      ]
     };
 
-    const options = {
+    const deployOptions = {
       method: 'post',
       contentType: 'application/json',
-      payload: JSON.stringify(requestBody),
+      payload: JSON.stringify(deploymentRequestBody),
       headers: { 'Authorization': `Bearer ${accessToken}` },
       muteHttpExceptions: true
     };
 
-    console.log(`スクリプトID ${scriptId} のバージョン ${versionNumber} をデプロイ中...`);
-    const response = UrlFetchApp.fetch(deploymentsApiUrl, options);
+    console.log(`スクリプトID ${scriptId} のバージョン ${versionNumber} をウェブアプリとしてデプロイ中...`);
+    const response = UrlFetchApp.fetch(deploymentsApiUrl, deployOptions);
     const responseCode = response.getResponseCode();
     const responseBody = response.getContentText();
 
