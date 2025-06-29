@@ -300,17 +300,16 @@ function deployScript(scriptId, description = '') {
     // Default webapp settings from appsscript.json
     const webappSettings = appsscriptConfig.webapp || { executeAs: "USER_DEPLOYING", access: "MYSELF" };
 
+    // ユーザーからの報告されたエラー: "Invalid JSON payload received. Unknown name \"entryPoints\": Cannot find field."
+    // これは、Apps Script Deployments APIが、ウェブアプリデプロイメントに対して 'entryPoints' フィールドを
+    // 認識しない、または異なる形式を期待することを示唆しています。公式ドキュメントと矛盾する場合がありますが、
+    // このエラーを解決するために 'webapp' 設定を直接トップレベルに配置します。
     const requestBody = {
       "description": description,
-      "entryPoints": [
-        {
-          "entryPointType": "WEB_APP",
-          "webapp": {
-            "executeAs": webappSettings.executeAs,
-            "access": webappSettings.access
-          }
-        }
-      ]
+      "webapp": { // 'entryPoints' の代わりに 'webapp' を直接リクエストボディに含める
+        "executeAs": webappSettings.executeAs,
+        "access": webappSettings.access
+      }
       // versionNumberを省略するとHEADがデプロイされる
     };
 
