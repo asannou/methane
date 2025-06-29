@@ -1,4 +1,5 @@
-const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index').setTitle('Methane AI Agent');
@@ -318,6 +319,7 @@ function getScriptLogs(targetScriptId) {
 /**
  * スクリプトの新しいバージョンを作成し、それを新しいウェブアプリとしてデプロイします。
  * appsscript.jsonに定義されたウェブアプリ設定を適用します。
+ * 既存の古いウェブアプリデプロイメントは自動的にアーカイブ（削除）されます。
  * @param {string} scriptId - デプロイするスクリプトのID
  * @param {string} description - デプロイの説明（オプション）
  * @returns {object} - デプロイ結果（成功/失敗、デプロイID、URL）
@@ -387,6 +389,8 @@ function deployScript(scriptId, description = '') {
     const deploymentResult = JSON.parse(responseBody);
     console.log("デプロイ成功応答データ:", JSON.stringify(deploymentResult, null, 2));
 
+    const newDeploymentId = deploymentResult.deploymentId; // 新しく作成されたデプロイメントのIDを取得
+
     // デプロイ結果からWebアプリURLを安全に抽出するように修正
     let webappUrl;
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
@@ -404,20 +408,52 @@ function deployScript(scriptId, description = '') {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
+    // --- 新しいロジック: 古いウェブアプリデプロイメントをアーカイブ（削除）する --- 
+    console.log("古いウェブアプリデプロイメントをアーカイブ中...");
+    const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
+    const listOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const listResponse = UrlFetchApp.fetch(listDeploymentsUrl, listOptions);
+    const listResponseBody = listResponse.getContentText();
+
+    if (listResponse.getResponseCode() !== 200) {
+      console.warn(`既存デプロイメントのリスト取得に失敗しましたが、新しいデプロイメントは成功しています。エラー: ${listResponseBody}`);
+    } else {
+      const existingDeployments = JSON.parse(listResponseBody).deployments || [];
+      console.log(`既存のデプロイメント数: ${existingDeployments.length}`);
+
+      existingDeployments.forEach(dep => {
+        // 新しく作成されたデプロイメントではなく、かつウェブアプリタイプであるものを特定
+        const isWebApp = dep.entryPoints && dep.entryPoints.some(ep => ep.webApp);
+        if (dep.deploymentId !== newDeploymentId && isWebApp) {
+          console.log(`古いウェブアプリデプロイメントを削除中: ID = ${dep.deploymentId}, URL = ${dep.entryPoints.find(ep => ep.webApp)?.webApp?.url || 'N/A'}`);
+          const deleteDeploymentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments/${dep.deploymentId}`;
+          const deleteOptions = { method: 'delete', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+          const deleteResponse = UrlFetchApp.fetch(deleteDeploymentUrl, deleteOptions);
+
+          if (deleteResponse.getResponseCode() !== 200) {
+            console.warn(`古いデプロイメント ${dep.deploymentId} の削除に失敗: ${deleteResponse.getContentText()}`);
+          } else {
+            console.log(`古いデプロイメント ${dep.deploymentId} を正常に削除しました。`);
+          }
+        }
+      });
+    }
+    // --- 新しいロジック終了 --- 
+
     if (!webappUrl) {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
       return {
         status: 'success',
-        message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。',
-        deploymentId: deploymentResult.deploymentId,
+        message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。古いウェブアプリデプロイメントはアーカイブされました。',
+        deploymentId: newDeploymentId,
         webappUrl: 'URL not found in response'
       };
     }
 
     return {
       status: 'success',
-      message: 'デプロイが正常に完了しました。',
-      deploymentId: deploymentResult.deploymentId,
+      message: 'デプロイが正常に完了しました。古いウェブアプリデプロイメントはアーカイブされました。',
+      deploymentId: newDeploymentId,
       webappUrl: webappUrl
     };
 
@@ -538,3 +574,4 @@ function listAppsScriptProjects() {
     return { status: 'error', message: `Apps Scriptプロジェクトのリストエラー: ${e.message}` };
   }
 }
+
