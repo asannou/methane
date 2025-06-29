@@ -68,7 +68,7 @@
     text-align: right;
     user-select: none;
     flex-shrink: 0;
-    width: 30px;
+    /* width: 30px; */ /* REMOVED: Fixed width, causing unnatural sizing */
     border-right: 1px solid #ddd;
     font-family: monospace;
     font-size: 0.9em;
@@ -563,7 +563,8 @@
             let errorMessage = response.message;
             if (response.fullErrorText) {
                 errorMessage += '\nAPI Response: ' + response.fullErrorText;
-            } else if (response.apiErrorDetails) {
+            }
+            else if (response.apiErrorDetails) {
                 errorMessage += '\nAPI Details: ' + JSON.stringify(response.apiErrorDetails, null, 2);
             }
             applyResultText.textContent = errorMessage;
