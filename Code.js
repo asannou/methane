@@ -490,3 +490,42 @@ function fixErrorsFromLogs(targetScriptId) {
   }
 }
 
+/**
+ * Lists Apps Script projects accessible to the user.
+ * @returns {object} An object containing 'status' and either 'projects' (Array<object>) or 'message'.
+ */
+function listAppsScriptProjects() {
+  const accessToken = ScriptApp.getOAuthToken();
+  const apiUrl = 'https://script.googleapis.com/v1/projects'; // This lists standalone projects
+  
+  const options = {
+    method: 'get',
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode !== 200) {
+      console.error(`Apps Script Projects API Error (Status: ${responseCode}): ${responseBody}`);
+      return { status: 'error', message: `Apps Scriptプロジェクトの取得に失敗しました: ${responseBody}` };
+    }
+
+    const projectsData = JSON.parse(responseBody);
+    console.log("Projects data:", JSON.stringify(projectsData, null, 2));
+
+    const projects = (projectsData.projects || []).map(p => ({
+      id: p.scriptId,
+      title: p.title || p.scriptId // Use title if available, otherwise scriptId
+    }));
+
+    return { status: 'success', projects: projects };
+
+  } catch (e) {
+    console.error("Apps Scriptプロジェクトのリスト中にエラーが発生しました:", e);
+    return { status: 'error', message: `Apps Scriptプロジェクトのリストエラー: ${e.message}` };
+  }
+}

@@ -4,7 +4,7 @@
 <base target="_top">
 <style>
   body { font-family: sans-serif; margin: 20px; }
-  input, textarea, button { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+  input, textarea, button, select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
   textarea { height: 150px; }
   /* Updated pre styles for better code display */
   pre {
@@ -90,8 +90,15 @@
 <body>
   <h1>Methane AI Agent</h1>
   <form id="agent-form">
-    <label for="scriptId">Target Script ID:</label>
-    <input type="text" id="scriptId" name="scriptId" required>
+    <label for="scriptIdSelect">Target Script ID:</label>
+    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+      <select id="scriptIdSelect" name="scriptIdSelect" style="flex-grow: 1;">
+        <option value="">-- Select or type manually --</option>
+      </select>
+      <button type="button" id="loadProjectsButton" style="width: auto; margin-bottom: 0;">Load Projects</button>
+    </div>
+    <input type="text" id="scriptIdManualInput" placeholder="Or paste Script ID here (overrides selection)" style="margin-bottom: 10px;">
+
     <label for="prompt">Prompt:</label>
     <textarea id="prompt" name="prompt" required></textarea>
     <button type="submit" id="proposeChangesButton">Propose Changes</button>
@@ -177,21 +184,14 @@
   <script>
     let currentProposal = null; // Store the AI's proposal globally for applyChanges
 
-    // --- New: Load scriptId from localStorage on page load ---
-    document.addEventListener('DOMContentLoaded', function() {
-      const scriptIdInput = document.getElementById('scriptId');
-      const savedScriptId = localStorage.getItem('targetScriptId');
-      if (savedScriptId) {
-        scriptIdInput.value = savedScriptId;
-      }
-
-      // NEW: Load GCP Project ID from localStorage
-      const gcpProjectIdInput = document.getElementById('gcpProjectId');
-      const savedGcpProjectId = localStorage.getItem('gcpProjectId');
-      if (savedGcpProjectId) {
-        gcpProjectIdInput.value = savedGcpProjectId;
-      }
-    });
+    // Helper to get the effective script ID
+    function getEffectiveScriptId() {
+        const manualId = document.getElementById('scriptIdManualInput').value.trim();
+        if (manualId) {
+            return manualId;
+        }
+        return document.getElementById('scriptIdSelect').value.trim();
+    }
 
     // --- New: Helper function to save scriptId to localStorage ---
     function saveScriptIdToLocalStorage(id) {
@@ -206,6 +206,59 @@
             localStorage.setItem('gcpProjectId', id);
         }
     }
+
+    // Function to load projects and populate the dropdown
+    function loadProjectsIntoDropdown(selectedId = null) {
+        const scriptIdSelect = document.getElementById('scriptIdSelect');
+        const loadProjectsButton = document.getElementById('loadProjectsButton');
+        loadProjectsButton.disabled = true; // Disable button while loading
+
+        // Clear existing options except the placeholder
+        scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
+
+        google.script.run
+            .withSuccessHandler(function(response) {
+                loadProjectsButton.disabled = false;
+                if (response.status === 'success') {
+                    response.projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.title;
+                        scriptIdSelect.appendChild(option);
+                    });
+                    if (selectedId) {
+                        scriptIdSelect.value = selectedId; // Set selected if saved ID was passed
+                    }
+                } else {
+                    alert('Failed to load Apps Script projects: ' + response.message);
+                }
+            })
+            .withFailureHandler(function(error) {
+                loadProjectsButton.disabled = false;
+                alert('Error loading Apps Script projects: ' + error.message);
+            })
+            .listAppsScriptProjects();
+    }
+
+    // --- New: Load scriptId from localStorage on page load ---
+    document.addEventListener('DOMContentLoaded', function() {
+      const scriptIdManualInput = document.getElementById('scriptIdManualInput');
+      const gcpProjectIdInput = document.getElementById('gcpProjectId');
+
+      const savedScriptId = localStorage.getItem('targetScriptId');
+      if (savedScriptId) {
+        scriptIdManualInput.value = savedScriptId;
+      }
+
+      // NEW: Load GCP Project ID from localStorage
+      const savedGcpProjectId = localStorage.getItem('gcpProjectId');
+      if (savedGcpProjectId) {
+        gcpProjectIdInput.value = savedGcpProjectId;
+      }
+
+      // Auto-load projects on page load
+      loadProjectsIntoDropdown(savedScriptId); // Pass the saved ID so it tries to pre-select
+    });
 
     // NEW: Function to format code with line numbers
     function formatCodeWithLineNumbers(code) {
@@ -323,7 +376,7 @@
       document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
 
       const formData = {
-        scriptId: document.getElementById('scriptId').value,
+        scriptId: getEffectiveScriptId(), // Changed to use helper
         prompt: document.getElementById('prompt').value
       };
 
@@ -417,7 +470,7 @@
 
     // NEW: Event Listener for Fix Apply Errors button
     document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
-      const scriptId = document.getElementById('scriptId').value;
+      const scriptId = getEffectiveScriptId(); // Changed to use helper
       if (!scriptId) {
         document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
         document.getElementById('apply-result-container').style.display = 'block';
@@ -516,7 +569,7 @@
       submitButton.disabled = true;
       spinner.style.display = 'block';
 
-      const scriptId = document.getElementById('scriptId').value;
+      const scriptId = getEffectiveScriptId(); // Changed to use helper
 
       // --- Save scriptId to localStorage when getting logs ---
       saveScriptIdToLocalStorage(scriptId);
@@ -556,7 +609,7 @@
       fixApplyErrorsButton.style.display = 'none'; // Hide the specific apply error fix button
       document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
 
-      const scriptId = document.getElementById('scriptId').value;
+      const scriptId = getEffectiveScriptId(); // Changed to use helper
 
       // Save scriptId to localStorage
       saveScriptIdToLocalStorage(scriptId);
@@ -608,7 +661,7 @@
       resultContainer.style.display = 'none';
       resultText.textContent = '';
 
-      const scriptId = document.getElementById('scriptId').value;
+      const scriptId = getEffectiveScriptId(); // Changed to use helper
       const description = document.getElementById('deploymentDescription').value;
 
       // Save scriptId to localStorage when deploying
@@ -636,6 +689,11 @@
           resultText.textContent = `Error deploying script: ${error.message}`;
         })
         .deployScript(scriptId, description);
+    });
+
+    // Event listener for Load Projects button
+    document.getElementById('loadProjectsButton').addEventListener('click', function() {
+        loadProjectsIntoDropdown(getEffectiveScriptId()); // Pass current ID to try and re-select
     });
   </script>
 </body>
