@@ -165,6 +165,13 @@ function getScriptLogs(targetScriptId) {
       throw new Error(`現在のスクリプトのメタデータ取得に失敗: ${metadataResponse.getContentText()}`);
     }
     const metadata = JSON.parse(metadataResponse.getContentText());
+
+    // defensive check for metadata.name before calling .match()
+    if (!metadata || typeof metadata.name !== 'string') {
+      console.error("Received metadata:", metadata); // Log the problematic metadata
+      throw new Error("スクリプトのメタデータに 'name' プロパティが見つからないか、不正な形式です。ログ取得を続行できません。");
+    }
+
     const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
     if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
       throw new Error("現在のスクリプトのGCPプロジェクトIDを特定できませんでした。");
@@ -178,9 +185,9 @@ function getScriptLogs(targetScriptId) {
       "resourceNames": [
         `projects/${gcpProjectId}`
       ],
-      "filter": `resource.type="app_script_function" AND labels.script.googleapis.com/script_id="${targetScriptId}"`, // Apps Scriptログに特化したフィルタ
+      "filter": `resource.type="app_script_function" AND labels.script.googleapis.com/script_id="${targetScriptId}"`,
       "orderBy": "timestamp desc",
-      "pageSize": 50 // 最近の50件のログを取得
+      "pageSize": 50
     };
 
     const options = {
