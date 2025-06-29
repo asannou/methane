@@ -39,7 +39,40 @@ function callGenerativeAI(userPrompt, projectContent) {
       "parts": [{ "text": systemPrompt }]
     }],
     "generationConfig": {
-      "response_mime_type": "application/json"
+      "response_mime_type": "application/json",
+      "response_schema": {
+        "type": "OBJECT",
+        "properties": {
+          "purpose": {
+            "type": "STRING",
+            "description": "変更の主旨を簡潔に説明してください。"
+          },
+          "files": {
+            "type": "ARRAY",
+            "items": {
+              "type": "OBJECT",
+              "properties": {
+                "name": {
+                  "type": "STRING",
+                  "description": "ファイル名（例: Code, appsscript, index）"
+                },
+                "type": {
+                  "type": "STRING",
+                  "enum": ["SERVER_JS", "JSON", "HTML"],
+                  "description": "ファイルタイプ（SERVER_JS, JSON, HTMLのいずれか）"
+                },
+                "source": {
+                  "type": "STRING",
+                  "description": "変更後のファイル内容"
+                }
+              },
+              "required": ["name", "type", "source"]
+            },
+            "description": "修正が必要なファイルの新しいソースコードを含むオブジェクトの配列。"
+          }
+        },
+        "required": ["purpose", "files"]
+      }
     }
   };
 
