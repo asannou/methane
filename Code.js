@@ -203,20 +203,17 @@ function getScriptLogs(targetScriptId) {
     const metadata = JSON.parse(metadataResponse.getContentText());
 
     // defensive check for metadata.name before calling .match()
-    if (!metadata || typeof metadata.name !== 'string') {
-      console.error("Received metadata:", metadata); // Log the problematic metadata
-      let errorMessage = "スクリプトのメタデータに 'name' プロパティが見つからないか、不正な形式です。ログ取得を続行できません。";
-      if (metadata) {
-        errorMessage += ` 受信したメタデータ: ${JSON.stringify(metadata)}`;
-      } else {
-        errorMessage += ` 受信したメタデータは null または undefined でした。`;
-      }
-      throw new Error(errorMessage);
+    // スクリプトのメタデータに 'name' プロパティがない、または形式が不正な場合のエラーハンドリングを改善
+    if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
+      console.error("Received metadata:", metadata);
+      const userGuidance = "スクリプトのGCPプロジェクトIDを特定できませんでした。これは、現在のApps Scriptプロジェクトが標準のGoogle Cloudプロジェクトにリンクされていない場合に発生することがあります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）から、Google Cloud Platformプロジェクトを明示的にリンクしてみてください。詳細は以下のメタデータをご確認ください：\n" + JSON.stringify(metadata, null, 2);
+      throw new Error(userGuidance);
     }
 
     const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
     if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
-      throw new Error("現在のスクリプトのGCPプロジェクトIDを特定できませんでした。");
+      // このケースは通常、上記のチェックで捕捉されるはずだが、念のため残しておく
+      throw new Error("現在のスクリプトのGCPプロジェクトIDを、メタデータから正しく抽出できませんでした。");
     }
     const gcpProjectId = gcpProjectIdMatch[1];
     console.log("現在のGCPプロジェクトID:", gcpProjectId);
