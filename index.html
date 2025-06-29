@@ -504,7 +504,11 @@
           submitButton.disabled = false;
           resultContainer.style.display = 'block';
           if (response.status === 'success') {
-            resultText.textContent = `${response.message}\nDeployment ID: ${response.deploymentId}\nWeb App URL: ${response.webappUrl}`;
+            let webappUrlHtml = `Web App URL: ${response.webappUrl}`;
+            if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
+              webappUrlHtml = `Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
+            }
+            resultText.innerHTML = `${response.message}<br>Deployment ID: ${response.deploymentId}<br>${webappUrlHtml}`;
           } else {
             resultText.textContent = `Error: ${response.message}`;
           }
