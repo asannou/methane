@@ -363,9 +363,9 @@ function deployScript(scriptId, description = '') {
     // createDeployment APIのペイロードからentryPointsを削除します。
     // entryPointsはレスポンスに含まれるプロパティであり、リクエストボディには含めません。
     const deploymentRequestBody = {
-      "deploymentConfig": { 
+      "deploymentConfig": {
         "versionNumber": versionNumber,
-        "manifestFileName": "appsscript" 
+        "manifestFileName": "appsscript"
       },
       "description": description
     };
@@ -395,13 +395,14 @@ function deployScript(scriptId, description = '') {
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
       const entryPoint = deploymentResult.entryPoints[0];
       // `entryPoint.webApp` が存在し、オブジェクトであり、さらに `url` プロパティを持つことを確認
-      if (entryPoint.webApp && typeof entryPoint.webApp === 'object' && entryPoint.webApp.url) {
+      // Optional Chaining を使用して、`TypeError: Cannot read properties of undefined (reading 'url')` を回避
+      if (entryPoint?.webApp?.url) {
         webappUrl = entryPoint.webApp.url;
-      } else if (entryPoint.webApp && typeof entryPoint.webApp === 'object') {
-        // webAppオブジェクトはあるがURLがない場合（デバッグ用）
+      } else if (entryPoint?.webApp) {
+        // webAppオブジェクトはあるがURLがない場合
         console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", entryPoint.webApp);
       } else {
-        // webAppオブジェクト自体がない場合（デバッグ用）
+        // webAppオブジェクト自体がない場合
         console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", entryPoint);
       }
     }
