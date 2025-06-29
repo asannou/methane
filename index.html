@@ -110,6 +110,7 @@
     <label for="prompt">Prompt:</label>
     <textarea id="prompt" name="prompt" required></textarea>
     <button type="submit" id="proposeChangesButton">Propose Changes</button>
+    <button type="button" id="cancelProposeButton" style="display:none;">Cancel</button>
   </form>
 
   <!-- Loading spinner for proposal -->
@@ -182,6 +183,7 @@
   <form id="fix-errors-form">
     <p>Using the Script ID entered above.</p>
     <button type="submit" id="fixErrorsButton">Fix Errors from Logs</button>
+    <button type="button" id="cancelFixErrorsButton" style="display:none;">Cancel</button>
   </form>
 
   <div id="fix-loading-spinner" class="spinner" style="display:none;"></div>
@@ -206,6 +208,7 @@
 
   <script>
     let currentProposal = null; // Store the AI's proposal globally for applyChanges
+    let activeRequestId = null; // NEW: Global flag for the currently active request ID
 
     // Helper to get the effective script ID
     function getEffectiveScriptId() {
@@ -420,13 +423,19 @@
       e.preventDefault();
       const form = this;
       const proposeButton = document.getElementById('proposeChangesButton');
+      const cancelProposeButton = document.getElementById('cancelProposeButton'); // NEW
       const spinner = document.getElementById('loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton'); // Get the new button
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+
+      // NEW: Generate a unique ID for this request and set it as active
+      const requestId = Date.now();
+      activeRequestId = requestId;
 
       proposeButton.disabled = true;
+      cancelProposeButton.style.display = 'inline-block'; // Show cancel button
       spinner.style.display = 'block';
       proposalContainer.style.display = 'none'; // Hide previous proposal
       applyButton.style.display = 'none'; // Hide apply button
@@ -444,8 +453,16 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
+          // NEW: Check if this is still the active request
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale success response for processPrompt.');
+            return; // Ignore if cancelled or new request started
+          }
+          // NEW: Reset active request state
+          activeRequestId = null;
           spinner.style.display = 'none';
           proposeButton.disabled = false;
+          cancelProposeButton.style.display = 'none'; // Hide cancel button
 
           if (response.status === 'proposal') {
             currentProposal = response; // Store the proposal
@@ -466,13 +483,48 @@
           }
         })
         .withFailureHandler(function(error) {
+          // NEW: Check if this is still the active request
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale failure response for processPrompt.');
+            return; // Ignore if cancelled or new request started
+          }
+          // NEW: Reset active request state
+          activeRequestId = null;
           spinner.style.display = 'none';
           proposeButton.disabled = false;
+          cancelProposeButton.style.display = 'none'; // Hide cancel button
+
           document.getElementById('apply-result').textContent = 'Error calling AI: ' + error.message;
           document.getElementById('apply-result-container').style.display = 'block';
           document.getElementById('proposal-container').style.display = 'block'; // Show container for error
         })
         .processPrompt(formData);
+    });
+
+    // NEW: Event Listener for Cancel Propose Changes
+    document.getElementById('cancelProposeButton').addEventListener('click', function() {
+      activeRequestId = null; // Invalidate the current active request
+
+      const proposeButton = document.getElementById('proposeChangesButton');
+      const cancelProposeButton = document.getElementById('cancelProposeButton');
+      const spinner = document.getElementById('loading-spinner');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+
+      spinner.style.display = 'none';
+      proposeButton.disabled = false;
+      cancelProposeButton.style.display = 'none';
+      
+      // Clear display or show cancellation message
+      currentProposal = null; // Clear any partial proposal
+      document.getElementById('proposal-purpose').textContent = '';
+      document.getElementById('proposed-files-display').innerHTML = '<p>AI生成はユーザーによってキャンセルされました。</p>';
+      proposalContainer.style.display = 'block'; // Ensure container is visible for message
+      applyButton.style.display = 'none';
+      applyResultContainer.style.display = 'none';
+      fixApplyErrorsButton.style.display = 'none';
     });
 
     // Event Listener for Apply Changes
@@ -489,15 +541,15 @@
       const applyButton = this;
       const applySpinner = document.getElementById('apply-loading-spinner');
       const applyResultText = document.getElementById('apply-result');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton'); // Get the new button
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
 
       applyButton.disabled = true;
-      fixApplyErrorsButton.style.display = 'none'; // Hide it initially
+      fixApplyErrorsButton.style.display = 'none';
       applySpinner.style.display = 'block';
-      applyResultText.textContent = 'Applying changes...'; // Clear previous message
+      applyResultText.textContent = 'Applying changes...';
 
       google.script.run
-        .withSuccessHandler(function(response) { // This handler will now get both success and error objects
+        .withSuccessHandler(function(response) {
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
           
@@ -506,30 +558,30 @@
             currentProposal = null; // Clear proposal
             document.getElementById('applyChangesButton').style.display = 'none';
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
-            fixApplyErrorsButton.style.display = 'none'; // Ensure button is hidden on success
+            fixApplyErrorsButton.style.display = 'none';
           } else { // response.status === 'error'
             let errorMessage = response.message;
-            if (response.fullErrorText) { // Display full API response if available
+            if (response.fullErrorText) {
                 errorMessage += '\nAPI Response: ' + response.fullErrorText;
             } else if (response.apiErrorDetails) {
                 errorMessage += '\nAPI Details: ' + JSON.stringify(response.apiErrorDetails, null, 2);
             }
             applyResultText.textContent = errorMessage;
-            fixApplyErrorsButton.style.display = 'block'; // Show the "Fix Apply Errors" button
+            fixApplyErrorsButton.style.display = 'block';
           }
         })
-        .withFailureHandler(function(error) { // This catches uncaught exceptions from backend
+        .withFailureHandler(function(error) {
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
           applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
-          fixApplyErrorsButton.style.display = 'block'; // Show the "Fix Apply Errors" button
+          fixApplyErrorsButton.style.display = 'block';
         })
         .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles);
     });
 
     // NEW: Event Listener for Fix Apply Errors button
     document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId(); // Changed to use helper
+      const scriptId = getEffectiveScriptId();
       if (!scriptId) {
         document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
         document.getElementById('apply-result-container').style.display = 'block';
@@ -542,54 +594,106 @@
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const proposeChangesButton = document.getElementById('proposeChangesButton'); // Also disable this temporarily
+      const proposeChangesButton = document.getElementById('proposeChangesButton');
+      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton'); // NEW
+
+      // NEW: Generate a unique ID for this request and set it as active
+      const requestId = Date.now();
+      activeRequestId = requestId;
 
       fixButton.disabled = true;
-      proposeChangesButton.disabled = true; // Disable other primary action button
+      proposeChangesButton.disabled = true;
+      cancelFixErrorsButton.style.display = 'inline-block'; // Show cancel button
       spinner.style.display = 'block';
-      proposalContainer.style.display = 'none'; // Hide previous proposal
-      applyButton.style.display = 'none'; // Hide apply button
-      applyResultContainer.style.display = 'none'; // Hide apply result (temporarily, will be re-populated)
-      document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
+      proposalContainer.style.display = 'none';
+      applyButton.style.display = 'none';
+      applyResultContainer.style.display = 'none';
+      document.getElementById('proposed-files-display').innerHTML = '';
 
       // Save scriptId to localStorage
       saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
         .withSuccessHandler(function(response) {
+          // NEW: Check if this is still the active request
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale success response for fixErrorsFromLogs.');
+            return; // Ignore if cancelled or new request started
+          }
+          // NEW: Reset active request state
+          activeRequestId = null;
           spinner.style.display = 'none';
-          fixButton.disabled = false; // Enable this button (fixApplyErrorsButton)
-          proposeChangesButton.disabled = false; // Re-enable other primary action button
+          fixButton.disabled = false;
+          proposeChangesButton.disabled = false;
+          cancelFixErrorsButton.style.display = 'none'; // Hide cancel button
 
           if (response.status === 'proposal') {
-            currentProposal = response; // Store the new proposal
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
+            currentProposal = response;
+            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
-            applyButton.style.display = 'block'; // Show apply button for the new proposal
-            document.getElementById('apply-result').textContent = response.message; // Display initial message
+            applyButton.style.display = 'block';
+            document.getElementById('apply-result').textContent = response.message;
             applyResultContainer.style.display = 'block';
             fixButton.style.display = 'none'; // Hide this button as a new proposal is ready
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
             applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
+            proposalContainer.style.display = 'block';
           } else {
             document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
             applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
+            proposalContainer.style.display = 'block';
           }
         })
         .withFailureHandler(function(error) {
+          // NEW: Check if this is still the active request
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale failure response for fixErrorsFromLogs.');
+            return; // Ignore if cancelled or new request started
+          }
+          // NEW: Reset active request state
+          activeRequestId = null;
           spinner.style.display = 'none';
-          fixButton.disabled = false; // Enable this button (fixApplyErrorsButton)
-          proposeChangesButton.disabled = false; // Re-enable other primary action button
+          fixButton.disabled = false;
+          proposeChangesButton.disabled = false;
+          cancelFixErrorsButton.style.display = 'none'; // Hide cancel button
+
           document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
           document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
+          document.getElementById('proposal-container').style.display = 'block';
         })
         .fixErrorsFromLogs(scriptId);
     });
+
+    // NEW: Event Listener for Cancel Fix Errors
+    document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
+      activeRequestId = null; // Invalidate the current active request
+
+      const fixButton = document.getElementById('fixErrorsButton');
+      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+      const spinner = document.getElementById('fix-loading-spinner');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const proposeChangesButton = document.getElementById('proposeChangesButton');
+
+      spinner.style.display = 'none';
+      fixButton.disabled = false;
+      proposeChangesButton.disabled = false; // Re-enable propose button as well
+      cancelFixErrorsButton.style.display = 'none';
+      
+      // Clear display or show cancellation message
+      currentProposal = null; // Clear any partial proposal
+      document.getElementById('proposal-purpose').textContent = '';
+      document.getElementById('proposed-files-display').innerHTML = '<p>AIによるエラー修正はユーザーによってキャンセルされました。</p>';
+      proposalContainer.style.display = 'block'; // Ensure container is visible for message
+      applyButton.style.display = 'none';
+      applyResultContainer.style.display = 'none';
+      fixApplyErrorsButton.style.display = 'none';
+    });
+
 
     // NEW: Event Listener for Save GCP Project ID
     document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
@@ -628,7 +732,7 @@
       submitButton.disabled = true;
       spinner.style.display = 'block';
 
-      const scriptId = getEffectiveScriptId(); // Changed to use helper
+      const scriptId = getEffectiveScriptId();
 
       // --- Save scriptId to localStorage when getting logs ---
       saveScriptIdToLocalStorage(scriptId);
@@ -649,59 +753,6 @@
         .getScriptLogs(scriptId);
     });
 
-    // NEW: Event Listener for Fix Errors from Logs
-    document.getElementById('fix-errors-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const fixButton = form.querySelector('#fixErrorsButton');
-      const spinner = document.getElementById('fix-loading-spinner');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton'); // Also hide this
-
-      fixButton.disabled = true;
-      spinner.style.display = 'block';
-      proposalContainer.style.display = 'none'; // Hide previous proposal
-      applyButton.style.display = 'none'; // Hide apply button
-      applyResultContainer.style.display = 'none'; // Hide apply result
-      fixApplyErrorsButton.style.display = 'none'; // Hide the specific apply error fix button
-      document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
-
-      const scriptId = getEffectiveScriptId(); // Changed to use helper
-
-      // Save scriptId to localStorage
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          spinner.style.display = 'none';
-          fixButton.disabled = false;
-
-          if (response.status === 'proposal') {
-            currentProposal = response; // Store the proposal
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyButton.style.display = 'block'; // Show apply button
-            document.getElementById('apply-result').textContent = response.message; // Display initial message
-            applyResultContainer.style.display = 'block';
-          } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
-          }
-        })
-        .withFailureHandler(function(error) {
-          spinner.style.display = 'none';
-          fixButton.disabled = false;
-          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
-          document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
-        })
-        .fixErrorsFromLogs(scriptId);
-    });
-
     // Event Listener for Deploy Script
     document.getElementById('deploy-form').addEventListener('submit', function(e) {
       e.preventDefault();
@@ -716,7 +767,7 @@
       resultContainer.style.display = 'none';
       resultText.textContent = '';
 
-      const scriptId = getEffectiveScriptId(); // Changed to use helper
+      const scriptId = getEffectiveScriptId();
       const description = document.getElementById('deploymentDescription').value;
 
       // Save scriptId to localStorage when deploying
