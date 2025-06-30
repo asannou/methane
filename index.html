@@ -121,6 +121,7 @@
     <h2>AI Generated Policy:</h2>
     <pre id="ai-policy"></pre>
     <button type="button" id="acceptPolicyButton" style="display:none;">Accept Policy & Propose Changes</button>
+    <button type="button" id="regeneratePolicyButton" style="display:none;">Regenerate Policy</button>
   </div>
 
   <!-- Proposal Review Section -->
@@ -299,6 +300,7 @@
       document.getElementById('applyChangesButton').style.display = 'none';
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
+      document.getElementById('regeneratePolicyButton').style.display = 'none';
     });
 
     // Function to generate the formatted HTML for both original and proposed panels for a single file.
@@ -441,6 +443,7 @@
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const loadingSpinner = document.getElementById('loading-spinner');
+      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
 
       const scriptId = getEffectiveScriptId();
       const promptText = document.getElementById('prompt').value;
@@ -462,6 +465,7 @@
       generatePolicyButton.disabled = true;
       document.getElementById('prompt').readOnly = true; // Disable prompt input during operation
       cancelAiOperationButton.style.display = 'inline-block';
+      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
       document.getElementById('applyChangesButton').style.display = 'none';
@@ -495,6 +499,7 @@
               document.getElementById('ai-policy').textContent = response.policy;
               document.getElementById('policy-container').style.display = 'block';
               document.getElementById('acceptPolicyButton').style.display = 'inline-block';
+              regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button
               generatePolicyButton.style.display = 'none'; // Hide generate policy button
               document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled
             } else if (response.status === 'error') {
@@ -530,11 +535,13 @@
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const loadingSpinner = document.getElementById('loading-spinner');
+      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
 
       // Reset UI for proposal generation
       loadingSpinner.style.display = 'block';
       acceptPolicyButton.disabled = true;
       acceptPolicyButton.style.display = 'none'; // Hide accept policy button
+      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
       cancelAiOperationButton.style.display = 'inline-block';
       document.getElementById('policy-container').style.display = 'none'; // Hide policy container
       document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal
@@ -605,6 +612,7 @@
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
+      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
@@ -624,6 +632,7 @@
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
       acceptPolicyButton.style.display = 'none';
+      regeneratePolicyButton.style.display = 'none';
       applyChangesButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
@@ -631,6 +640,108 @@
       generatePolicyButton.style.display = 'inline-block'; // Ensure primary button is visible
 
       alert('AI操作はユーザーによってキャンセルされました。');
+    });
+
+    // Event Listener for Regenerate Policy button
+    document.getElementById('regeneratePolicyButton').addEventListener('click', function() {
+      const scriptId = getEffectiveScriptId();
+      const promptText = document.getElementById('prompt').value;
+
+      if (!scriptId) {
+        alert('Please select or enter a Script ID.');
+        return;
+      }
+      if (!promptText.trim()) {
+        alert('Prompt cannot be empty.');
+        return;
+      }
+
+      saveScriptIdToLocalStorage(scriptId);
+
+      // UI Reset and loading state
+      const loadingSpinner = document.getElementById('loading-spinner');
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
+      const acceptPolicyButton = document.getElementById('acceptPolicyButton');
+      const regeneratePolicyButton = this; // The button itself
+      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const policyContainer = document.getElementById('policy-container');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyChangesButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+
+      loadingSpinner.style.display = 'block';
+      generatePolicyButton.disabled = true; // Disable original generate button
+      acceptPolicyButton.disabled = true; // Disable accept button
+      regeneratePolicyButton.disabled = true; // Disable regenerate button
+      document.getElementById('prompt').readOnly = true;
+      cancelAiOperationButton.style.display = 'inline-block';
+
+      // Hide all related sections and clear content
+      policyContainer.style.display = 'none';
+      proposalContainer.style.display = 'none';
+      applyChangesButton.style.display = 'none';
+      applyResultContainer.style.display = 'none';
+      fixApplyErrorsButton.style.display = 'none';
+      document.getElementById('proposed-files-display').innerHTML = '';
+      document.getElementById('ai-policy').textContent = '';
+      document.getElementById('proposal-purpose').textContent = '';
+
+      currentPolicyData = null; // Clear previous policy data
+      currentProposal = null; // Clear previous proposal data
+
+      const formData = { scriptId: scriptId, prompt: promptText };
+
+      const requestId = Date.now();
+      activeRequestId = requestId;
+
+      console.log('Regenerating policy...');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale success response for regeneratePolicy.');
+            return;
+          }
+          activeRequestId = null;
+          loadingSpinner.style.display = 'none';
+          generatePolicyButton.disabled = false; // Re-enable original generate button
+          acceptPolicyButton.disabled = false; // Re-enable accept button
+          regeneratePolicyButton.disabled = false; // Re-enable regenerate button
+          document.getElementById('prompt').readOnly = false;
+          cancelAiOperationButton.style.display = 'none';
+
+          if (response.status === 'policy') {
+            currentPolicyData = response;
+            document.getElementById('ai-policy').textContent = response.policy;
+            policyContainer.style.display = 'block';
+            acceptPolicyButton.style.display = 'inline-block';
+            regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button again
+            generatePolicyButton.style.display = 'none'; // Keep original generate button hidden
+            document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled
+          } else if (response.status === 'error') {
+            document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
+            policyContainer.style.display = 'block';
+            generatePolicyButton.style.display = 'inline-block'; // Show original generate button on error
+          }
+        })
+        .withFailureHandler(function(error) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale failure response for regeneratePolicy.');
+            return;
+          }
+          activeRequestId = null;
+          loadingSpinner.style.display = 'none';
+          generatePolicyButton.disabled = false;
+          acceptPolicyButton.disabled = false;
+          regeneratePolicyButton.disabled = false;
+          document.getElementById('prompt').readOnly = false;
+          cancelAiOperationButton.style.display = 'none';
+
+          document.getElementById('ai-policy').textContent = 'Error regenerating policy: ' + error.message;
+          policyContainer.style.display = 'block';
+          generatePolicyButton.style.display = 'inline-block'; // Show original generate button on error
+        })
+        .generateProposalPolicy(formData);
     });
 
     // Event Listener for Apply Changes
