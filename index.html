@@ -485,7 +485,7 @@
       // Reset UI for new operation
       loadingSpinner.style.display = 'block';
       generatePolicyButton.disabled = true;
-      document.getElementById('prompt').readOnly = true; // Disable prompt input during operation
+      // document.getElementById('prompt').readOnly = true; // Disable prompt input during operation - Removed as per user instruction
       cancelAiOperationButton.style.display = 'inline-block';
       regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
       document.getElementById('regenerateProposalButton').style.display = 'none'; // Hide new button
@@ -526,7 +526,7 @@
               document.getElementById('acceptPolicyButton').style.display = 'inline-block';
               regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button
               generatePolicyButton.style.display = 'none'; // Hide generate policy button
-              document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled
+              // document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled - Removed as per user instruction
             } else if (response.status === 'error') {
               document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
               document.getElementById('policy-container').style.display = 'block';
@@ -571,7 +571,7 @@
       regenerateProposalButton.style.display = 'none'; // Hide new button during generation
       cancelAiOperationButton.style.display = 'inline-block';
       // Removed: document.getElementById('policy-container').style.display = 'none'; // Hide policy container
-      document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal
+      // document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal - Removed as per user instruction
 
       const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt };
 
@@ -733,7 +733,7 @@
       generatePolicyButton.disabled = true; // Disable original generate button
       acceptPolicyButton.disabled = true; // Disable accept button
       regeneratePolicyButton.disabled = true; // Disable regenerate button
-      document.getElementById('prompt').readOnly = true;
+      // document.getElementById('prompt').readOnly = true; // Removed as per user instruction
       cancelAiOperationButton.style.display = 'inline-block';
 
       // Hide all related sections and clear content
@@ -779,7 +779,7 @@
             acceptPolicyButton.style.display = 'inline-block';
             regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button again
             generatePolicyButton.style.display = 'none'; // Keep original generate button hidden
-            document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled
+            // document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled - Removed as per user instruction
           } else if (response.status === 'error') {
             document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
             policyContainer.style.display = 'block';
@@ -851,11 +851,11 @@
                 } else if (response.webappUrl === 'URL not found in response') {
                   message += `<br>WebアプリURL: ${response.webappUrl}`;
                 }
-              } else if (response.deploymentStatus === 'error') {
-                message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`;
-              } else { // not_attempted
-                message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`;
               }
+            } else if (response.deploymentStatus === 'error') {
+              message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`;
+            } else { // not_attempted
+              message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`;
             }
             applyResultText.innerHTML = message; // Use innerHTML because of HTML links
             currentProposal = null; // Clear proposal
