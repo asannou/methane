@@ -6,61 +6,12 @@ function doGet() {
 }
 
 /**
- * Attempts a basic syntax validation of HTML content.
- * This is not a full HTML parser but checks for common structural issues required for Apps Script web apps.
- * @param {string} htmlContent - The HTML string to validate.
- * @returns {{isValid: boolean, message: string}} - Validation result.
- */
-function validateHtmlSyntax(htmlContent) {
-  if (!htmlContent || typeof htmlContent !== 'string') {
-    return { isValid: false, message: "HTML content is null or not a string." };
-  }
-
-  // 必須タグの存在チェック
-  const requiredTags = ['<!DOCTYPE html>', '<html>', '<head>', '<body>', '</head>', '</html>', '</body>'];
-  for (const tag of requiredTags) {
-    if (!htmlContent.includes(tag)) {
-      return { isValid: false, message: `Missing required HTML tag: ${tag}` };
-    }
-  }
-
-  // <base target="_top"> の存在チェック (Apps Script Web Appsのベストプラクティス)
-  if (htmlContent.includes('<base ') && !htmlContent.includes('<base target="_top">')) {
-    return { isValid: false, message: "If <base> tag is present, it should be <base target=\"_top\"> for Apps Script web apps to prevent framing issues." };
-  }
-
-  // 簡易的な閉じタグのマッチングチェック（非常に基本的なもの）
-  // これを正確に行うにはDOMパーサーが必要ですが、GASでは困難なため、よくある間違いのみに焦点を当てる
-  const simpleTagPairs = [
-    ['div', 'div'], ['p', 'p'], ['span', 'span'], ['script', 'script'], ['style', 'style'],
-    ['pre', 'pre'], ['form', 'form'], ['label', 'label'], ['button', 'button'], ['body', 'body'],
-    ['head', 'head'], ['html', 'html']
-  ];
-
-  for (const [openTag, closeTag] of simpleTagPairs) {
-    const openCount = (htmlContent.match(new RegExp(`<${openTag}[^>]*?>`, 'g')) || []).length;
-    const closeCount = (htmlContent.match(new RegExp(`</${closeTag}>`, 'g')) || []).length;
-    if (openCount !== closeCount) {
-      return { isValid: false, message: `Unmatched <${openTag}> or </${closeTag}> tags. Found <${openTag}>: ${openCount}, </${closeTag}>: ${closeCount}.` };
-    }
-  }
-
-  // その他、基本的なHTML構造の妥当性（例: <head>が<body>の前に来るなど）は、この関数では深追いしない。
-  // そのような高度なチェックはサーバーサイドのHTMLバリデーターに依存すべき。
-
-  return { isValid: true, message: "Basic HTML syntax appears valid." };
-}
-
-/**
  * Gemini APIを呼び出す関数
  * @param {string} userPrompt - ユーザーが入力したプロンプト
  * @param {object} projectContent - 対象プロジェクトの全ファイル情報
- * @param {object} [retryInfo={count: 0, errorMessage: ''}] - リトライ情報
  * @returns {object} - AIが生成した修正後のファイル情報を含むオブジェクト
  */
-function callGenerativeAI(userPrompt, projectContent, retryInfo = { count: 0, errorMessage: '' }) {
-  const MAX_AI_RETRIES = 2; // AIによる再生成の最大試行回数
-
+function callGenerativeAI(userPrompt, projectContent) {
   let systemPrompt = "あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、修正後のファイル内容を生成してください。\n\n";
   systemPrompt += "## 既存のファイル一覧\n";
   projectContent.files.forEach(file => {
@@ -76,15 +27,6 @@ function callGenerativeAI(userPrompt, projectContent, retryInfo = { count: 0, er
   systemPrompt += "  - ファイル名は、上記「既存のファイル一覧」で提示されたものを、一字一句変えずにそのまま使用してください。翻訳や変更は絶対にしないでください。\n";
   systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
   systemPrompt += "  - 生成するソースコードの内容は、指示に関係のない改行、インデント、空白文字などを勝手に変更したり除去したりせず、必ず元のフォーマットを維持してください。特にHTMLファイルでは、元の構造とインデントを厳密に保持してください。 生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
-
-  // NEW: リトライ時の追加指示
-  if (retryInfo.count > 0) {
-    systemPrompt += `\n\n--- 再生成の指示 ---\n`;
-    systemPrompt += `前回の応答に含まれるHTMLファイルが構文エラーを含んでいたため、再生成を要求します。エラーメッセージは以下の通りです。\n`;
-    systemPrompt += `エラー詳細: ${retryInfo.errorMessage}\n`;
-    systemPrompt += `HTMLファイルは必ず有効なHTML5構文に従い、特に閉じタグの欠落や不正な構造がないことを確認してください。\n`;
-  }
-
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
   systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
@@ -139,7 +81,7 @@ function callGenerativeAI(userPrompt, projectContent, retryInfo = { count: 0, er
     muteHttpExceptions: true
   };
 
-  console.log(`Gemini APIにリクエストを送信します (リトライ回数: ${retryInfo.count})...`);
+  console.log("Gemini APIにリクエストを送信します...");
   const response = UrlFetchApp.fetch(API_URL, options);
   const responseCode = response.getResponseCode();
   const responseBody = response.getContentText();
@@ -152,39 +94,11 @@ function callGenerativeAI(userPrompt, projectContent, retryInfo = { count: 0, er
   let generatedText = jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
   generatedText = generatedText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
 
+  // ログ出力のサイズが大きすぎる問題を回避するため、出力を制限
   console.log("Geminiからの応答（抜粋）:\n" + generatedText.substring(0, 2000) + (generatedText.length > 2000 ? "... (後略)" : ""));
 
   try {
-    const aiProposedChanges = JSON.parse(generatedText);
-
-    // HTMLファイルの構文チェックと再生成ロジック
-    if (aiProposedChanges.files && Array.isArray(aiProposedChanges.files)) {
-      let htmlErrorDetected = false;
-      let htmlErrorMessage = "";
-
-      for (const file of aiProposedChanges.files) {
-        if (file.type === 'HTML') {
-          const validationResult = validateHtmlSyntax(file.source);
-          if (!validationResult.isValid) {
-            htmlErrorDetected = true;
-            htmlErrorMessage = validationResult.message;
-            console.warn(`AIが生成したHTMLに構文エラーを検出しました: ${file.name}.html - ${validationResult.message}`);
-            break; // 最初のHTMLエラーで停止し、再生成を試みる
-          }
-        }
-      }
-
-      if (htmlErrorDetected) {
-        if (retryInfo.count < MAX_AI_RETRIES) {
-          console.log(`HTMLエラーのため、AIに再生成を要求します (現在のリトライ: ${retryInfo.count + 1}/${MAX_AI_RETRIES})...`);
-          return callGenerativeAI(userPrompt, projectContent, { count: retryInfo.count + 1, errorMessage: htmlErrorMessage });
-        } else {
-          throw new Error(`AIが${MAX_AI_RETRIES}回の試行後も有効なHTMLを生成できませんでした。最終エラー: ${htmlErrorMessage}`);
-        }
-      }
-    }
-
-    return aiProposedChanges; // 全てのチェックをパスした、またはHTMLファイルが含まれていない場合
+    return JSON.parse(generatedText);
   } catch (e) {
     throw new Error(`AIからのJSON応答の解析に失敗しました: ${e.message}. 受信したテキスト（先頭500文字）: ${generatedText.substring(0, 500)}...`);
   }
