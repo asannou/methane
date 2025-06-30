@@ -246,9 +246,10 @@ function processPrompt(formObject) {
  * ユーザーが承認したAIの提案に基づいてスクリプトファイルを更新します。
  * @param {string} scriptId - 更新対象のスクリプトID
  * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列
+ * @param {boolean} autoDeploy - 変更適用後に自動的にデプロイするかどうか
  * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
  */
-function applyProposedChanges(scriptId, proposedFiles) {
+function applyProposedChanges(scriptId, proposedFiles, autoDeploy) {
   try {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
@@ -286,7 +287,21 @@ function applyProposedChanges(scriptId, proposedFiles) {
         };
     }
 
-    return { status: 'success', message: `スクリプト (ID: ${scriptId}) の更新に成功しました。AIの提案が適用されました。` };
+    let deployResult = null;
+    if (autoDeploy) {
+      console.log(`自動デプロイを開始します。スクリプトID: ${scriptId}`);
+      deployResult = deployScript(scriptId, "AI-proposed changes applied and auto-deployed.");
+      console.log("自動デプロイ結果:", JSON.stringify(deployResult, null, 2));
+    }
+
+    return {
+      status: 'success',
+      message: `スクリプト (ID: ${scriptId}) の更新に成功しました。AIの提案が適用されました。`,
+      deploymentStatus: deployResult ? deployResult.status : 'not_attempted',
+      deploymentMessage: deployResult ? deployResult.message : '自動デプロイは実行されませんでした。',
+      deploymentId: deployResult ? deployResult.deploymentId : null,
+      webappUrl: deployResult ? deployResult.webappUrl : null
+    };
 
   } catch (error) {
     console.error("スクリプト適用中にエラーが発生しました:", error);

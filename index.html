@@ -132,6 +132,9 @@
     <div id="proposed-files-display">
       <!-- File comparisons will be inserted here by JavaScript -->
     </div>
+    <div>
+        <label><input type="checkbox" id="autoDeployAfterApply"> 適用後自動デプロイ</label>
+    </div>
     <button type="button" id="applyChangesButton" style="display:none;">Apply Changes</button>
     <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
     <div id="apply-result-container" style="display:none;">
@@ -759,11 +762,15 @@
       const applySpinner = document.getElementById('apply-loading-spinner');
       const applyResultText = document.getElementById('apply-result');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const autoDeployChecked = document.getElementById('autoDeployAfterApply').checked;
 
       applyButton.disabled = true;
       fixApplyErrorsButton.style.display = 'none';
       applySpinner.style.display = 'block';
       applyResultText.textContent = 'Applying changes...';
+      if (autoDeployChecked) {
+          applyResultText.textContent += '\n自動デプロイを伴います...';
+      }
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -771,7 +778,24 @@
           applyButton.disabled = false;
           
           if (response.status === 'success') {
-            applyResultText.textContent = response.message;
+            let message = response.message;
+            if (response.deploymentStatus) { // Check if deployment attempt was made
+              message += `<br><br><strong>自動デプロイ結果:</strong><br>`;
+              if (response.deploymentStatus === 'success') {
+                message += `状態: 成功<br>メッセージ: ${response.deploymentMessage}`;
+                if (response.deploymentId) message += `<br>デプロイID: ${response.deploymentId}`;
+                if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
+                  message += `<br>WebアプリURL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
+                } else if (response.webappUrl === 'URL not found in response') {
+                  message += `<br>WebアプリURL: ${response.webappUrl}`;
+                }
+              } else if (response.deploymentStatus === 'error') {
+                message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`;
+              } else { // not_attempted
+                message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`;
+              }
+            }
+            applyResultText.innerHTML = message; // Use innerHTML because of HTML links
             currentProposal = null; // Clear proposal
             document.getElementById('applyChangesButton').style.display = 'none';
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
@@ -794,7 +818,7 @@
           applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
           fixApplyErrorsButton.style.display = 'block';
         })
-        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles);
+        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked);
     });
 
     // Event Listener for Fix Apply Errors button
