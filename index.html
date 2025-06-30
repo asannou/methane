@@ -136,6 +136,7 @@
         <label><input type="checkbox" id="autoDeployAfterApply"> 適用後自動デプロイ</label>
     </div>
     <button type="button" id="applyChangesButton" style="display:none;">Apply Changes</button>
+    <button type="button" id="regenerateProposalButton" style="display:none;">Regenerate Proposal</button>
     <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
     <div id="apply-result-container" style="display:none;">
       <h3>Apply Result:</h3>
@@ -301,6 +302,7 @@
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
       document.getElementById('applyChangesButton').style.display = 'none';
+      document.getElementById('regenerateProposalButton').style.display = 'none';
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('regeneratePolicyButton').style.display = 'none';
@@ -469,6 +471,7 @@
       document.getElementById('prompt').readOnly = true; // Disable prompt input during operation
       cancelAiOperationButton.style.display = 'inline-block';
       regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
+      document.getElementById('regenerateProposalButton').style.display = 'none'; // Hide new button
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
       document.getElementById('applyChangesButton').style.display = 'none';
@@ -539,12 +542,14 @@
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const loadingSpinner = document.getElementById('loading-spinner');
       const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
 
       // Reset UI for proposal generation
       loadingSpinner.style.display = 'block';
       acceptPolicyButton.disabled = true;
       acceptPolicyButton.style.display = 'none'; // Hide accept policy button
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
+      regeneratePolicyButton.style.display = 'none'; // Hide regenerate policy button
+      regenerateProposalButton.style.display = 'none'; // Hide new button during generation
       cancelAiOperationButton.style.display = 'inline-block';
       document.getElementById('policy-container').style.display = 'none'; // Hide policy container
       document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal
@@ -574,6 +579,7 @@
             displayFileComparison(response.originalFiles, response.proposedFiles);
             document.getElementById('proposal-container').style.display = 'block';
             document.getElementById('applyChangesButton').style.display = 'block'; // Show apply button
+            regenerateProposalButton.style.display = 'inline-block'; // Show regenerate proposal button
             document.getElementById('apply-result').textContent = response.message; // Display initial message
             document.getElementById('apply-result-container').style.display = 'block';
           } else if (response.status === 'error') {
@@ -616,6 +622,7 @@
       const proposalContainer = document.getElementById('proposal-container');
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
       const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
@@ -636,6 +643,7 @@
       proposalContainer.style.display = 'none';
       acceptPolicyButton.style.display = 'none';
       regeneratePolicyButton.style.display = 'none';
+      regenerateProposalButton.style.display = 'none';
       applyChangesButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
@@ -670,6 +678,7 @@
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
       const applyChangesButton = document.getElementById('applyChangesButton');
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
 
@@ -684,6 +693,7 @@
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
       applyChangesButton.style.display = 'none';
+      regenerateProposalButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
@@ -762,10 +772,12 @@
       const applySpinner = document.getElementById('apply-loading-spinner');
       const applyResultText = document.getElementById('apply-result');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const autoDeployChecked = document.getElementById('autoDeployAfterApply').checked;
 
       applyButton.disabled = true;
       fixApplyErrorsButton.style.display = 'none';
+      regenerateProposalButton.disabled = true; // Disable regenerate proposal button
       applySpinner.style.display = 'block';
       applyResultText.textContent = 'Applying changes...';
       if (autoDeployChecked) {
@@ -776,6 +788,7 @@
         .withSuccessHandler(function(response) {
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
+          regenerateProposalButton.disabled = false;
           
           if (response.status === 'success') {
             let message = response.message;
@@ -798,6 +811,7 @@
             applyResultText.innerHTML = message; // Use innerHTML because of HTML links
             currentProposal = null; // Clear proposal
             document.getElementById('applyChangesButton').style.display = 'none';
+            regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button after applying
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
             fixApplyErrorsButton.style.display = 'none';
           } else { // response.status === 'error'
@@ -815,6 +829,7 @@
         .withFailureHandler(function(error) {
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
+          regenerateProposalButton.disabled = false;
           applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
           fixApplyErrorsButton.style.display = 'block';
         })
@@ -838,6 +853,7 @@
       const applyResultContainer = document.getElementById('apply-result-container');
       const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
 
       // Generate a unique ID for this request and set it as active
@@ -848,6 +864,7 @@
       generatePolicyButton.disabled = true;
       promptInput.readOnly = true; // Disable prompt input during operation
       cancelFixErrorsButton.style.display = 'inline-block';
+      regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button during fix
       spinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
@@ -876,6 +893,7 @@
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyButton.style.display = 'block';
+            regenerateProposalButton.style.display = 'inline-block'; // Show regenerate proposal button
             document.getElementById('apply-result').textContent = response.message;
             applyResultContainer.style.display = 'block';
             fixButton.style.display = 'none'; 
@@ -920,6 +938,7 @@
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
 
       spinner.style.display = 'none';
@@ -927,6 +946,7 @@
       generatePolicyButton.disabled = false; 
       promptInput.readOnly = false; 
       cancelFixErrorsButton.style.display = 'none';
+      regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button on cancel
       
       currentProposal = null; // Clear any partial proposal
       document.getElementById('proposal-purpose').textContent = '';
@@ -937,6 +957,98 @@
       fixApplyErrorsButton.style.display = 'none';
     });
 
+    // Event Listener for Regenerate Proposal button
+    document.getElementById('regenerateProposalButton').addEventListener('click', function() {
+      if (!currentPolicyData || !currentPolicyData.scriptId || !currentPolicyData.userPrompt) {
+        alert('Cannot regenerate proposal. Policy data is missing.');
+        return;
+      }
+
+      const scriptId = currentPolicyData.scriptId;
+      const promptText = currentPolicyData.userPrompt;
+
+      const regenerateButton = this;
+      const loadingSpinner = document.getElementById('loading-spinner'); // Reuse main spinner
+      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyChangesButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+
+      // UI Reset and loading state
+      loadingSpinner.style.display = 'block';
+      regenerateButton.disabled = true; // Disable itself
+      applyChangesButton.disabled = true; // Disable apply button
+      cancelAiOperationButton.style.display = 'inline-block';
+
+      // Hide all related sections and clear content
+      proposalContainer.style.display = 'none';
+      applyChangesButton.style.display = 'none';
+      applyResultContainer.style.display = 'none';
+      fixApplyErrorsButton.style.display = 'none';
+      document.getElementById('proposed-files-display').innerHTML = '';
+      document.getElementById('proposal-purpose').textContent = '';
+      document.getElementById('apply-result').textContent = '';
+
+      currentProposal = null; // Clear previous proposal data
+
+      const formData = { scriptId: scriptId, prompt: promptText };
+
+      const requestId = Date.now();
+      activeRequestId = requestId;
+
+      console.log('Regenerating AI proposed changes...');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale success response for regenerateProposal.');
+            return;
+          }
+          activeRequestId = null;
+          loadingSpinner.style.display = 'none';
+          regenerateButton.disabled = false; // Re-enable itself
+          applyChangesButton.disabled = false; // Re-enable apply button
+          cancelAiOperationButton.style.display = 'none';
+
+          if (response.status === 'proposal') {
+            currentProposal = response;
+            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
+            displayFileComparison(response.originalFiles, response.proposedFiles);
+            proposalContainer.style.display = 'block';
+            applyChangesButton.style.display = 'block';
+            regenerateButton.style.display = 'inline-block'; // Keep it visible after success
+            document.getElementById('apply-result').textContent = response.message;
+            applyResultContainer.style.display = 'block';
+          } else if (response.status === 'error') {
+            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+            regenerateButton.style.display = 'inline-block'; // Keep visible to allow retry
+          } else {
+            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block'; // Show container to display error
+            regenerateButton.style.display = 'inline-block'; // Keep visible
+          }
+        })
+        .withFailureHandler(function(error) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale failure response for regenerateProposal.');
+            return;
+          }
+          activeRequestId = null;
+          loadingSpinner.style.display = 'none';
+          regenerateButton.disabled = false;
+          applyChangesButton.disabled = false;
+          cancelAiOperationButton.style.display = 'none';
+
+          document.getElementById('apply-result').textContent = 'Error regenerating proposal: ' + error.message;
+          applyResultContainer.style.display = 'block';
+          proposalContainer.style.display = 'block'; // Show container for error
+          regenerateButton.style.display = 'inline-block'; // Keep visible
+        })
+        .processPrompt(formData);
+    });
 
     // Event Listener for Save GCP Project ID
     document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
