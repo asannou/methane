@@ -105,10 +105,100 @@ function callGenerativeAI(userPrompt, projectContent) {
 }
 
 /**
+ * ユーザーの指示に基づいて、AIに変更の方針を生成させます。
+ * 実際のコード変更は行いません。
+ * @param {object} formObject - フォームデータ { scriptId: string, prompt: string }
+ * @returns {object} - AIが生成した変更方針を含むオブジェクト
+ */
+function generateProposalPolicy(formObject) {
+  const scriptId = formObject.scriptId;
+  const userPrompt = formObject.prompt;
+
+  if (!API_KEY) {
+    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    if (getResponse.getResponseCode() !== 200) {
+        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+    }
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    let aiPrompt = `以下のGoogle Apps Scriptのファイル群に対して、提供されたユーザーの指示に基づいてどのような変更を提案するか、その大まかな「方針」を簡潔に、箇条書きでまとめてください。\n`;
+    aiPrompt += `コードの詳細は不要で、目的、アプローチ、影響範囲など、高レベルな視点から説明してください。\n\n`;
+    aiPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
+    aiPrompt += `## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n`;
+    aiPrompt += `レスポンス形式の例:\n\`\`\`json\n{\"policy\": \"...変更方針のテキスト...\"}\n\`\`\``;
+
+    // Call Gemini API with a specific schema for policy generation
+    const requestBody = {
+      "contents": [{
+        "parts": [{ "text": aiPrompt }]
+      }],
+      "generationConfig": {
+        "response_mime_type": "application/json",
+        "response_schema": {
+          "type": "OBJECT",
+          "properties": {
+            "policy": {
+              "type": "STRING",
+              "description": "提案される変更の大まかな方針。"
+            }
+          },
+          "required": ["policy"]
+        }
+      }
+    };
+
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(requestBody),
+      muteHttpExceptions: true
+    };
+
+    console.log("Gemini APIに方針生成リクエストを送信します...");
+    const response = UrlFetchApp.fetch(API_URL, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode !== 200) {
+      throw new Error(`Gemini APIエラー (Status: ${responseCode}): ${responseBody}`);
+    }
+
+    const jsonResponse = JSON.parse(responseBody);
+    let generatedText = jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    generatedText = generatedText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
+
+    console.log("Geminiからの方針応答（抜粋）:\n" + generatedText.substring(0, 2000) + (generatedText.length > 2000 ? "... (後略)" : ""));
+
+    try {
+      const policyResponse = JSON.parse(generatedText);
+      if (policyResponse && policyResponse.policy) {
+        return { status: 'policy', policy: policyResponse.policy, scriptId: scriptId, userPrompt: userPrompt };
+      } else {
+        throw new Error("AIからの応答が不正な形式です。'policy'プロパティが見つかりません。");
+      }
+    } catch (e) {
+      throw new Error(`AIからの方針JSON応答の解析に失敗しました: ${e.message}. 受信したテキスト（先頭500文字）: ${generatedText.substring(0, 500)}...`);
+    }
+
+  } catch (error) {
+    console.error("方針生成中にエラーが発生しました:", error);
+    return { status: 'error', message: `方針生成エラー: ${error.message}` };
+  }
+}
+
+/**
  * AIによるスクリプト変更の提案を生成し、フロントエンドに返します。
  * 実際の変更は行いません。
  * @param {object} formObject - フォームデータ { scriptId: string, prompt: string }
- * @returns {object} - AIが提案した変更、元のファイル、スクリプトIDを含むオブジェクト
+ * @returns {object} - AIが提案した修正、元のファイル、スクリプトIDを含むオブジェクト
  */
 function processPrompt(formObject) {
   const scriptId = formObject.scriptId;
@@ -466,7 +556,7 @@ function deployScript(scriptId, description = '') {
 /**
  * スクリプトログに基づいてAIにエラー修正を提案させます。
  * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID
- * @returns {object} - AIが提案した変更、元のファイル、スクリプトIDを含むオブジェクト
+ * @returns {object} - AIが提案した修正、元のファイル、スクリプトIDを含むオブジェクト
  */
 function fixErrorsFromLogs(targetScriptId) {
   if (!API_KEY) {

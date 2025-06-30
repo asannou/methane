@@ -109,12 +109,19 @@
 
     <label for="prompt">Prompt:</label>
     <textarea id="prompt" name="prompt" required></textarea>
-    <button type="submit" id="proposeChangesButton">Propose Changes</button>
-    <button type="button" id="cancelProposeButton" style="display:none;">Cancel</button>
+    <button type="submit" id="generatePolicyButton">Generate Policy</button>
+    <button type="button" id="cancelAiOperationButton" style="display:none;">Cancel</button>
   </form>
 
   <!-- Loading spinner for proposal -->
   <div id="loading-spinner" class="spinner" style="display:none;"></div>
+
+  <!-- Policy Review Section -->
+  <div id="policy-container" style="display:none;">
+    <h2>AI Generated Policy:</h2>
+    <pre id="ai-policy"></pre>
+    <button type="button" id="acceptPolicyButton" style="display:none;">Accept Policy & Propose Changes</button>
+  </div>
 
   <!-- Proposal Review Section -->
   <div id="proposal-container" style="display:none;">
@@ -207,8 +214,9 @@
   </div>
 
   <script>
-    let currentProposal = null; // Store the AI's proposal globally for applyChanges
-    let activeRequestId = null; // NEW: Global flag for the currently active request ID
+    let currentPolicyData = null; // Stores AI policy and original prompt
+    let currentProposal = null; // Store the AI's code proposal globally for applyChanges
+    let activeRequestId = null; // Global flag for the currently active request ID
 
     // Helper to get the effective script ID
     function getEffectiveScriptId() {
@@ -219,14 +227,14 @@
         return document.getElementById('scriptIdSelect').value.trim();
     }
 
-    // --- New: Helper function to save scriptId to localStorage ---
+    // --- Helper function to save scriptId to localStorage ---
     function saveScriptIdToLocalStorage(id) {
         if (id) {
             localStorage.setItem('targetScriptId', id);
         }
     }
 
-    // NEW: Helper function to save gcpProjectId to localStorage
+    // Helper function to save gcpProjectId to localStorage
     function saveGcpProjectIdToLocalStorage(id) {
         if (id) {
             localStorage.setItem('gcpProjectId', id);
@@ -266,7 +274,7 @@
             .listAppsScriptProjects();
     }
 
-    // --- New: Load scriptId from localStorage on page load ---
+    // --- Load scriptId from localStorage on page load ---
     document.addEventListener('DOMContentLoaded', function() {
       const scriptIdManualInput = document.getElementById('scriptIdManualInput');
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
@@ -276,7 +284,7 @@
         scriptIdManualInput.value = savedScriptId;
       }
 
-      // NEW: Load GCP Project ID from localStorage
+      // Load GCP Project ID from localStorage
       const savedGcpProjectId = localStorage.getItem('gcpProjectId');
       if (savedGcpProjectId) {
         gcpProjectIdInput.value = savedGcpProjectId;
@@ -284,9 +292,16 @@
 
       // Auto-load projects on page load
       loadProjectsIntoDropdown(savedScriptId); // Pass the saved ID so it tries to pre-select
+
+      // Initial UI state setup
+      document.getElementById('policy-container').style.display = 'none';
+      document.getElementById('proposal-container').style.display = 'none';
+      document.getElementById('applyChangesButton').style.display = 'none';
+      document.getElementById('apply-result-container').style.display = 'none';
+      document.getElementById('fixApplyErrorsButton').style.display = 'none';
     });
 
-    // NEW: Function to generate the formatted HTML for both original and proposed panels for a single file.
+    // Function to generate the formatted HTML for both original and proposed panels for a single file.
     // This function aims for simple highlighting of changes line-by-line without full diff alignment.
     function generateFormattedDiffPanels(originalSource, proposedSource) {
         const originalLines = originalSource ? originalSource.split('\n') : [];
@@ -418,81 +433,160 @@
       return div.innerHTML;
     }
 
-    // Event Listener for Propose Changes (original submit)
+    // Main form submission handler for both policy generation and proposal generation
     document.getElementById('agent-form').addEventListener('submit', function(e) {
       e.preventDefault();
-      const form = this;
-      const proposeButton = document.getElementById('proposeChangesButton');
-      const cancelProposeButton = document.getElementById('cancelProposeButton'); // NEW
-      const spinner = document.getElementById('loading-spinner');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const submitterId = e.submitter.id;
 
-      // NEW: Generate a unique ID for this request and set it as active
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
+      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const loadingSpinner = document.getElementById('loading-spinner');
+
+      const scriptId = getEffectiveScriptId();
+      const promptText = document.getElementById('prompt').value;
+
+      if (!scriptId) {
+        alert('Please select or enter a Script ID.');
+        return;
+      }
+      if (!promptText.trim()) {
+        alert('Prompt cannot be empty.');
+        return;
+      }
+
+      // Save scriptId to localStorage regardless of operation
+      saveScriptIdToLocalStorage(scriptId);
+
+      // Reset UI for new operation
+      loadingSpinner.style.display = 'block';
+      generatePolicyButton.disabled = true;
+      document.getElementById('prompt').readOnly = true; // Disable prompt input during operation
+      cancelAiOperationButton.style.display = 'inline-block';
+      document.getElementById('policy-container').style.display = 'none';
+      document.getElementById('proposal-container').style.display = 'none';
+      document.getElementById('applyChangesButton').style.display = 'none';
+      document.getElementById('apply-result-container').style.display = 'none';
+      document.getElementById('fixApplyErrorsButton').style.display = 'none';
+      document.getElementById('proposed-files-display').innerHTML = '';
+      document.getElementById('ai-policy').textContent = '';
+
+      const formData = { scriptId: scriptId, prompt: promptText };
+
+      // Generate a unique ID for this request and set it as active
       const requestId = Date.now();
       activeRequestId = requestId;
 
-      proposeButton.disabled = true;
-      cancelProposeButton.style.display = 'inline-block'; // Show cancel button
-      spinner.style.display = 'block';
-      proposalContainer.style.display = 'none'; // Hide previous proposal
-      applyButton.style.display = 'none'; // Hide apply button
-      applyResultContainer.style.display = 'none'; // Hide apply result
-      fixApplyErrorsButton.style.display = 'none'; // Hide fix button
-      document.getElementById('proposed-files-display').innerHTML = ''; // Clear file display
+      if (submitterId === 'generatePolicyButton') {
+        console.log('Generating policy...');
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (activeRequestId !== requestId) {
+              console.log('Ignoring stale success response for generateProposalPolicy.');
+              return;
+            }
+            activeRequestId = null;
+            loadingSpinner.style.display = 'none';
+            generatePolicyButton.disabled = false;
+            document.getElementById('prompt').readOnly = false; // Re-enable prompt input
+            cancelAiOperationButton.style.display = 'none';
 
-      const formData = {
-        scriptId: getEffectiveScriptId(), // Changed to use helper
-        prompt: document.getElementById('prompt').value
-      };
+            if (response.status === 'policy') {
+              currentPolicyData = response; // Store policy data
+              document.getElementById('ai-policy').textContent = response.policy;
+              document.getElementById('policy-container').style.display = 'block';
+              document.getElementById('acceptPolicyButton').style.display = 'inline-block';
+              generatePolicyButton.style.display = 'none'; // Hide generate policy button
+              document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled
+            } else if (response.status === 'error') {
+              document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
+              document.getElementById('policy-container').style.display = 'block';
+            }
+          })
+          .withFailureHandler(function(error) {
+            if (activeRequestId !== requestId) {
+              console.log('Ignoring stale failure response for generateProposalPolicy.');
+              return;
+            }
+            activeRequestId = null;
+            loadingSpinner.style.display = 'none';
+            generatePolicyButton.disabled = false;
+            document.getElementById('prompt').readOnly = false;
+            cancelAiOperationButton.style.display = 'none';
+            document.getElementById('ai-policy').textContent = 'Error generating policy: ' + error.message;
+            document.getElementById('policy-container').style.display = 'block';
+          })
+          .generateProposalPolicy(formData);
+      }
+    });
 
-      // --- Save scriptId to localStorage ---
-      saveScriptIdToLocalStorage(formData.scriptId);
+    // Event Listener for Accept Policy & Propose Changes button
+    document.getElementById('acceptPolicyButton').addEventListener('click', function() {
+      if (!currentPolicyData) {
+        alert('No policy to accept. Please generate a policy first.');
+        return;
+      }
 
+      const acceptPolicyButton = this;
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
+      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const loadingSpinner = document.getElementById('loading-spinner');
+
+      // Reset UI for proposal generation
+      loadingSpinner.style.display = 'block';
+      acceptPolicyButton.disabled = true;
+      acceptPolicyButton.style.display = 'none'; // Hide accept policy button
+      cancelAiOperationButton.style.display = 'inline-block';
+      document.getElementById('policy-container').style.display = 'none'; // Hide policy container
+      document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal
+
+      const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt };
+
+      const requestId = Date.now();
+      activeRequestId = requestId;
+
+      console.log('Generating code proposal...');
       google.script.run
         .withSuccessHandler(function(response) {
-          // NEW: Check if this is still the active request
           if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for processPrompt.');
-            return; // Ignore if cancelled or new request started
+            console.log('Ignoring stale success response for processPrompt (after policy).');
+            return;
           }
-          // NEW: Reset active request state
           activeRequestId = null;
-          spinner.style.display = 'none';
-          proposeButton.disabled = false;
-          cancelProposeButton.style.display = 'none'; // Hide cancel button
+          loadingSpinner.style.display = 'none';
+          acceptPolicyButton.disabled = false;
+          generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
+          document.getElementById('prompt').readOnly = false; // Re-enable prompt input
+          cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'proposal') {
             currentProposal = response; // Store the proposal
             document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
             displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyButton.style.display = 'block'; // Show apply button
+            document.getElementById('proposal-container').style.display = 'block';
+            document.getElementById('applyChangesButton').style.display = 'block'; // Show apply button
             document.getElementById('apply-result').textContent = response.message; // Display initial message
-            applyResultContainer.style.display = 'block';
+            document.getElementById('apply-result-container').style.display = 'block';
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
+            document.getElementById('apply-result-container').style.display = 'block';
+            document.getElementById('proposal-container').style.display = 'block'; // Show container to display error
           } else {
             document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
+            document.getElementById('apply-result-container').style.display = 'block';
+            document.getElementById('proposal-container').style.display = 'block'; // Show container to display error
           }
         })
         .withFailureHandler(function(error) {
-          // NEW: Check if this is still the active request
           if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for processPrompt.');
-            return; // Ignore if cancelled or new request started
+            console.log('Ignoring stale failure response for processPrompt (after policy).');
+            return;
           }
-          // NEW: Reset active request state
           activeRequestId = null;
-          spinner.style.display = 'none';
-          proposeButton.disabled = false;
-          cancelProposeButton.style.display = 'none'; // Hide cancel button
+          loadingSpinner.style.display = 'none';
+          acceptPolicyButton.disabled = false;
+          generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
+          document.getElementById('prompt').readOnly = false;
+          cancelAiOperationButton.style.display = 'none';
 
           document.getElementById('apply-result').textContent = 'Error calling AI: ' + error.message;
           document.getElementById('apply-result-container').style.display = 'block';
@@ -501,30 +595,42 @@
         .processPrompt(formData);
     });
 
-    // NEW: Event Listener for Cancel Propose Changes
-    document.getElementById('cancelProposeButton').addEventListener('click', function() {
+    // Event Listener for general AI operation cancel button
+    document.getElementById('cancelAiOperationButton').addEventListener('click', function() {
       activeRequestId = null; // Invalidate the current active request
 
-      const proposeButton = document.getElementById('proposeChangesButton');
-      const cancelProposeButton = document.getElementById('cancelProposeButton');
-      const spinner = document.getElementById('loading-spinner');
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
+      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const loadingSpinner = document.getElementById('loading-spinner');
+      const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
+      const acceptPolicyButton = document.getElementById('acceptPolicyButton');
+      const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
 
-      spinner.style.display = 'none';
-      proposeButton.disabled = false;
-      cancelProposeButton.style.display = 'none';
-      
-      // Clear display or show cancellation message
+      loadingSpinner.style.display = 'none';
+      generatePolicyButton.disabled = false;
+      document.getElementById('prompt').readOnly = false;
+      cancelAiOperationButton.style.display = 'none';
+
+      currentPolicyData = null; // Clear any partial policy
       currentProposal = null; // Clear any partial proposal
+      document.getElementById('ai-policy').textContent = '';
       document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('proposed-files-display').innerHTML = '<p>AI生成はユーザーによってキャンセルされました。</p>';
-      proposalContainer.style.display = 'block'; // Ensure container is visible for message
-      applyButton.style.display = 'none';
+      document.getElementById('proposed-files-display').innerHTML = '';
+      document.getElementById('apply-result').textContent = '';
+
+      policyContainer.style.display = 'none';
+      proposalContainer.style.display = 'none';
+      acceptPolicyButton.style.display = 'none';
+      applyChangesButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
+
+      generatePolicyButton.style.display = 'inline-block'; // Ensure primary button is visible
+
+      alert('AI操作はユーザーによってキャンセルされました。');
     });
 
     // Event Listener for Apply Changes
@@ -580,7 +686,7 @@
         .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles);
     });
 
-    // NEW: Event Listener for Fix Apply Errors button
+    // Event Listener for Fix Apply Errors button
     document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
       if (!scriptId) {
@@ -595,16 +701,18 @@
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const proposeChangesButton = document.getElementById('proposeChangesButton');
-      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton'); // NEW
+      const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
+      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+      const promptInput = document.getElementById('prompt');
 
-      // NEW: Generate a unique ID for this request and set it as active
+      // Generate a unique ID for this request and set it as active
       const requestId = Date.now();
       activeRequestId = requestId;
 
       fixButton.disabled = true;
-      proposeChangesButton.disabled = true;
-      cancelFixErrorsButton.style.display = 'inline-block'; // Show cancel button
+      generatePolicyButton.disabled = true;
+      promptInput.readOnly = true; // Disable prompt input during operation
+      cancelFixErrorsButton.style.display = 'inline-block';
       spinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
@@ -616,17 +724,16 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          // NEW: Check if this is still the active request
           if (activeRequestId !== requestId) {
             console.log('Ignoring stale success response for fixErrorsFromLogs.');
-            return; // Ignore if cancelled or new request started
+            return; 
           }
-          // NEW: Reset active request state
           activeRequestId = null;
           spinner.style.display = 'none';
           fixButton.disabled = false;
-          proposeChangesButton.disabled = false;
-          cancelFixErrorsButton.style.display = 'none'; // Hide cancel button
+          generatePolicyButton.disabled = false; 
+          promptInput.readOnly = false; 
+          cancelFixErrorsButton.style.display = 'none';
 
           if (response.status === 'proposal') {
             currentProposal = response;
@@ -636,7 +743,7 @@
             applyButton.style.display = 'block';
             document.getElementById('apply-result').textContent = response.message;
             applyResultContainer.style.display = 'block';
-            fixButton.style.display = 'none'; // Hide this button as a new proposal is ready
+            fixButton.style.display = 'none'; 
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
             applyResultContainer.style.display = 'block';
@@ -648,17 +755,16 @@
           }
         })
         .withFailureHandler(function(error) {
-          // NEW: Check if this is still the active request
           if (activeRequestId !== requestId) {
             console.log('Ignoring stale failure response for fixErrorsFromLogs.');
-            return; // Ignore if cancelled or new request started
+            return; 
           }
-          // NEW: Reset active request state
           activeRequestId = null;
           spinner.style.display = 'none';
           fixButton.disabled = false;
-          proposeChangesButton.disabled = false;
-          cancelFixErrorsButton.style.display = 'none'; // Hide cancel button
+          generatePolicyButton.disabled = false; 
+          promptInput.readOnly = false; 
+          cancelFixErrorsButton.style.display = 'none';
 
           document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
           document.getElementById('apply-result-container').style.display = 'block';
@@ -667,7 +773,7 @@
         .fixErrorsFromLogs(scriptId);
     });
 
-    // NEW: Event Listener for Cancel Fix Errors
+    // Event Listener for Cancel Fix Errors
     document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
       activeRequestId = null; // Invalidate the current active request
 
@@ -678,25 +784,26 @@
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const proposeChangesButton = document.getElementById('proposeChangesButton');
+      const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
+      const promptInput = document.getElementById('prompt');
 
       spinner.style.display = 'none';
       fixButton.disabled = false;
-      proposeChangesButton.disabled = false; // Re-enable propose button as well
+      generatePolicyButton.disabled = false; 
+      promptInput.readOnly = false; 
       cancelFixErrorsButton.style.display = 'none';
       
-      // Clear display or show cancellation message
       currentProposal = null; // Clear any partial proposal
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '<p>AIによるエラー修正はユーザーによってキャンセルされました。</p>';
-      proposalContainer.style.display = 'block'; // Ensure container is visible for message
+      proposalContainer.style.display = 'block'; 
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
     });
 
 
-    // NEW: Event Listener for Save GCP Project ID
+    // Event Listener for Save GCP Project ID
     document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
       const gcpProjectId = gcpProjectIdInput.value.trim();
