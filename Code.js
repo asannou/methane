@@ -29,9 +29,10 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += "- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n";
   systemPrompt += "- レスポンスは必ず、以下のJSON形式のみで返してください。\n";
   systemPrompt += "- 重要:\n";
-  systemPrompt += "  - ファイル名は、上記「既存のファイル一覧」で提示されたものを、一字一句変えずにそのまま使用してください。翻訳や変更は絶対にしないでください。\n";
+  systemPrompt += "  - 変更が必要なファイル、または**新しく追加したいファイル**の新しいソースコードを生成してください。\n";
+  systemPrompt += "  - 新しいファイルを提案する場合、適切なファイル名（例: `NewScript`, `util`, `styles`, `dialog`など）とタイプ（`SERVER_JS`, `HTML`, `JSON`のいずれか）を含めてください。\n";
   systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
-  systemPrompt += "  - 生成するソースコードの内容は、指示に関係のない改行、インデント、空白文字などを勝手に変更したり除去したりせず、必ず元のフォーマットを維持してください。特にHTMLファイルでは、元の構造とインデントを厳密に保持してください。 生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
+  systemPrompt += "  - 生成するソースコードの内容は、指示に関係のない改行、インデント、空白文字などを勝手に変更したり除去したりせず、必ず元のフォーマットを維持してください。特にHTMLファイルでは、元の構造とインデクトを厳密に保持してください。 生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
   systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
@@ -277,20 +278,30 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy) {
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
+    // Create a mutable copy of files to safely add/modify
+    const currentFiles = [...projectContent.files];
+    const updatedFilesMap = new Map(currentFiles.map(file => [file.name, file]));
+
     proposedFiles.forEach(updatedFile => {
       if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
            console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(updatedFile, null, 2));
            return;
       }
 
-      const targetFile = projectContent.files.find(file => file.name === updatedFile.name);
-      if (targetFile) {
-        targetFile.source = updatedFile.source;
+      const existingFile = updatedFilesMap.get(updatedFile.name);
+      if (existingFile) {
+        // Update existing file
+        existingFile.source = updatedFile.source;
+        existingFile.type = updatedFile.type; // Ensure type is also updated if needed, although usually it stays the same.
       } else {
-        // This is a critical error for the apply function, should be reported clearly
-        throw new Error(`AIが既存にないファイル名 '${updatedFile.name}' を返しました。既存ファイルのみ更新可能です。`);
+        // Add new file
+        console.log(`新しいファイル '${updatedFile.name}' (タイプ: ${updatedFile.type}) を追加します。`);
+        updatedFilesMap.set(updatedFile.name, updatedFile);
       }
     });
+
+    // Convert map back to array for payload
+    projectContent.files = Array.from(updatedFilesMap.values());
 
     const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
