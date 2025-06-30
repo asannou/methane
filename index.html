@@ -570,7 +570,7 @@
       regeneratePolicyButton.style.display = 'none'; // Hide regenerate policy button
       regenerateProposalButton.style.display = 'none'; // Hide new button during generation
       cancelAiOperationButton.style.display = 'inline-block';
-      document.getElementById('policy-container').style.display = 'none'; // Hide policy container
+      // Removed: document.getElementById('policy-container').style.display = 'none'; // Hide policy container
       document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal
 
       const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt };
@@ -1089,8 +1089,8 @@
           }
           activeRequestId = null;
           loadingSpinner.style.display = 'none';
-          regenerateButton.disabled = false; // Re-enable itself
-          applyChangesButton.disabled = false; // Re-enable apply button
+          regenerateButton.disabled = false;
+          applyChangesButton.disabled = false;
           cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'proposal') {
