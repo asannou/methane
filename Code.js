@@ -129,8 +129,14 @@ function generateProposalPolicy(formObject) {
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    let aiPrompt = `以下のGoogle Apps Scriptのファイル群に対して、提供されたユーザーの指示に基づいてどのような変更を提案するか、その大まかな「方針」を簡潔に、箇条書きでまとめてください。\n`;
+    let aiPrompt = `あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、どのような変更を提案するか、その大まかな「方針」を簡潔に、箇条書きでまとめてください。\n\n`;
     aiPrompt += `コードの詳細は不要で、目的、アプローチ、影響範囲など、高レベルな視点から説明してください。\n\n`;
+    aiPrompt += "## 既存のファイル一覧\n";
+    projectContent.files.forEach(file => {
+      const fileExtension = file.type === 'SERVER_JS' ? 'gs' : (file.type === 'JSON' ? 'json' : 'html');
+      aiPrompt += `### ファイル名: ${file.name}.${fileExtension}\n`;
+      aiPrompt += "```\n" + file.source + "\n```\n\n";
+    });
     aiPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
     aiPrompt += `## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n`;
     aiPrompt += `レスポンス形式の例:\n\`\`\`json\n{\"policy\": \"...変更方針のテキスト...\"}\n\`\`\``;
