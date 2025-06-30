@@ -9,10 +9,15 @@ function doGet() {
  * Gemini APIを呼び出す関数
  * @param {string} userPrompt - ユーザーが入力したプロンプト
  * @param {object} projectContent - 対象プロジェクトの全ファイル情報
+ * @param {string} [policy] - AIが生成した変更方針（オプション）
  * @returns {object} - AIが生成した修正後のファイル情報を含むオブジェクト
  */
-function callGenerativeAI(userPrompt, projectContent) {
+function callGenerativeAI(userPrompt, projectContent, policy = null) {
   let systemPrompt = "あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、修正後のファイル内容を生成してください。\n\n";
+  if (policy) {
+    systemPrompt += "## AI生成ポリシー:\n" + policy + "\n\n";
+    systemPrompt += "上記のポリシーを考慮し、以下のユーザーの指示を達成するための修正を提案してください。\n\n";
+  }
   systemPrompt += "## 既存のファイル一覧\n";
   projectContent.files.forEach(file => {
     const fileExtension = file.type === 'SERVER_JS' ? 'gs' : (file.type === 'JSON' ? 'json' : 'html');
@@ -139,7 +144,11 @@ function generateProposalPolicy(formObject) {
     });
     aiPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
     aiPrompt += `## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n`;
-    aiPrompt += `レスポンス形式の例:\n\`\`\`json\n{\"policy\": \"...変更方針のテキスト...\"}\n\`\`\``;
+    aiPrompt += `レスポンス形式の例:\n\
+` + `\
+` + `{\"policy\": \"...変更方針のテキスト...\"}\n` + `\
+` + `\
+`;
 
     // Call Gemini API with a specific schema for policy generation
     const requestBody = {
@@ -203,12 +212,13 @@ function generateProposalPolicy(formObject) {
 /**
  * AIによるスクリプト変更の提案を生成し、フロントエンドに返します。
  * 実際の変更は行いません。
- * @param {object} formObject - フォームデータ { scriptId: string, prompt: string }
+ * @param {object} formObject - フォームデータ { scriptId: string, prompt: string, policy?: string }
  * @returns {object} - AIが提案した修正、元のファイル、スクリプトIDを含むオブジェクト
  */
 function processPrompt(formObject) {
   const scriptId = formObject.scriptId;
   const prompt = formObject.prompt;
+  const policyText = formObject.policy;
 
   if (!API_KEY) {
     return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
@@ -225,7 +235,7 @@ function processPrompt(formObject) {
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    const aiResponse = callGenerativeAI(prompt, projectContent);
+    const aiResponse = callGenerativeAI(prompt, projectContent, policyText);
 
     if (!aiResponse || !Array.isArray(aiResponse.files)) {
       throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
@@ -233,7 +243,7 @@ function processPrompt(formObject) {
 
     const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
 
-    return { 
+    return {
       status: 'proposal',
       scriptId: scriptId,
       originalFiles: projectContent.files,

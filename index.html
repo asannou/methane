@@ -573,7 +573,7 @@
       // Removed: document.getElementById('policy-container').style.display = 'none'; // Hide policy container
       // document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal - Removed as per user instruction
 
-      const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt };
+      const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt, policy: currentPolicyData.policy };
 
       const requestId = Date.now();
       activeRequestId = requestId;
@@ -1039,13 +1039,14 @@
 
     // Event Listener for Regenerate Proposal button
     document.getElementById('regenerateProposalButton').addEventListener('click', function() {
-      if (!currentPolicyData || !currentPolicyData.scriptId || !currentPolicyData.userPrompt) {
+      if (!currentPolicyData || !currentPolicyData.scriptId || !currentPolicyData.userPrompt || !currentPolicyData.policy) {
         alert('Cannot regenerate proposal. Policy data is missing.');
         return;
       }
 
       const scriptId = currentPolicyData.scriptId;
       const promptText = currentPolicyData.userPrompt;
+      const policyText = currentPolicyData.policy;
 
       const regenerateButton = this;
       const loadingSpinner = document.getElementById('loading-spinner'); // Reuse main spinner
@@ -1075,7 +1076,7 @@
 
       currentProposal = null; // Clear previous proposal data
 
-      const formData = { scriptId: scriptId, prompt: promptText };
+      const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
 
       const requestId = Date.now();
       activeRequestId = requestId;
