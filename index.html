@@ -128,6 +128,8 @@
   <div id="proposal-container" style="display:none;">
     <h2>AI Proposed Changes:</h2>
     <p><strong id="proposal-purpose-label">変更の主旨:</strong> <span id="proposal-purpose"></span></p>
+    <!-- NEW: HTML Validation Warnings -->
+    <div id="html-validation-warnings" style="color: red; margin-bottom: 10px; display: none;"></div>
     <p>以下の変更がAIから提案されました。内容を確認し、問題なければ「Apply Changes」ボタンをクリックして適用してください。</p>
     <div id="proposed-files-display">
       <!-- File comparisons will be inserted here by JavaScript -->
@@ -308,6 +310,21 @@
       document.getElementById('regeneratePolicyButton').style.display = 'none';
     });
 
+    // NEW: Function to validate HTML content using DOMParser
+    function validateHtml(htmlString, fileName) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlString, 'text/html');
+        const parseError = doc.querySelector('parsererror');
+
+        if (parseError) {
+            // DOMParser finds errors and inserts <parsererror> in the parsed document.
+            const errorMessage = parseError.textContent;
+            console.error(`HTML validation error in ${fileName}:`, errorMessage);
+            return { isValid: false, message: `HTMLファイル "${fileName}" に構文エラーが見つかりました: ${errorMessage}` };
+        }
+        return { isValid: true };
+    }
+
     // Function to generate the formatted HTML for both original and proposed panels for a single file.
     // This function aims for simple highlighting of changes line-by-line without full diff alignment.
     function generateFormattedDiffPanels(originalSource, proposedSource) {
@@ -479,6 +496,8 @@
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').textContent = '';
+      document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
+      document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
 
       const formData = { scriptId: scriptId, prompt: promptText };
 
@@ -576,6 +595,30 @@
           if (response.status === 'proposal') {
             currentProposal = response; // Store the proposal
             document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
+            
+            // NEW: HTML Validation
+            const htmlWarningsDiv = document.getElementById('html-validation-warnings');
+            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
+            let hasHtmlErrors = false;
+
+            response.proposedFiles.forEach(file => {
+                if (file.type === 'HTML') {
+                    const validationResult = validateHtml(file.source, file.name);
+                    if (!validationResult.isValid) {
+                        hasHtmlErrors = true;
+                        const warningP = document.createElement('p');
+                        warningP.textContent = validationResult.message;
+                        htmlWarningsDiv.appendChild(warningP);
+                    }
+                }
+            });
+
+            if (hasHtmlErrors) {
+                htmlWarningsDiv.style.display = 'block';
+            } else {
+                htmlWarningsDiv.style.display = 'none';
+            }
+
             displayFileComparison(response.originalFiles, response.proposedFiles);
             document.getElementById('proposal-container').style.display = 'block';
             document.getElementById('applyChangesButton').style.display = 'block'; // Show apply button
@@ -626,6 +669,7 @@
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       loadingSpinner.style.display = 'none';
       generatePolicyButton.disabled = false;
@@ -638,6 +682,8 @@
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('apply-result').textContent = '';
+      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
+      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
 
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
@@ -681,6 +727,7 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       loadingSpinner.style.display = 'block';
       generatePolicyButton.disabled = true; // Disable original generate button
@@ -699,6 +746,8 @@
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').textContent = '';
       document.getElementById('proposal-purpose').textContent = '';
+      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
+      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
 
       currentPolicyData = null; // Clear previous policy data
       currentProposal = null; // Clear previous proposal data
@@ -813,6 +862,8 @@
             document.getElementById('applyChangesButton').style.display = 'none';
             regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button after applying
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
+            document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
+            document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
             fixApplyErrorsButton.style.display = 'none';
           } else { // response.status === 'error'
             let errorMessage = response.message;
@@ -855,6 +906,7 @@
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       // Generate a unique ID for this request and set it as active
       const requestId = Date.now();
@@ -870,6 +922,8 @@
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
+      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
+      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
 
       // Save scriptId to localStorage
       saveScriptIdToLocalStorage(scriptId);
@@ -890,6 +944,29 @@
           if (response.status === 'proposal') {
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
+            
+            // NEW: HTML Validation
+            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
+            let hasHtmlErrors = false;
+
+            response.proposedFiles.forEach(file => {
+                if (file.type === 'HTML') {
+                    const validationResult = validateHtml(file.source, file.name);
+                    if (!validationResult.isValid) {
+                        hasHtmlErrors = true;
+                        const warningP = document.createElement('p');
+                        warningP.textContent = validationResult.message;
+                        htmlWarningsDiv.appendChild(warningP);
+                    }
+                }
+            });
+
+            if (hasHtmlErrors) {
+                htmlWarningsDiv.style.display = 'block';
+            } else {
+                htmlWarningsDiv.style.display = 'none';
+            }
+
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyButton.style.display = 'block';
@@ -940,6 +1017,7 @@
       const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       spinner.style.display = 'none';
       fixButton.disabled = false;
@@ -951,6 +1029,8 @@
       currentProposal = null; // Clear any partial proposal
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '<p>AIによるエラー修正はユーザーによってキャンセルされました。</p>';
+      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
+      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
       proposalContainer.style.display = 'block'; 
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
@@ -974,6 +1054,7 @@
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       // UI Reset and loading state
       loadingSpinner.style.display = 'block';
@@ -989,6 +1070,8 @@
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('apply-result').textContent = '';
+      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
+      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
 
       currentProposal = null; // Clear previous proposal data
 
@@ -1013,6 +1096,29 @@
           if (response.status === 'proposal') {
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
+            
+            // NEW: HTML Validation
+            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
+            let hasHtmlErrors = false;
+
+            response.proposedFiles.forEach(file => {
+                if (file.type === 'HTML') {
+                    const validationResult = validateHtml(file.source, file.name);
+                    if (!validationResult.isValid) {
+                        hasHtmlErrors = true;
+                        const warningP = document.createElement('p');
+                        warningP.textContent = validationResult.message;
+                        htmlWarningsDiv.appendChild(warningP);
+                    }
+                }
+            });
+
+            if (hasHtmlErrors) {
+                htmlWarningsDiv.style.display = 'block';
+            } else {
+                htmlWarningsDiv.style.display = 'none';
+            }
+
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyChangesButton.style.display = 'block';
