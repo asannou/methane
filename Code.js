@@ -6,6 +6,15 @@ function doGet() {
 }
 
 /**
+ * Includes a HTML file by name.
+ * @param {string} filename - The name of the HTML file (without extension).
+ * @returns {string} The content of the HTML file.
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
  * Gemini APIを呼び出す関数
  * @param {string} userPrompt - ユーザーが入力したプロンプト
  * @param {object} projectContent - 対象プロジェクトの全ファイル情報
@@ -163,7 +172,7 @@ function generateProposalPolicy(formObject) {
           "properties": {
             "policy": {
               "type": "STRING",
-              "description": "提案される変更の大まかな方針。"
+              "description": "提案される変更の大まかな方針."
             }
           },
           "required": ["policy"]
