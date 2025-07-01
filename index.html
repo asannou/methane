@@ -15,6 +15,7 @@
       <button type="button" id="loadProjectsButton" style="width: auto; margin-bottom: 0;">Load Projects</button>
     </div>
     <input type="text" id="scriptIdManualInput" placeholder="Or paste Script ID here (overrides selection)" style="margin-bottom: 10px;">
+    <div id="editor-url-display" style="margin-bottom: 10px; font-size: 0.9em;"></div>
 
     <label for="prompt">Prompt:</label>
     <textarea id="prompt" name="prompt" required></textarea>
@@ -82,21 +83,6 @@
   <div id="log-result-container" style="display:none;">
     <h3>Logs:</h3>
     <pre id="log-result"></pre>
-  </div>
-
-  <hr>
-
-  <h2>Script Editor URL</h2>
-  <form id="editor-url-form">
-    <p>Using the Script ID entered above.</p>
-    <button type="submit" id="getEditorUrlButton">Show Editor URL</button>
-  </form>
-
-  <div id="editor-url-loading-spinner" class="spinner" style="display:none;"></div>
-
-  <div id="editor-url-result-container" style="display:none;">
-    <h3>Editor URL:</h3>
-    <pre id="editor-url-result"></pre>
   </div>
 
   <hr>
@@ -190,6 +176,37 @@
             .listAppsScriptProjects();
     }
 
+    // Function to display the Apps Script Editor URL based on current Script ID
+    function updateEditorUrlDisplay() {
+        const scriptId = getEffectiveScriptId();
+        const editorUrlDisplayDiv = document.getElementById('editor-url-display');
+        
+        editorUrlDisplayDiv.innerHTML = ''; // Clear previous content
+
+        if (!scriptId) {
+            editorUrlDisplayDiv.textContent = 'Apps Script Editor URL: (Script ID needed)';
+            return;
+        }
+
+        editorUrlDisplayDiv.innerHTML = 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...';
+
+        // Save scriptId to localStorage every time it's used/updated
+        saveScriptIdToLocalStorage(scriptId);
+
+        google.script.run
+            .withSuccessHandler(function(response) {
+                if (response.startsWith("エラー:")) {
+                    editorUrlDisplayDiv.textContent = `Apps Script Editor URL: ${response}`;
+                } else {
+                    editorUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
+                }
+            })
+            .withFailureHandler(function(error) {
+                editorUrlDisplayDiv.textContent = `Apps Script Editor URL: Error - ${error.message}`;
+            })
+            .getScriptEditorUrl(scriptId);
+    }
+
     // --- Load scriptId from localStorage on page load ---
     document.addEventListener('DOMContentLoaded', function() {
       const scriptIdManualInput = document.getElementById('scriptIdManualInput');
@@ -217,7 +234,14 @@
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('regeneratePolicyButton').style.display = 'none';
+
+      // Initial display of editor URL
+      updateEditorUrlDisplay();
     });
+
+    // NEW: Add event listeners for script ID changes
+    document.getElementById('scriptIdSelect').addEventListener('change', updateEditorUrlDisplay);
+    document.getElementById('scriptIdManualInput').addEventListener('input', updateEditorUrlDisplay);
 
     // NEW: Function to validate HTML content using DOMParser
     function validateHtml(htmlString, fileName) {
@@ -762,9 +786,9 @@
                 }
               }
             } else if (response.deploymentStatus === 'error') {
-              message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`;
+              message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`; 
             } else { // not_attempted
-              message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`;
+              message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`; 
             }
             applyResultText.innerHTML = message; // Use innerHTML because of HTML links
             currentProposal = null; // Clear proposal
@@ -1171,53 +1195,6 @@
     // Event listener for Load Projects button
     document.getElementById('loadProjectsButton').addEventListener('click', function() {
         loadProjectsIntoDropdown(getEffectiveScriptId()); // Pass current ID to try and re-select
-    });
-
-    // Event Listener for Show Editor URL button
-    document.getElementById('editor-url-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const submitButton = form.querySelector('#getEditorUrlButton');
-      const spinner = document.getElementById('editor-url-loading-spinner');
-      const resultContainer = document.getElementById('editor-url-result-container');
-      const resultText = document.getElementById('editor-url-result');
-
-      submitButton.disabled = true;
-      spinner.style.display = 'block';
-      resultContainer.style.display = 'none';
-      resultText.textContent = '';
-
-      const scriptId = getEffectiveScriptId();
-
-      // Save scriptId to localStorage when getting editor URL
-      saveScriptIdToLocalStorage(scriptId);
-
-      if (!scriptId) {
-        resultText.textContent = 'Error: スクリプトIDが指定されていません。';
-        resultContainer.style.display = 'block';
-        submitButton.disabled = false;
-        spinner.style.display = 'none';
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
-          resultContainer.style.display = 'block';
-          if (response.startsWith("エラー:")) {
-            resultText.textContent = response;
-          } else {
-            resultText.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
-          }
-        })
-        .withFailureHandler(function(error) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
-          resultContainer.style.display = 'block';
-          resultText.textContent = `Error getting editor URL: ${error.message}`;
-        })
-        .getScriptEditorUrl(scriptId);
     });
   </script>
 </body>
