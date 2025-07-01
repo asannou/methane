@@ -115,6 +115,27 @@
     <pre id="deploy-result"></pre>
   </div>
 
+  <hr>
+
+  <h2>Add Apps Script Library</h2>
+  <p>Target Script ID is the one entered above.</p>
+  <form id="add-library-form">
+    <label for="libraryScriptId">Library Script ID:</label>
+    <input type="text" id="libraryScriptId" name="libraryScriptId" required>
+
+    <label for="libraryVersion">Library Version (Optional, defaults to HEAD):</label>
+    <input type="text" id="libraryVersion" name="libraryVersion" placeholder="e.g., 1, 2, 3 or HEAD">
+    
+    <button type="submit" id="addLibraryButton">Add Library</button>
+  </form>
+
+  <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
+
+  <div id="add-library-result-container" style="display:none;">
+    <h3>Add Library Result:</h3>
+    <pre id="add-library-result"></pre>
+  </div>
+
   <script>
     let currentPolicyData = null; // Stores AI policy and original prompt
     let currentProposal = null; // Store the AI's code proposal globally for applyChanges
@@ -1171,7 +1192,7 @@
         .withSuccessHandler(function(response) {
           saveResultText.textContent = response.message;
           if (response.status === 'success') {
-            saveGcpProjectIdToLocalStorage(gcpProjectId); // Save to localStorage on success
+            saveGcpProjectIdToLocalStorage(gcpProjectId);
           }
         })
         .withFailureHandler(function(error) {
@@ -1257,6 +1278,65 @@
     // Event listener for Load Projects button
     document.getElementById('loadProjectsButton').addEventListener('click', function() {
         loadProjectsIntoDropdown(getEffectiveScriptId()); // Pass current ID to try and re-select
+    });
+
+    // New event listener for adding library
+    document.getElementById('add-library-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = this;
+      const submitButton = form.querySelector('#addLibraryButton');
+      const spinner = document.getElementById('add-library-loading-spinner');
+      const resultContainer = document.getElementById('add-library-result-container');
+      const resultText = document.getElementById('add-library-result');
+
+      submitButton.disabled = true;
+      spinner.style.display = 'block';
+      resultContainer.style.display = 'none';
+      resultText.textContent = '';
+
+      const targetScriptId = getEffectiveScriptId();
+      const libraryScriptId = document.getElementById('libraryScriptId').value.trim();
+      const libraryVersion = document.getElementById('libraryVersion').value.trim(); // Can be empty string for HEAD
+
+      if (!targetScriptId) {
+        resultText.textContent = 'Error: Please select or enter a Target Script ID.';
+        resultContainer.style.display = 'block';
+        submitButton.disabled = false;
+        spinner.style.display = 'none';
+        return;
+      }
+      if (!libraryScriptId) {
+        resultText.textContent = 'Error: Library Script ID cannot be empty.';
+        resultContainer.style.display = 'block';
+        submitButton.disabled = false;
+        spinner.style.display = 'none';
+        return;
+      }
+
+      // Save targetScriptId to localStorage
+      saveScriptIdToLocalStorage(targetScriptId);
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          spinner.style.display = 'none';
+          submitButton.disabled = false;
+          resultContainer.style.display = 'block';
+          if (response.status === 'success') {
+            resultText.textContent = response.message;
+            // Optionally clear input fields on success
+            document.getElementById('libraryScriptId').value = '';
+            document.getElementById('libraryVersion').value = '';
+          } else {
+            resultText.textContent = `Error: ${response.message}`;
+          }
+        })
+        .withFailureHandler(function(error) {
+          spinner.style.display = 'none';
+          submitButton.disabled = false;
+          resultContainer.style.display = 'block';
+          resultText.textContent = `Error adding library: ${error.message}`;
+        })
+        .addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion);
     });
   </script>
 </body>

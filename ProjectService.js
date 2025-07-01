@@ -96,7 +96,7 @@ function setGcpProjectId(gcpProjectId) {
 
 /**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
- * @param {string} targetScriptId - ログを取得するApps ScriptのID (このIDはGCPプロジェクト内の全てのApps Scriptログを取得するために使用されません)
+ * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID (このIDはGCPプロジェクト内の全てのApps Scriptログを取得するために使用されません)
  * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
  */
 function getScriptLogs(targetScriptId) {
@@ -387,4 +387,117 @@ function getScriptEditorUrl(scriptId) {
     return "エラー: スクリプトIDが指定されていません。";
   }
   return `https://script.google.com/d/${scriptId}/edit`;
+}
+
+/**
+ * Adds a new Apps Script library dependency to the target script's appsscript.json.
+ *
+ * @param {string} targetScriptId - The ID of the script to modify.
+ * @param {string} libraryScriptId - The Script ID of the library to add.
+ * @param {string} libraryVersion - The version of the library (e.g., "1", "HEAD"). Can be an empty string for HEAD.
+ * @returns {object} - Result object with status and message.
+ */
+function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
+  if (!targetScriptId || targetScriptId.trim() === '') {
+    return { status: 'error', message: '対象のスクリプトIDが指定されていません。' };
+  }
+  if (!libraryScriptId || libraryScriptId.trim() === '') {
+    return { status: 'error', message: 'ライブラリのスクリプトIDが指定されていません。' };
+  }
+
+  // Default to 'HEAD' if version is empty or not provided
+  const effectiveVersion = libraryVersion.trim() === '' ? 'HEAD' : libraryVersion.trim();
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
+
+    // 1. Get current appsscript.json content
+    console.log(`スクリプトID ${targetScriptId} の現在の内容を取得中...`);
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+
+    if (getResponse.getResponseCode() !== 200) {
+      const errorDetails = JSON.parse(getResponse.getContentText() || '{}');
+      console.error("スクリプト内容の取得に失敗しました:", getResponse.getContentText());
+      return { status: 'error', message: `スクリプト内容の取得に失敗: ${errorDetails.error?.message || getResponse.getContentText()}` };
+    }
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    let appsscriptJsonFile = projectContent.files.find(file => file.name === 'appsscript' && file.type === 'JSON');
+
+    if (!appsscriptJsonFile) {
+      return { status: 'error', message: '対象スクリプトにappsscript.jsonファイルが見つかりませんでした。' };
+    }
+
+    let manifest = JSON.parse(appsscriptJsonFile.source);
+
+    // Ensure dependencies and dependencies.libraries exist
+    if (!manifest.dependencies) {
+      manifest.dependencies = {};
+    }
+    if (!manifest.dependencies.libraries) {
+      manifest.dependencies.libraries = [];
+    }
+
+    // Check for existing library to prevent duplicates
+    const existingLibraryIndex = manifest.dependencies.libraries.findIndex(
+      lib => lib.libraryId === libraryScriptId
+    );
+
+    if (existingLibraryIndex !== -1) {
+      // If found, update version if different, otherwise notify it already exists
+      const existingLib = manifest.dependencies.libraries[existingLibraryIndex];
+      if (existingLib.version !== effectiveVersion) {
+        existingLib.version = effectiveVersion;
+        appsscriptJsonFile.source = JSON.stringify(manifest, null, 2); // Prettify output
+        console.log(`既存のライブラリ '${libraryScriptId}' のバージョンを '${effectiveVersion}' に更新します。`);
+        // Proceed to update the project content
+      } else {
+        return { status: 'success', message: `ライブラリ '${libraryScriptId}' (バージョン: ${effectiveVersion}) は既に追加されています。` };
+      }
+    } else {
+      // Add new library
+      manifest.dependencies.libraries.push({
+        libraryId: libraryScriptId,
+        version: effectiveVersion,
+        userSymbol: 'lib_' + libraryScriptId.substring(0, 8) // Use first 8 chars for user symbol
+      });
+      appsscriptJsonFile.source = JSON.stringify(manifest, null, 2); // Prettify output
+      console.log(`新しいライブラリ '${libraryScriptId}' (バージョン: ${effectiveVersion}) を追加します。`);
+    }
+
+    // Prepare files array for updateContent - only include appsscript.json for modification
+    const filesToUpdate = projectContent.files.map(file => {
+      if (file.name === 'appsscript' && file.type === 'JSON') {
+        return appsscriptJsonFile; // Return the modified appsscript.json
+      }
+      return file; // Return other files as is (their source won't be changed)
+    });
+    
+    // Construct the payload for updateContent
+    const updatePayload = { files: filesToUpdate };
+
+    // 2. Update the project content (appsscript.json)
+    console.log(`スクリプトID ${targetScriptId} のappsscript.jsonを更新中...`);
+    const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(updatePayload), muteHttpExceptions: true };
+    const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
+
+    if (putResponse.getResponseCode() !== 200) {
+      const errorDetails = JSON.parse(putResponse.getContentText() || '{}');
+      console.error("appsscript.jsonの更新に失敗しました:", putResponse.getContentText());
+      return { 
+        status: 'error', 
+        message: `appsscript.jsonの更新に失敗しました: ${errorDetails.error?.message || putResponse.getContentText()}`, 
+        apiErrorDetails: errorDetails,
+        fullErrorText: putResponse.getContentText()
+      };
+    }
+
+    return { status: 'success', message: `ライブラリ '${libraryScriptId}' (バージョン: ${effectiveVersion}) が対象スクリプトに追加（または更新）されました。` };
+
+  } catch (error) {
+    console.error("ライブラリ追加中にエラーが発生しました:", error);
+    return { status: 'error', message: `ライブラリ追加エラー: ${error.message}` };
+  }
 }
