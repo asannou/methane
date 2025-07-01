@@ -199,6 +199,34 @@
         <h3 class="title is-5">Add Library Result:</h3>
         <pre id="add-library-result" class="content"></pre>
       </div>
+
+      <!-- NEW: Version Control Section -->
+      <hr class="my-5">
+
+      <h2 class="title is-4">Version Control</h2>
+      <p class="content">スクリプトのバージョン履歴を表示し、特定の過去のバージョンに復元します。</p>
+      <div class="field is-grouped">
+        <div class="control">
+          <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
+        </div>
+        <div class="control is-expanded">
+          <div class="select is-fullwidth">
+            <select id="versionSelect">
+              <option value="">-- Select a version --</option>
+            </select>
+          </div>
+        </div>
+        <div class="control">
+          <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
+        </div>
+      </div>
+
+      <div id="version-loading-spinner" class="spinner" style="display:none;"></div>
+      <div id="version-result-container" class="box mt-4" style="display:none;">
+        <h3 class="title is-5">Version Operation Result:</h3>
+        <pre id="version-result" class="content"></pre>
+      </div>
+
     </div>
   </section>
 
@@ -317,6 +345,9 @@
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('regeneratePolicyButton').style.display = 'none';
+      
+      // NEW: Version control UI initial state
+      document.getElementById('version-result-container').style.display = 'none';
 
       // Initial display of editor URL
       updateEditorUrlDisplay();
@@ -577,6 +608,8 @@
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
       document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
+      // NEW: Hide version control result too
+      document.getElementById('version-result-container').style.display = 'none';
 
       const formData = { scriptId: scriptId, prompt: promptText };
 
@@ -1400,6 +1433,136 @@
           resultText.textContent = `Error adding library: ${error.message}`;
         })
         .addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion);
+    });
+
+    // NEW: Version Control Functions and Event Listeners
+    document.getElementById('getVersionsButton').addEventListener('click', function() {
+      const scriptId = getEffectiveScriptId();
+      const versionsSelect = document.getElementById('versionSelect');
+      const getVersionsButton = this;
+      const revertVersionButton = document.getElementById('revertVersionButton');
+      const versionLoadingSpinner = document.getElementById('version-loading-spinner');
+      const versionResultContainer = document.getElementById('version-result-container');
+      const versionResultText = document.getElementById('version-result');
+
+      versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>'; // Clear and show loading
+      versionsSelect.disabled = true;
+      getVersionsButton.disabled = true;
+      revertVersionButton.disabled = true;
+      versionLoadingSpinner.style.display = 'block';
+      versionResultContainer.style.display = 'none'; // Hide previous results
+
+      if (!scriptId) {
+        versionsSelect.innerHTML = '<option value="">-- Select a Script ID first --</option>';
+        versionResultText.textContent = 'Error: Please select or enter a Script ID to get versions.';
+        versionResultContainer.style.display = 'block';
+        versionsSelect.disabled = false;
+        getVersionsButton.disabled = false;
+        versionLoadingSpinner.style.display = 'none';
+        return;
+      }
+
+      saveScriptIdToLocalStorage(scriptId); // Save script ID when fetching versions
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          versionLoadingSpinner.style.display = 'none';
+          getVersionsButton.disabled = false;
+          versionsSelect.disabled = false;
+          revertVersionButton.disabled = false; // Enable revert after versions loaded
+
+          if (response.status === 'success') {
+            versionsSelect.innerHTML = '<option value="">-- Select a version --</option>'; // Reset
+            if (response.versions && response.versions.length > 0) {
+              response.versions.forEach(version => {
+                const option = document.createElement('option');
+                option.value = version.versionNumber;
+                option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
+                versionsSelect.appendChild(option);
+              });
+              versionResultText.textContent = `バージョンが見つかりました: ${response.versions.length}件`;
+            } else {
+              versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
+              versionResultText.textContent = response.message;
+              revertVersionButton.disabled = true; // Disable if no versions
+            }
+          } else {
+            versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
+            versionResultText.textContent = `Error: ${response.message}`;
+            revertVersionButton.disabled = true; // Disable on error
+          }
+          versionResultContainer.style.display = 'block';
+        })
+        .withFailureHandler(function(error) {
+          versionLoadingSpinner.style.display = 'none';
+          getVersionsButton.disabled = false;
+          versionsSelect.disabled = false;
+          revertVersionButton.disabled = true;
+          versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
+          versionResultText.textContent = `Error getting versions: ${error.message}`;
+          versionResultContainer.style.display = 'block';
+        })
+        .listScriptVersions(scriptId);
+    });
+
+    document.getElementById('revertVersionButton').addEventListener('click', function() {
+      const scriptId = getEffectiveScriptId();
+      const versionSelect = document.getElementById('versionSelect');
+      const selectedVersion = versionSelect.value;
+      const revertButton = this;
+      const getVersionsButton = document.getElementById('getVersionsButton');
+      const versionLoadingSpinner = document.getElementById('version-loading-spinner');
+      const versionResultContainer = document.getElementById('version-result-container');
+      const versionResultText = document.getElementById('version-result');
+
+      if (!scriptId) {
+        versionResultText.textContent = 'Error: Please select or enter a Script ID.';
+        versionResultContainer.style.display = 'block';
+        return;
+      }
+      if (!selectedVersion) {
+        versionResultText.textContent = 'Error: Please select a version to revert to.';
+        versionResultContainer.style.display = 'block';
+        return;
+      }
+
+      if (!confirm(`スクリプトID ${scriptId} をバージョン ${selectedVersion} に戻します。これは元に戻せません。続行しますか？`)) {
+        return;
+      }
+
+      revertButton.disabled = true;
+      getVersionsButton.disabled = true;
+      versionSelect.disabled = true;
+      versionLoadingSpinner.style.display = 'block';
+      versionResultContainer.style.display = 'block'; // Show container immediately
+      versionResultText.textContent = `スクリプトをバージョン ${selectedVersion} に戻しています...`;
+
+      saveScriptIdToLocalStorage(scriptId); // Save script ID when reverting
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          versionLoadingSpinner.style.display = 'none';
+          revertButton.disabled = false;
+          getVersionsButton.disabled = false;
+          versionSelect.disabled = false;
+
+          if (response.status === 'success') {
+            versionResultText.textContent = response.message;
+            // Optionally, refresh versions or clear selection after successful revert
+            versionSelect.innerHTML = '<option value="">-- Select a version --</option>';
+            revertButton.disabled = true;
+          } else {
+            versionResultText.textContent = `Error: ${response.message}`;
+          }
+        })
+        .withFailureHandler(function(error) {
+          versionLoadingSpinner.style.display = 'none';
+          revertButton.disabled = false;
+          getVersionsButton.disabled = false;
+          versionSelect.disabled = false;
+          versionResultText.textContent = `Error reverting to version: ${error.message}`;
+        })
+        .revertToVersion(scriptId, parseInt(selectedVersion));
     });
   </script>
 </body>

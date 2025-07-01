@@ -46,9 +46,9 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
     if (putResponse.getResponseCode() !== 200) {
-        return { 
-            status: 'error', 
-            message: `スクリプトの更新に失敗しました。(HTTP ${putResponse.getResponseCode()})`, 
+        return {
+            status: 'error',
+            message: `スクリプトの更新に失敗しました。(HTTP ${putResponse.getResponseCode()})`,
             apiErrorDetails: JSON.parse(putResponse.getContentText() || '{}'),
             fullErrorText: putResponse.getContentText() // Provide full text for debugging
         };
@@ -519,5 +519,120 @@ function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
   } catch (error) {
     console.error("ライブラリ追加中にエラーが発生しました:", error);
     return { status: 'error', message: `ライブラリ追加エラー: ${error.message}` };
+  }
+}
+
+/**
+ * Lists all script versions for a given Apps Script project.
+ * @param {string} scriptId - The ID of the Apps Script project.
+ * @returns {object} An object containing 'status' and either 'versions' (Array<object>) or 'message'.
+ */
+function listScriptVersions(scriptId) {
+  if (!scriptId || scriptId.trim() === '') {
+    return { status: 'error', message: 'スクリプトIDが指定されていません。' };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
+
+    console.log(`スクリプトID ${scriptId} のバージョンをリスト中...`);
+    const options = {
+      method: 'get',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      muteHttpExceptions: true
+    };
+    const response = UrlFetchApp.fetch(versionsApiUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode !== 200) {
+      console.error(`バージョン取得APIエラー (ステータス: ${responseCode}): ${responseBody}`);
+      return { status: 'error', message: `バージョン取得エラー (HTTP ${responseCode}): ${responseBody}` };
+    }
+
+    const versionsData = JSON.parse(responseBody);
+    if (!versionsData.versions || versionsData.versions.length === 0) {
+      return { status: 'success', versions: [], message: 'このスクリプトにはバージョンが見つかりませんでした。' };
+    }
+
+    const versions = versionsData.versions.map(v => ({
+      versionNumber: v.versionNumber,
+      createTime: v.createTime,
+      description: v.description || '説明なし'
+    })).sort((a, b) => b.versionNumber - a.versionNumber); // 最新のバージョンが上位に来るようにソート
+
+    return { status: 'success', versions: versions };
+
+  } catch (e) {
+    console.error("バージョン取得中にエラーが発生しました:", e);
+    return { status: 'error', message: `バージョン取得エラー: ${e.message}` };
+  }
+}
+
+/**
+ * Reverts the Apps Script project content to a specific version.
+ * This fetches the content of the specified version and then updates the current HEAD with it.
+ * @param {string} scriptId - The ID of the Apps Script project.
+ * @param {number} versionNumber - The version number to revert to.
+ * @returns {object} An object containing 'status' and 'message'.
+ */
+function revertToVersion(scriptId, versionNumber) {
+  if (!scriptId || scriptId.trim() === '') {
+    return { status: 'error', message: 'スクリプトIDが指定されていません。' };
+  }
+  if (typeof versionNumber !== 'number' || versionNumber <= 0) {
+    return { status: 'error', message: '有効なバージョン番号が指定されていません。' };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const targetVersionContentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions/${versionNumber}`;
+    const currentContentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+
+    // 1. 指定されたバージョンのコンテンツを取得する
+    console.log(`バージョン ${versionNumber} のコンテンツを取得中...`);
+    const getVersionContentOptions = {
+      method: 'get',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      muteHttpExceptions: true
+    };
+    const getVersionContentResponse = UrlFetchApp.fetch(targetVersionContentUrl, getVersionContentOptions);
+    const getVersionContentCode = getVersionContentResponse.getResponseCode();
+    const getVersionContentBody = getVersionContentResponse.getContentText();
+
+    if (getVersionContentCode !== 200) {
+      console.error(`指定バージョンコンテンツ取得APIエラー (ステータス: ${getVersionContentCode}): ${getVersionContentBody}`);
+      return { status: 'error', message: `バージョン ${versionNumber} のコンテンツ取得エラー (HTTP ${getVersionContentCode}): ${getVersionContentBody}` };
+    }
+    const versionContent = JSON.parse(getVersionContentBody);
+    if (!versionContent.files) {
+      throw new Error(`バージョン ${versionNumber} のコンテンツにファイルデータが見つかりませんでした。`);
+    }
+
+    // 2. 取得したファイルコンテンツで現在のHEADを更新する (PUT)
+    console.log(`現在のスクリプトをバージョン ${versionNumber} の内容で更新中...`);
+    const putContentPayload = { files: versionContent.files };
+    const putContentOptions = {
+      method: 'put',
+      contentType: 'application/json',
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      payload: JSON.stringify(putContentPayload),
+      muteHttpExceptions: true
+    };
+    const putContentResponse = UrlFetchApp.fetch(currentContentUrl, putContentOptions);
+    const putContentCode = putContentResponse.getResponseCode();
+    const putContentBody = putContentResponse.getContentText();
+
+    if (putContentCode !== 200) {
+      console.error(`スクリプト更新APIエラー (ステータス: ${putContentCode}): ${putContentBody}`);
+      return { status: 'error', message: `スクリプトをバージョン ${versionNumber} に戻す際にエラーが発生しました (HTTP ${putContentCode}): ${putContentBody}` };
+    }
+
+    return { status: 'success', message: `スクリプトは正常にバージョン ${versionNumber} に戻されました。` };
+
+  } catch (e) {
+    console.error("バージョンへの復元中にエラーが発生しました:", e);
+    return { status: 'error', message: `バージョン復元エラー: ${e.message}` };
   }
 }
