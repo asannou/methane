@@ -266,6 +266,7 @@
 
     // NEW: Function to validate HTML content using DOMParser
     function validateHtml(htmlString, fileName) {
+        console.log(`HTML validation started for file: ${fileName}`);
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlString, 'text/html');
         const parseError = doc.querySelector('parsererror');
@@ -273,9 +274,10 @@
         if (parseError) {
             // DOMParser finds errors and inserts <parsererror> in the parsed document.
             const errorMessage = parseError.textContent;
-            console.error(`HTML validation error in ${fileName}:`, errorMessage);
+            console.error(`HTML validation failed in ${fileName}:`, errorMessage);
             return { isValid: false, message: `HTMLファイル "${fileName}" に構文エラーが見つかりました: ${errorMessage}` };
         }
+        console.log(`HTML validation successful for file: ${fileName}`);
         return { isValid: true };
     }
 
