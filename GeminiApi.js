@@ -31,7 +31,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += "  - 生成するソースコードの内容は、指示と無関係な改行、インデント、空白文字の削除や変更を完全に禁止し、元のファイルの書式を厳密に維持することを最優先してください。特にHTMLファイルでは、元の構造とインデントを厳密に保持してください。生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
-  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"...新しいソース...\"}]}\n```";
+  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}]}\n```";
   systemPrompt += "- 'purpose'フィールドには、提案された変更の全体的な目的や理由を、ユーザーが理解しやすいように簡潔に説明してください。\n";
 
   const requestBody = {
@@ -92,7 +92,13 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
     throw new Error(`Gemini APIエラー (Status: ${responseCode}): ${responseBody}`);
   }
 
-  const jsonResponse = JSON.parse(responseBody);
+  let jsonResponse;
+  try {
+    jsonResponse = JSON.parse(responseBody);
+  } catch (e) {
+    throw new Error(`Gemini API応答のJSON解析に失敗しました: ${e.message}. 受信したボディ: ${responseBody}`);
+  }
+
   let generatedText = jsonResponse.candidates?.[0]?.content?.parts?.[0]?.text || '';
   generatedText = generatedText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
 
