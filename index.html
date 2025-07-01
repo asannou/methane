@@ -2,6 +2,7 @@
 <html>
 <head>
 <base target="_top">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <?!= include('style'); ?>
 </head>
 <body>
@@ -29,7 +30,7 @@
   <!-- Policy Review Section -->
   <div id="policy-container" style="display:none;">
     <h2>AI Generated Policy:</h2>
-    <pre id="ai-policy"></pre>
+    <div id="ai-policy"></div>
     <button type="button" id="acceptPolicyButton" style="display:none;">Accept Policy & Propose Changes</button>
     <button type="button" id="regeneratePolicyButton" style="display:none;">Regenerate Policy</button>
   </div>
@@ -512,7 +513,7 @@
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('ai-policy').textContent = '';
+      document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
       document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
 
@@ -538,7 +539,7 @@
 
             if (response.status === 'policy') {
               currentPolicyData = response; // Store policy data
-              document.getElementById('ai-policy').textContent = response.policy;
+              document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
               document.getElementById('policy-container').style.display = 'block';
               document.getElementById('acceptPolicyButton').style.display = 'inline-block';
               regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button
@@ -695,7 +696,7 @@
 
       currentPolicyData = null; // Clear any partial policy
       currentProposal = null; // Clear any partial proposal
-      document.getElementById('ai-policy').textContent = '';
+      document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('apply-result').textContent = '';
@@ -761,7 +762,7 @@
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('ai-policy').textContent = '';
+      document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
       htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
@@ -791,7 +792,7 @@
 
           if (response.status === 'policy') {
             currentPolicyData = response;
-            document.getElementById('ai-policy').textContent = response.policy;
+            document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
             policyContainer.style.display = 'block';
             acceptPolicyButton.style.display = 'inline-block';
             regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button again

@@ -92,4 +92,55 @@
   .code-content-col > .diff-line-removed { background-color: #ffe6e6; } /* Light red for removed content */
   .code-content-col > .diff-line-modified { background-color: #fffacd; } /* Light yellow for modified content */
   .code-content-col > .diff-line-empty-fill { background-color: transparent; } /* Transparent fill for alignment */
+
+  /* Styles for Markdown rendered content in ai-policy div */
+  #ai-policy {
+    background-color: #ffffff;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  #ai-policy h1, #ai-policy h2, #ai-policy h3, #ai-policy h4, #ai-policy h5, #ai-policy h6 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+    font-weight: bold;
+  }
+  #ai-policy h1 { font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+  #ai-policy h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+  #ai-policy h3 { font-size: 1.2em; }
+
+  #ai-policy p { margin-bottom: 1em; }
+
+  #ai-policy ul, #ai-policy ol {
+    margin-left: 20px;
+    margin-bottom: 1em;
+  }
+  #ai-policy ul li, #ai-policy ol li {
+    margin-bottom: 0.5em;
+  }
+
+  #ai-policy blockquote {
+    border-left: 4px solid #ccc;
+    padding-left: 10px;
+    color: #555;
+    margin: 1em 0;
+  }
+
+  #ai-policy code {
+    font-family: monospace;
+    background-color: #f0f0f0;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+
+  #ai-policy pre code {
+    display: block;
+    padding: 10px;
+    background-color: #eef;
+    overflow-x: auto;
+    border-radius: 4px;
+  }
 </style>
