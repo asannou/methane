@@ -14,7 +14,7 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        return { status: 'error', message: `スクリプト内容の再取得に失敗: ${getResponse.getContentText()}`, apiErrorDetails: JSON.parse(getResponse.getContentText() || '{}') };
+        return { status: 'error', message: `Failed to retrieve script content again: ${getResponse.getContentText()}`, apiErrorDetails: JSON.parse(getResponse.getContentText() || '{}') };
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
@@ -48,7 +48,7 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     if (putResponse.getResponseCode() !== 200) {
         return {
             status: 'error',
-            message: `スクリプトの更新に失敗しました。(HTTP ${putResponse.getResponseCode()})`,
+            message: `Failed to update script. (HTTP ${putResponse.getResponseCode()})`,
             apiErrorDetails: JSON.parse(putResponse.getContentText() || '{}'),
             fullErrorText: putResponse.getContentText() // Provide full text for debugging
         };
@@ -63,16 +63,16 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
 
     return {
       status: 'success',
-      message: `スクリプト (ID: ${scriptId}) の更新に成功しました。AIの提案が適用されました。`,
+      message: `Script (ID: ${scriptId}) updated successfully. AI's proposal has been applied.`,
       deploymentStatus: deployResult ? deployResult.status : 'not_attempted',
-      deploymentMessage: deployResult ? deployResult.message : '自動デプロイは実行されませんでした。',
+      deploymentMessage: deployResult ? deployResult.message : 'Auto-deploy was not executed.',
       deploymentId: deployResult ? deployResult.deploymentId : null,
       webappUrl: deployResult ? deployResult.webappUrl : null
     };
 
   } catch (error) {
     console.error("スクリプト適用中にエラーが発生しました:", error);
-    return { status: 'error', message: `スクリプト適用エラー: ${error.message}` };
+    return { status: 'error', message: `Script application error: ${error.message}` };
   }
 }
 
@@ -83,14 +83,14 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
  */
 function setGcpProjectId(gcpProjectId) {
   if (!gcpProjectId || gcpProjectId.trim() === '') {
-    return { status: 'error', message: 'GCPプロジェクトIDは空にできません。' };
+    return { status: 'error', message: 'GCP Project ID cannot be empty.' };
   }
   try {
     PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId.trim());
-    return { status: 'success', message: `GCPプロジェクトID '${gcpProjectId.trim()}' が正常に設定されました。` };
+    return { status: 'success', message: `GCP Project ID '${gcpProjectId.trim()}' set successfully.` };
   } catch (e) {
     console.error("GCPプロジェクトIDの設定中にエラーが発生しました:", e);
-    return { status: 'error', message: `GCPプロジェクトIDの設定エラー: ${e.message}` };
+    return { status: 'error', message: `GCP Project ID setting error: ${e.message}` };
   }
 }
 
@@ -113,19 +113,19 @@ function getScriptLogs(targetScriptId) {
       const metadataResponse = UrlFetchApp.fetch(currentScriptMetadataUrl, metadataOptions);
       
       if (metadataResponse.getResponseCode() !== 200) {
-        throw new Error(`現在のスクリプトのメタデータ取得に失敗: ${metadataResponse.getContentText()}`);
+        throw new Error(`Failed to retrieve current script metadata: ${metadataResponse.getContentText()}`);
       }
       const metadata = JSON.parse(metadataResponse.getContentText());
 
       if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
         console.error("Received metadata:", JSON.stringify(metadata, null, 2));
-        const userGuidance = "スクリプトのGCPプロジェクトIDを特定できませんでした。これは、現在のApps Scriptプロジェクトが標準のGoogle Cloudプロジェクトにリンクされていない場合に発生することがあります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）から、Google Cloud Platformプロジェクトを明示的にリンクするか、ウェブUIで手動で設定してください。";
+        const userGuidance = "Could not identify the GCP Project ID for the script. This can happen if the current Apps Script project is not linked to a standard Google Cloud project. Please explicitly link a Google Cloud Platform project from the Apps Script editor's 'Project settings' (gear icon) or set it manually in the web UI.";
         throw new Error(userGuidance);
       }
 
       const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
       if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
-        throw new Error("現在のスクリプトのGCPプロジェクトIDを、メタデータから正しく抽出できませんでした。");
+        throw new Error("Could not correctly extract the current script's GCP Project ID from metadata.");
       }
       gcpProjectId = gcpProjectIdMatch[1];
       PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId);
@@ -158,15 +158,15 @@ function getScriptLogs(targetScriptId) {
     const responseBody = response.getContentText();
 
     if (responseCode !== 200) {
-      throw new Error(`Cloud Logging APIエラー (ステータス: ${responseCode}): ${responseBody}`);
+      throw new Error(`Cloud Logging API error (Status: ${responseCode}): ${responseBody}`);
     }
 
     const logsData = JSON.parse(responseBody);
     if (!logsData.entries || logsData.entries.length === 0) {
-      return "指定されたスクリプトIDに関連する、またはGCPプロジェクト全体でApps Scriptのログが見つかりませんでした。\n";
+      return "No Apps Script logs found for the specified Script ID, or across the GCP project.\n";
     }
 
-    let formattedLogs = "--- 最新のログ ---\n";
+    let formattedLogs = "--- Latest Logs ---\n";
     logsData.entries.forEach(entry => {
       const timestamp = new Date(entry.timestamp).toLocaleString();
       let logPayload = '';
@@ -184,7 +184,7 @@ function getScriptLogs(targetScriptId) {
 
   } catch (e) {
     console.error("ログ取得中にエラーが発生しました:", e);
-    return `ログ取得エラー: ${e.message}`;
+    return `Log retrieval error: ${e.message}`;
   }
 }
 
@@ -222,7 +222,7 @@ function deployScript(scriptId, description = '') {
     console.log(`バージョン作成API応答 - ステータス: ${createVersionResponseCode}, ボディ: ${createVersionResponseBody}`);
 
     if (createVersionResponseCode !== 200) {
-      throw new Error(`バージョン作成APIエラー (ステータス: ${createVersionResponseCode}): ${createVersionResponseBody}`);
+      throw new Error(`Version creation API error (Status: ${createVersionResponseCode}): ${createVersionResponseBody}`);
     }
     const versionResult = JSON.parse(createVersionResponseBody);
     console.log("解析されたバージョン作成応答データ:", JSON.stringify(versionResult, null, 2));
@@ -255,7 +255,7 @@ function deployScript(scriptId, description = '') {
     console.log(`デプロイAPI応答 - ステータス: ${responseCode}, ボディ: ${responseBody}`);
 
     if (responseCode !== 200) {
-      throw new Error(`デプロイAPIエラー (ステータス: ${responseCode}): ${responseBody}`);
+      throw new Error(`Deployment API error (Status: ${responseCode}): ${responseBody}`);
     }
 
     const deploymentResult = JSON.parse(responseBody);
@@ -336,7 +336,7 @@ function deployScript(scriptId, description = '') {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
       return {
         status: 'success',
-        message: 'デプロイは正常に完了しましたが、ウェブアプリURLが見つかりませんでした。デプロイを確認してください。古いウェブアプリデプロイメントはアーカイブされました。',
+        message: 'Deployment completed successfully, but the web app URL was not found. Please verify the deployment. Old web app deployments were archived.',
         deploymentId: newDeploymentId,
         webappUrl: 'URL not found in response'
       };
@@ -344,14 +344,14 @@ function deployScript(scriptId, description = '') {
 
     return {
       status: 'success',
-      message: 'デプロイが正常に完了しました。古いウェブアプリデプロイメントはアーカイブされました。',
+      message: 'Deployment completed successfully. Old web app deployments were archived.',
       deploymentId: newDeploymentId,
       webappUrl: webappUrl
     };
 
   } catch (e) {
     console.error("デプロイ中にエラーが発生しました:", e);
-    return { status: 'error', message: `デプロイエラー: ${e.message}` };
+    return { status: 'error', message: `Deployment error: ${e.message}` };
   }
 }
 
@@ -385,13 +385,13 @@ function listAppsScriptProjects() {
 
   } catch (e) {
     console.error("ドライブAPIによるApps Scriptプロジェクトのリスト中にエラーが発生しました:", e);
-    let userMessage = `Apps Scriptプロジェクトのリストエラー: ${e.message}`;
+    let userMessage = `Apps Script project list error: ${e.message}`;
 
     if (e.name === 'ReferenceError' && e.message.includes("Drive is not defined")) {
-      userMessage = `Apps Scriptプロジェクトの取得に失敗しました。Drive API (Advanced Service) がこのApps Scriptプロジェクトで有効になっていない可能性があります。Apps Scriptエディタの「プロジェクトの設定」（歯車アイコン）>「Advanced Google Services」から「Drive API」を有効にし、このプロジェクトに関連付けられているか確認してください。また、appsscript.jsonに適切なOAuthスコープ (https://www.googleapis.com/auth/drive.readonly) が設定されていることを確認してください。`;
+      userMessage = `Failed to retrieve Apps Script projects. Drive API (Advanced Service) might not be enabled for this Apps Script project. Please enable 'Drive API' from 'Project settings' (gear icon) > 'Advanced Google Services' in the Apps Script editor and ensure it's linked to this project. Also, confirm that the appropriate OAuth scope (https://www.googleapis.com/auth/drive.readonly) is set in appsscript.json.`;
     } else if (e.message.includes("API call to drive.files.list failed with error")) {
       // This is for cases where Drive is defined but the API call itself failed (e.g., permission issue)
-      userMessage = `Apps Scriptプロジェクトの取得に失敗しました。Drive API (Advanced Service) がこのApps Scriptプロジェクトで有効になっているか、およびappsscript.jsonに適切なOAuthスコープ (https://www.googleapis.com/auth/drive.readonly) が設定されているか確認してください。エラー: ${e.message}`;
+      userMessage = `Failed to retrieve Apps Script projects. Please confirm that Drive API (Advanced Service) is enabled for this Apps Script project and that the appropriate OAuth scope (https://www.googleapis.com/auth/drive.readonly) is set in appsscript.json. Error: ${e.message}`;
     }
     return { status: 'error', message: userMessage };
   }
@@ -404,7 +404,7 @@ function listAppsScriptProjects() {
  */
 function getScriptEditorUrl(scriptId) {
   if (!scriptId || scriptId.trim() === '') {
-    return "エラー: スクリプトIDが指定されていません。";
+    return "Error: Script ID is not specified.";
   }
   return `https://script.google.com/d/${scriptId}/edit`;
 }
@@ -419,10 +419,10 @@ function getScriptEditorUrl(scriptId) {
  */
 function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
   if (!targetScriptId || targetScriptId.trim() === '') {
-    return { status: 'error', message: '対象のスクリプトIDが指定されていません。' };
+    return { status: 'error', message: 'Target script ID is not specified.' };
   }
   if (!libraryScriptId || libraryScriptId.trim() === '') {
-    return { status: 'error', message: 'ライブラリのスクリプトIDが指定されていません。' };
+    return { status: 'error', message: 'Library Script ID is not specified.' };
   }
 
   // Default to 'HEAD' if version is empty or not provided
@@ -440,14 +440,14 @@ function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
     if (getResponse.getResponseCode() !== 200) {
       const errorDetails = JSON.parse(getResponse.getContentText() || '{}');
       console.error("スクリプト内容の取得に失敗しました:", getResponse.getContentText());
-      return { status: 'error', message: `スクリプト内容の取得に失敗: ${errorDetails.error?.message || getResponse.getContentText()}` };
+      return { status: 'error', message: `Failed to retrieve script content: ${errorDetails.error?.message || getResponse.getContentText()}` };
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
     let appsscriptJsonFile = projectContent.files.find(file => file.name === 'appsscript' && file.type === 'JSON');
 
     if (!appsscriptJsonFile) {
-      return { status: 'error', message: '対象スクリプトにappsscript.jsonファイルが見つかりませんでした。' };
+      return { status: 'error', message: 'appsscript.json file not found in the target script.' };
     }
 
     let manifest = JSON.parse(appsscriptJsonFile.source);
@@ -474,7 +474,7 @@ function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
         console.log(`既存のライブラリ '${libraryScriptId}' のバージョンを '${effectiveVersion}' に更新します。`);
         // Proceed to update the project content
       } else {
-        return { status: 'success', message: `ライブラリ '${libraryScriptId}' (バージョン: ${effectiveVersion}) は既に追加されています。` };
+        return { status: 'success', message: `Library '${libraryScriptId}' (Version: ${effectiveVersion}) is already added.` };
       }
     } else {
       // Add new library
@@ -508,17 +508,17 @@ function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
       console.error("appsscript.jsonの更新に失敗しました:", putResponse.getContentText());
       return { 
         status: 'error', 
-        message: `appsscript.jsonの更新に失敗しました: ${errorDetails.error?.message || putResponse.getContentText()}`, 
+        message: `Failed to update appsscript.json: ${errorDetails.error?.message || putResponse.getContentText()}`, 
         apiErrorDetails: errorDetails,
         fullErrorText: putResponse.getContentText()
       };
     }
 
-    return { status: 'success', message: `ライブラリ '${libraryScriptId}' (バージョン: ${effectiveVersion}) が対象スクリプトに追加（または更新）されました。` };
+    return { status: 'success', message: `Library '${libraryScriptId}' (Version: ${effectiveVersion}) has been added to (or updated in) the target script.` };
 
   } catch (error) {
     console.error("ライブラリ追加中にエラーが発生しました:", error);
-    return { status: 'error', message: `ライブラリ追加エラー: ${error.message}` };
+    return { status: 'error', message: `Library addition error: ${error.message}` };
   }
 }
 
@@ -529,7 +529,7 @@ function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
  */
 function listScriptVersions(scriptId) {
   if (!scriptId || scriptId.trim() === '') {
-    return { status: 'error', message: 'スクリプトIDが指定されていません。' };
+    return { status: 'error', message: 'Script ID is not specified.' };
   }
 
   try {
@@ -548,12 +548,12 @@ function listScriptVersions(scriptId) {
 
     if (responseCode !== 200) {
       console.error(`バージョン取得APIエラー (ステータス: ${responseCode}): ${responseBody}`);
-      return { status: 'error', message: `バージョン取得エラー (HTTP ${responseCode}): ${responseBody}` };
+      return { status: 'error', message: `Version retrieval error (HTTP ${responseCode}): ${responseBody}` };
     }
 
     const versionsData = JSON.parse(responseBody);
     if (!versionsData.versions || versionsData.versions.length === 0) {
-      return { status: 'success', versions: [], message: 'このスクリプトにはバージョンが見つかりませんでした。' };
+      return { status: 'success', versions: [], message: 'No versions found for this script.' };
     }
 
     const versions = versionsData.versions.map(v => ({
@@ -566,7 +566,7 @@ function listScriptVersions(scriptId) {
 
   } catch (e) {
     console.error("バージョン取得中にエラーが発生しました:", e);
-    return { status: 'error', message: `バージョン取得エラー: ${e.message}` };
+    return { status: 'error', message: `Version retrieval error: ${e.message}` };
   }
 }
 
@@ -579,10 +579,10 @@ function listScriptVersions(scriptId) {
  */
 function revertToVersion(scriptId, versionNumber) {
   if (!scriptId || scriptId.trim() === '') {
-    return { status: 'error', message: 'スクリプトIDが指定されていません。' };
+    return { status: 'error', message: 'Script ID is not specified.' };
   }
   if (typeof versionNumber !== 'number' || versionNumber <= 0) {
-    return { status: 'error', message: '有効なバージョン番号が指定されていません。' };
+    return { status: 'error', message: 'A valid version number is not specified.' };
   }
 
   try {
@@ -603,11 +603,11 @@ function revertToVersion(scriptId, versionNumber) {
 
     if (getVersionContentCode !== 200) {
       console.error(`指定バージョンコンテンツ取得APIエラー (ステータス: ${getVersionContentCode}): ${getVersionContentBody}`);
-      return { status: 'error', message: `バージョン ${versionNumber} のコンテンツ取得エラー (HTTP ${getVersionContentCode}): ${getVersionContentBody}` };
+      return { status: 'error', message: `Failed to retrieve content for version ${versionNumber} (HTTP ${getVersionContentCode}): ${getVersionContentBody}` };
     }
     const versionContent = JSON.parse(getVersionContentBody);
     if (!versionContent.files) {
-      throw new Error(`バージョン ${versionNumber} のコンテンツにファイルデータが見つかりませんでした。`);
+      throw new Error(`No file data found in content for version ${versionNumber}.`);
     }
 
     // 2. 取得したファイルコンテンツで現在のHEADを更新する (PUT)
@@ -626,13 +626,13 @@ function revertToVersion(scriptId, versionNumber) {
 
     if (putContentCode !== 200) {
       console.error(`スクリプト更新APIエラー (ステータス: ${putContentCode}): ${putContentBody}`);
-      return { status: 'error', message: `スクリプトをバージョン ${versionNumber} に戻す際にエラーが発生しました (HTTP ${putContentCode}): ${putContentBody}` };
+      return { status: 'error', message: `Error reverting script to version ${versionNumber} (HTTP ${putContentCode}): ${putContentBody}` };
     }
 
-    return { status: 'success', message: `スクリプトは正常にバージョン ${versionNumber} に戻されました。` };
+    return { status: 'success', message: `Script successfully reverted to version ${versionNumber}.` };
 
   } catch (e) {
     console.error("バージョンへの復元中にエラーが発生しました:", e);
-    return { status: 'error', message: `バージョン復元エラー: ${e.message}` };
+    return { status: 'error', message: `Version reversion error: ${e.message}` };
   }
 }

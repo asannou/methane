@@ -9,7 +9,7 @@ function generateProposalPolicy(formObject) {
   const userPrompt = formObject.prompt;
 
   if (!API_KEY) {
-    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
+    return { status: 'error', message: "Error: Gemini API key is not set. Please check script properties." };
   }
 
   try {
@@ -19,7 +19,7 @@ function generateProposalPolicy(formObject) {
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+        throw new Error(`Failed to retrieve script content: ${getResponse.getContentText()}`);
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
@@ -35,7 +35,7 @@ function generateProposalPolicy(formObject) {
     aiPrompt += `## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n`;
     aiPrompt += `レスポンス形式の例:\n\
 ` + `\
-` + `{\"policy\": \"...変更方針のテキスト...\"}\n\
+` + `{"policy": "...変更方針のテキスト..."}\n\
 ` + `\
 ` + `\
 `;
@@ -87,7 +87,7 @@ function generateProposalPolicy(formObject) {
       if (policyResponse && policyResponse.policy) {
         return { status: 'policy', policy: policyResponse.policy, scriptId: scriptId, userPrompt: userPrompt };
       } else {
-        throw new Error("AIからの応答が不正な形式です。'policy'プロパティが見つかりません。");
+        throw new Error("Invalid response format from AI. 'policy' property not found.");
       }
     } catch (e) {
       throw new Error(`AIからの方針JSON応答の解析に失敗しました: ${e.message}. 受信したテキスト（先頭500文字）: ${generatedText.substring(0, 500)}...`);
@@ -95,7 +95,7 @@ function generateProposalPolicy(formObject) {
 
   } catch (error) {
     console.error("方針生成中にエラーが発生しました:", error);
-    return { status: 'error', message: `方針生成エラー: ${error.message}` };
+    return { status: 'error', message: `Policy generation error: ${error.message}` };
   }
 }
 
@@ -111,7 +111,7 @@ function processPrompt(formObject) {
   const policyText = formObject.policy;
 
   if (!API_KEY) {
-    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
+    return { status: 'error', message: "Error: Gemini API key is not set. Please check script properties." };
   }
 
   try {
@@ -121,17 +121,17 @@ function processPrompt(formObject) {
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+        throw new Error(`Failed to retrieve script content: ${getResponse.getContentText()}`);
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
     const aiResponse = callGenerativeAI(prompt, projectContent, policyText);
 
     if (!aiResponse || !Array.isArray(aiResponse.files)) {
-      throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
+      throw new Error("Invalid response format from AI. 'files' property not found or is not an array.");
     }
 
-    const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
+    const proposalPurpose = aiResponse.purpose || "AI did not provide a purpose for the changes.";
 
     return {
       status: 'proposal',
@@ -139,12 +139,12 @@ function processPrompt(formObject) {
       originalFiles: projectContent.files,
       proposedFiles: aiResponse.files,
       purpose: proposalPurpose,
-      message: "AIからの提案が生成されました。内容を確認し、適用してください。"
+      message: "AI proposal generated. Please review the content and apply."
     };
 
   } catch (error) {
     console.error("AI提案生成中にエラーが発生しました:", error);
-    return { status: 'error', message: `AI提案生成エラー: ${error.message}` };
+    return { status: 'error', message: `AI proposal generation error: ${error.message}` };
   }
 }
 
@@ -155,17 +155,17 @@ function processPrompt(formObject) {
  */
 function fixErrorsFromLogs(targetScriptId) {
   if (!API_KEY) {
-    return { status: 'error', message: "Error: Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。" };
+    return { status: 'error', message: "Error: Gemini API key is not set. Please check script properties." };
   }
   if (!targetScriptId || targetScriptId.trim() === '') {
-    return { status: 'error', message: "Error: スクリプトIDが指定されていません。" };
+    return { status: 'error', message: "Error: Script ID is not specified." };
   }
 
   try {
     // 1. ログを取得
     const logs = getScriptLogs(targetScriptId);
     // getScriptLogs はエラーメッセージも文字列として返す可能性があるため、それをチェック
-    if (logs.startsWith("ログ取得エラー:") || logs.startsWith("指定されたスクリプトIDに関連する")) {
+    if (logs.startsWith("Log retrieval error:") || logs.startsWith("No Apps Script logs found for the specified Script ID")) {
         return { status: 'error', message: logs }; // エラーメッセージやログなしメッセージをそのまま返す
     }
 
@@ -175,7 +175,7 @@ function fixErrorsFromLogs(targetScriptId) {
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        throw new Error(`スクリプト内容の取得に失敗: ${getResponse.getContentText()}`);
+        throw new Error(`Failed to retrieve script content: ${getResponse.getContentText()}`);
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
@@ -191,10 +191,10 @@ function fixErrorsFromLogs(targetScriptId) {
     const aiResponse = callGenerativeAI(aiPrompt, projectContent);
 
     if (!aiResponse || !Array.isArray(aiResponse.files)) {
-      throw new Error("AIからの応答が不正な形式です。'files'プロパティが見つからないか、配列ではありません。");
+      throw new Error("Invalid response format from AI. 'files' property not found or is not an array.");
     }
 
-    const proposalPurpose = aiResponse.purpose || "AIは変更の主旨を提供しませんでした。";
+    const proposalPurpose = aiResponse.purpose || "AI did not provide a purpose for the changes.";
 
     return {
       status: 'proposal', // processPrompt と同じステータス
@@ -202,11 +202,11 @@ function fixErrorsFromLogs(targetScriptId) {
       originalFiles: projectContent.files, // 元のファイルも返す
       proposedFiles: aiResponse.files,
       purpose: proposalPurpose,
-      message: "AIからのエラー修正提案が生成されました。内容を確認し、適用してください。"
+      message: "AI error fix proposal generated. Please review the content and apply."
     };
 
   } catch (error) {
     console.error("エラー修正提案生成中にエラーが発生しました:", error);
-    return { status: 'error', message: `エラー修正提案生成エラー: ${error.message}` };
+    return { status: 'error', message: `Error fix proposal generation error: ${error.message}` };
   }
 }

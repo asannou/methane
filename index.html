@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <base target="_top">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -57,7 +57,7 @@
             <!-- Policy editing controls (placeholder for future expansion) -->
           </div>
           <div class="control">
-            <button type="button" id="togglePolicyEditButton" class="button is-small is-light">ポリシーを編集</button>
+            <button type="button" id="togglePolicyEditButton" class="button is-small is-light">Edit Policy</button>
           </div>
         </div>
         <div id="ai-policy" class="content"></div>
@@ -78,17 +78,17 @@
       <!-- Proposal Review Section -->
       <div id="proposal-container" class="box mt-4" style="display:none;">
         <h2 class="title is-4">AI Proposed Changes:</h2>
-        <p class="content"><strong id="proposal-purpose-label">変更の主旨:</strong> <span id="proposal-purpose"></span></p>
+        <p class="content"><strong id="proposal-purpose-label">Purpose of Change:</strong> <span id="proposal-purpose"></span></p>
         <!-- NEW: HTML Validation Warnings -->
         <div id="html-validation-warnings" class="notification is-danger is-light mb-4" style="display: none;"></div>
-        <p class="content">以下の変更がAIから提案されました。内容を確認し、問題なければ「Apply Changes」ボタンをクリックして適用してください。</p>
+        <p class="content">The following changes have been proposed by the AI. Please review the content and click the "Apply Changes" button to apply if there are no issues.</p>
         <div id="proposed-files-display">
           <!-- File comparisons will be inserted here by JavaScript -->
         </div>
         <div class="field mt-3">
           <label class="checkbox">
             <input type="checkbox" id="autoDeployAfterApply">
-            適用後自動デプロイ
+            Auto-deploy after applying
           </label>
         </div>
         <div class="field is-grouped mt-4">
@@ -111,7 +111,7 @@
       <hr class="my-5">
 
       <h2 class="title is-4">Google Cloud Project ID Configuration</h2>
-      <p class="content">ログ取得には、このApps ScriptがリンクされているGoogle Cloud Projectが必要です。APIで自動取得できない場合に備え、GCPプロジェクトIDを手動で設定してください。</p>
+      <p class="content">A Google Cloud Project linked to this Apps Script is required for log retrieval. Please manually set your GCP Project ID in case automatic retrieval via API fails.</p>
       <div class="field">
         <label class="label" for="gcpProjectId">GCP Project ID:</label>
         <div class="control">
@@ -145,7 +145,7 @@
       <hr class="my-5">
 
       <h2 class="title is-4">Automated Error Fix from Logs</h2>
-      <p class="content">既存のスクリプトログに基づいて、AIにエラー修正の提案をさせます。提案された変更は上記の「AI Proposed Changes」セクションに表示されます。</p>
+      <p class="content">Allows AI to propose error fixes based on existing script logs. Proposed changes will appear in the "AI Proposed Changes" section above.</p>
       <form id="fix-errors-form">
         <p class="content">Using the Script ID entered above.</p>
         <div class="field is-grouped">
@@ -213,7 +213,7 @@
       <hr class="my-5">
 
       <h2 class="title is-4">Version Control</h2>
-      <p class="content">スクリプトのバージョン履歴を表示し、特定の過去のバージョンに復元します。</p>
+      <p class="content">View script version history and revert to a specific past version.</p>
       <div class="field is-grouped">
         <div class="control">
           <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
@@ -316,10 +316,10 @@
 
         google.script.run
             .withSuccessHandler(function(response) {
-                if (response.startsWith("エラー:")) {
+                if (response.startsWith("Error:")) {
                     editorUrlDisplayDiv.textContent = `Apps Script Editor URL: ${response}`;
                 } else {
-                    editorUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
+                    editorUrlUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
                 }
             })
             .withFailureHandler(function(error) {
@@ -378,7 +378,7 @@
             // DOMParser finds errors and inserts <parsererror> in the parsed document.
             const errorMessage = parseError.textContent;
             console.error(`HTML validation failed in ${fileName}:`, errorMessage);
-            return { isValid: false, message: `HTMLファイル "${fileName}" に構文エラーが見つかりました: ${errorMessage}` };
+            return { isValid: false, message: `Syntax error found in HTML file "${fileName}": ${errorMessage}` };
         }
         console.log(`HTML validation successful for file: ${fileName}`);
         return { isValid: true };
@@ -623,7 +623,7 @@
       document.getElementById('version-result-container').style.display = 'none';
       // NEW: Hide policy editor
       document.getElementById('policyEditor').style.display = 'none';
-      document.getElementById('togglePolicyEditButton').textContent = 'ポリシーを編集';
+      document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
 
       const formData = { scriptId: scriptId, prompt: promptText };
@@ -690,18 +690,18 @@
         aiPolicyDiv.innerHTML = marked.parse(currentPolicyData.policy); // Render Markdown
         aiPolicyDiv.style.display = 'block';
         policyEditorTextarea.style.display = 'none';
-        toggleButton.textContent = 'ポリシーを編集';
+        toggleButton.textContent = 'Edit Policy';
         promptInput.readOnly = false; // Re-enable prompt after editing policy
       } else {
         // Enter edit mode
         if (!currentPolicyData || !currentPolicyData.policy) {
-          alert('編集するポリシーがありません。まずポリシーを生成してください。');
+          alert('No policy to edit. Please generate a policy first.');
           return;
         }
         policyEditorTextarea.value = currentPolicyData.policy; // Load raw policy text
         aiPolicyDiv.style.display = 'none';
         policyEditorTextarea.style.display = 'block';
-        toggleButton.textContent = '編集を完了';
+        toggleButton.textContent = 'Finish Editing';
         promptInput.readOnly = false; // Ensure prompt is editable during policy editing
         policyEditorTextarea.focus();
       }
@@ -734,7 +734,7 @@
       
       // NEW: Hide policy editor if visible
       document.getElementById('policyEditor').style.display = 'none';
-      document.getElementById('togglePolicyEditButton').textContent = 'ポリシーを編集';
+      document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
 
       const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt, policy: currentPolicyData.policy };
@@ -758,7 +758,7 @@
 
           if (response.status === 'proposal') {
             currentProposal = response; // Store the proposal
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
+            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
             // NEW: HTML Validation
             const htmlWarningsDiv = document.getElementById('html-validation-warnings');
@@ -867,10 +867,10 @@
 
       // NEW: Reset policy editing state
       policyEditorTextarea.style.display = 'none';
-      togglePolicyEditButton.textContent = 'ポリシーを編集';
+      togglePolicyEditButton.textContent = 'Edit Policy';
       isPolicyEditing = false;
 
-      alert('AI操作はユーザーによってキャンセルされました。');
+      alert('AI operation canceled by user.');
     });
 
     // Event Listener for Regenerate Policy button
@@ -927,7 +927,7 @@
       htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
       // NEW: Hide policy editor
       policyEditorTextarea.style.display = 'none';
-      togglePolicyEditButton.textContent = 'ポリシーを編集';
+      togglePolicyEditButton.textContent = 'Edit Policy';
       isPolicyEditing = false;
 
       currentPolicyData = null; // Clear previous policy data
@@ -1010,7 +1010,7 @@
       applySpinner.style.display = 'block';
       applyResultText.textContent = 'Applying changes...';
       if (autoDeployChecked) {
-          applyResultText.textContent += '\n自動デプロイを伴います...';
+          applyResultText.textContent += '\nAuto-deploying...';
       }
 
       google.script.run
@@ -1022,20 +1022,20 @@
           if (response.status === 'success') {
             let message = response.message;
             if (response.deploymentStatus) { // Check if deployment attempt was made
-              message += `<br><br><strong>自動デプロイ結果:</strong><br>`;
+              message += `<br><br><strong>Auto-deploy Result:</strong><br>`;
               if (response.deploymentStatus === 'success') {
-                message += `状態: 成功<br>メッセージ: ${response.deploymentMessage}`;
-                if (response.deploymentId) message += `<br>デプロイID: ${response.deploymentId}`;
+                message += `Status: Success<br>Message: ${response.deploymentMessage}`;
+                if (response.deploymentId) message += `<br>Deployment ID: ${response.deploymentId}`;
                 if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
-                  message += `<br>WebアプリURL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
+                  message += `<br>Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
                 } else if (response.webappUrl === 'URL not found in response') {
-                  message += `<br>WebアプリURL: ${response.webappUrl}`;
+                  message += `<br>Web App URL: ${response.webappUrl}`;
                 }
               }
             } else if (response.deploymentStatus === 'error') {
-              message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`; 
+              message += `Status: Error<br>Message: ${response.deploymentMessage}`; 
             } else { // not_attempted
-              message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`; 
+              message += `Status: Not Executed<br>Message: ${response.deploymentMessage}`; 
             }
             applyResultText.innerHTML = message; // Use innerHTML because of HTML links
             currentProposal = null; // Clear proposal
@@ -1123,7 +1123,7 @@
 
           if (response.status === 'proposal') {
             currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
+            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
             // NEW: HTML Validation
             htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
@@ -1208,7 +1208,7 @@
       
       currentProposal = null; // Clear any partial proposal
       document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('proposed-files-display').innerHTML = '<p>AIによるエラー修正はユーザーによってキャンセルされました。</p>';
+      document.getElementById('proposed-files-display').innerHTML = '<p>AI error fix canceled by user.</p>';
       htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
       htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
       proposalContainer.style.display = 'block'; 
@@ -1279,7 +1279,7 @@
 
           if (response.status === 'proposal') {
             currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
+            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
             // NEW: HTML Validation
             htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
@@ -1550,7 +1550,7 @@
                 option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
                 versionsSelect.appendChild(option);
               });
-              versionResultText.textContent = `バージョンが見つかりました: ${response.versions.length}件`;
+              versionResultText.textContent = `Versions found: ${response.versions.length} items`;
             } else {
               versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
               versionResultText.textContent = response.message;
@@ -1596,7 +1596,7 @@
         return;
       }
 
-      if (!confirm(`スクリプトID ${scriptId} をバージョン ${selectedVersion} に戻します。これは元に戻せません。続行しますか？`)) {
+      if (!confirm(`Reverting script ID ${scriptId} to version ${selectedVersion}. This cannot be undone. Do you wish to continue?`)) {
         return;
       }
 
@@ -1605,7 +1605,7 @@
       versionSelect.disabled = true;
       versionLoadingSpinner.style.display = 'block';
       versionResultContainer.style.display = 'block'; // Show container immediately
-      versionResultText.textContent = `スクリプトをバージョン ${selectedVersion} に戻しています...`;
+      versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
 
       saveScriptIdToLocalStorage(scriptId); // Save script ID when reverting
 
