@@ -319,7 +319,7 @@
                 if (response.startsWith("Error:")) {
                     editorUrlDisplayDiv.textContent = `Apps Script Editor URL: ${response}`;
                 } else {
-                    editorUrlUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
+                    editorUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
                 }
             })
             .withFailureHandler(function(error) {
@@ -566,8 +566,7 @@
       switch (type) {
         case 'SERVER_JS': return 'gs';
         case 'JSON': return 'json';
-        case 'HTML': return 'html';
-        default: return 'txt';
+        default: return 'html';
       }
     }
 
@@ -1502,7 +1501,7 @@
           resultContainer.style.display = 'block';
           resultText.textContent = `Error adding library: ${error.message}`;
         })
-        .addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion);
+        .addLibraryToProject(targetScriptId, libraryScriptId, effectiveVersion);
     });
 
     // NEW: Version Control Functions and Event Listeners
