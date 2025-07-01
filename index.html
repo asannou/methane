@@ -13,18 +13,13 @@
       <h1 class="title is-2">Methane AI Agent</h1>
 
       <form id="agent-form" class="box">
-        <div class="field">
+        <div class="field mb-3">
           <label class="label" for="scriptIdSelect">Target Script ID:</label>
-          <div class="field is-grouped is-align-items-center mb-3">
-            <div class="control is-expanded">
-              <div class="select is-fullwidth">
-                <select id="scriptIdSelect" name="scriptIdSelect">
-                  <option value="">-- Select or type manually --</option>
-                </select>
-              </div>
-            </div>
-            <div class="control">
-              <button type="button" id="loadProjectsButton" class="button is-info">Load Projects</button>
+          <div class="control is-expanded">
+            <div class="select is-fullwidth">
+              <select id="scriptIdSelect" name="scriptIdSelect">
+                <option value="">-- Select or type manually --</option>
+              </select>
             </div>
           </div>
         </div>
@@ -240,15 +235,12 @@
     // Function to load projects and populate the dropdown
     function loadProjectsIntoDropdown(selectedId = null) {
         const scriptIdSelect = document.getElementById('scriptIdSelect');
-        const loadProjectsButton = document.getElementById('loadProjectsButton');
-        loadProjectsButton.disabled = true; // Disable button while loading
 
         // Clear existing options except the placeholder
         scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
 
         google.script.run
             .withSuccessHandler(function(response) {
-                loadProjectsButton.disabled = false;
                 if (response.status === 'success') {
                     response.projects.forEach(project => {
                         const option = document.createElement('option');
@@ -264,7 +256,6 @@
                 }
             })
             .withFailureHandler(function(error) {
-                loadProjectsButton.disabled = false;
                 alert('Error loading Apps Script projects: ' + error.message);
             })
             .listAppsScriptProjects();
@@ -684,7 +675,7 @@
 
           if (response.status === 'proposal') {
             currentProposal = response; // Store the proposal
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
+            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
             
             // NEW: HTML Validation
             const htmlWarningsDiv = document.getElementById('html-validation-warnings');
@@ -1350,10 +1341,7 @@
         .deployScript(scriptId, description);
     });
 
-    // Event listener for Load Projects button
-    document.getElementById('loadProjectsButton').addEventListener('click', function() {
-        loadProjectsIntoDropdown(getEffectiveScriptId()); // Pass current ID to try and re-select
-    });
+    // Removed Event listener for Load Projects button
 
     // New event listener for adding library
     document.getElementById('add-library-form').addEventListener('submit', function(e) {
