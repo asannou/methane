@@ -8,11 +8,21 @@
     height: 20px;
     animation: spin 1s linear infinite;
     margin: 10px auto; /* Center the spinner */
+    display: block; /* Ensure it's a block element for margin: auto to work */
   }
 
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+
+  /* The small spinner in editor-url-display needs specific override */
+  #editor-url-display .spinner {
+    width: 14px;
+    height: 14px;
+    margin: 0 5px;
+    display: inline-block; /* Override for inline context */
+    vertical-align: middle;
   }
 
   /* Layout for diff-like display - Custom, keep these */

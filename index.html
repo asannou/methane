@@ -46,8 +46,8 @@
         </div>
       </form>
 
-      <!-- Loading spinner for proposal -->
-      <div id="loading-spinner" class="spinner" style="display:none;"></div>
+      <!-- Loading spinner for policy generation -->
+      <div id="policy-loading-spinner" class="spinner" style="display:none;"></div>
 
       <!-- Policy Review Section -->
       <div id="policy-container" class="box mt-4" style="display:none;">
@@ -62,6 +62,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Loading spinner for proposal generation -->
+      <div id="proposal-loading-spinner" class="spinner" style="display:none;"></div>
 
       <!-- Proposal Review Section -->
       <div id="proposal-container" class="box mt-4" style="display:none;">
@@ -124,9 +127,8 @@
         </div>
       </form>
 
-      <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
-
       <div id="log-result-container" class="box mt-4" style="display:none;">
+        <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
         <h3 class="title is-5">Logs:</h3>
         <pre id="log-result" class="content"></pre>
       </div>
@@ -147,8 +149,6 @@
         </div>
       </form>
 
-      <div id="fix-loading-spinner" class="spinner" style="display:none;"></div>
-
       <hr class="my-5">
 
       <h2 class="title is-4">Deploy Script</h2>
@@ -166,9 +166,8 @@
         </div>
       </form>
 
-      <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
-
       <div id="deploy-result-container" class="box mt-4" style="display:none;">
+        <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
         <h3 class="title is-5">Deployment Result:</h3>
         <pre id="deploy-result" class="content"></pre>
       </div>
@@ -195,9 +194,8 @@
         </div>
       </form>
 
-      <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
-
       <div id="add-library-result-container" class="box mt-4" style="display:none;">
+        <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
         <h3 class="title is-5">Add Library Result:</h3>
         <pre id="add-library-result" class="content"></pre>
       </div>
@@ -545,7 +543,7 @@
 
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const loadingSpinner = document.getElementById('loading-spinner');
+      const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
       const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
 
       const scriptId = getEffectiveScriptId();
@@ -564,7 +562,7 @@
       saveScriptIdToLocalStorage(scriptId);
 
       // Reset UI for new operation
-      loadingSpinner.style.display = 'block';
+      policyLoadingSpinner.style.display = 'block';
       generatePolicyButton.disabled = true;
       // document.getElementById('prompt').readOnly = true; // Disable prompt input during operation - Removed as per user instruction
       cancelAiOperationButton.style.display = 'inline-block';
@@ -595,7 +593,7 @@
               return;
             }
             activeRequestId = null;
-            loadingSpinner.style.display = 'none';
+            policyLoadingSpinner.style.display = 'none';
             generatePolicyButton.disabled = false;
             document.getElementById('prompt').readOnly = false; // Re-enable prompt input
             cancelAiOperationButton.style.display = 'none';
@@ -619,7 +617,7 @@
               return;
             }
             activeRequestId = null;
-            loadingSpinner.style.display = 'none';
+            policyLoadingSpinner.style.display = 'none';
             generatePolicyButton.disabled = false;
             document.getElementById('prompt').readOnly = false;
             cancelAiOperationButton.style.display = 'none';
@@ -640,12 +638,12 @@
       const acceptPolicyButton = this;
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const loadingSpinner = document.getElementById('loading-spinner');
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
 
       // Reset UI for proposal generation
-      loadingSpinner.style.display = 'block';
+      proposalLoadingSpinner.style.display = 'block';
       acceptPolicyButton.disabled = true;
       acceptPolicyButton.style.display = 'none'; // Hide accept policy button
       regeneratePolicyButton.style.display = 'none'; // Hide regenerate policy button
@@ -667,7 +665,7 @@
             return;
           }
           activeRequestId = null;
-          loadingSpinner.style.display = 'none';
+          proposalLoadingSpinner.style.display = 'none';
           acceptPolicyButton.disabled = false;
           generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
           document.getElementById('prompt').readOnly = false; // Re-enable prompt input
@@ -722,7 +720,7 @@
             return;
           }
           activeRequestId = null;
-          loadingSpinner.style.display = 'none';
+          proposalLoadingSpinner.style.display = 'none';
           acceptPolicyButton.disabled = false;
           generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
           document.getElementById('prompt').readOnly = false;
@@ -741,7 +739,8 @@
 
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const loadingSpinner = document.getElementById('loading-spinner');
+      const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
@@ -752,7 +751,8 @@
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
-      loadingSpinner.style.display = 'none';
+      policyLoadingSpinner.style.display = 'none';
+      proposalLoadingSpinner.style.display = 'none';
       generatePolicyButton.disabled = false;
       document.getElementById('prompt').readOnly = false;
       cancelAiOperationButton.style.display = 'none';
@@ -797,7 +797,7 @@
       saveScriptIdToLocalStorage(scriptId);
 
       // UI Reset and loading state
-      const loadingSpinner = document.getElementById('loading-spinner');
+      const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
       const regeneratePolicyButton = this; // The button itself
@@ -810,7 +810,7 @@
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
-      loadingSpinner.style.display = 'block';
+      policyLoadingSpinner.style.display = 'block';
       generatePolicyButton.disabled = true; // Disable original generate button
       acceptPolicyButton.disabled = true; // Disable accept button
       regeneratePolicyButton.disabled = true; // Disable regenerate button
@@ -846,7 +846,7 @@
             return;
           }
           activeRequestId = null;
-          loadingSpinner.style.display = 'none';
+          policyLoadingSpinner.style.display = 'none';
           generatePolicyButton.disabled = false; // Re-enable original generate button
           acceptPolicyButton.disabled = false; // Re-enable accept button
           regeneratePolicyButton.disabled = false; // Re-enable regenerate button
@@ -873,7 +873,7 @@
             return;
           }
           activeRequestId = null;
-          loadingSpinner.style.display = 'none';
+          policyLoadingSpinner.style.display = 'none';
           generatePolicyButton.disabled = false;
           acceptPolicyButton.disabled = false;
           regeneratePolicyButton.disabled = false;
@@ -979,7 +979,7 @@
 
       // Re-use the existing fix errors logic
       const fixButton = this; // The fixApplyErrorsButton itself
-      const spinner = document.getElementById('fix-loading-spinner'); // Re-use the existing fix spinner
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); // Re-use the proposal spinner
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
@@ -998,7 +998,7 @@
       promptInput.readOnly = true; // Disable prompt input during operation
       cancelFixErrorsButton.style.display = 'inline-block';
       regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button during fix
-      spinner.style.display = 'block';
+      proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
@@ -1016,7 +1016,7 @@
             return; 
           }
           activeRequestId = null;
-          spinner.style.display = 'none';
+          proposalLoadingSpinner.style.display = 'none';
           fixButton.disabled = false;
           generatePolicyButton.disabled = false; 
           promptInput.readOnly = false; 
@@ -1071,7 +1071,7 @@
             return; 
           }
           activeRequestId = null;
-          spinner.style.display = 'none';
+          proposalLoadingSpinner.style.display = 'none';
           fixButton.disabled = false;
           generatePolicyButton.disabled = false; 
           promptInput.readOnly = false; 
@@ -1090,7 +1090,7 @@
 
       const fixButton = document.getElementById('fixErrorsButton');
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
-      const spinner = document.getElementById('fix-loading-spinner');
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
@@ -1100,7 +1100,7 @@
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
-      spinner.style.display = 'none';
+      proposalLoadingSpinner.style.display = 'none';
       fixButton.disabled = false;
       generatePolicyButton.disabled = false; 
       promptInput.readOnly = false; 
@@ -1130,7 +1130,7 @@
       const policyText = currentPolicyData.policy;
 
       const regenerateButton = this;
-      const loadingSpinner = document.getElementById('loading-spinner'); // Reuse main spinner
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); // Reuse main spinner
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const proposalContainer = document.getElementById('proposal-container');
       const applyChangesButton = document.getElementById('applyChangesButton');
@@ -1139,7 +1139,7 @@
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       // UI Reset and loading state
-      loadingSpinner.style.display = 'block';
+      proposalLoadingSpinner.style.display = 'block';
       regenerateButton.disabled = true; // Disable itself
       applyChangesButton.disabled = true; // Disable apply button
       cancelAiOperationButton.style.display = 'inline-block';
@@ -1170,7 +1170,7 @@
             return;
           }
           activeRequestId = null;
-          loadingSpinner.style.display = 'none';
+          proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
           applyChangesButton.disabled = false;
           cancelAiOperationButton.style.display = 'none';
@@ -1226,7 +1226,7 @@
             return;
           }
           activeRequestId = null;
-          loadingSpinner.style.display = 'none';
+          proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
           applyChangesButton.disabled = false;
           cancelAiOperationButton.style.display = 'none';
