@@ -2,7 +2,7 @@ const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_
 const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index').setTitle('Methane AI Agent');
+  return HtmlService.createTemplateFromFile('index').evaluate().setTitle('Methane AI Agent');
 }
 
 /**
