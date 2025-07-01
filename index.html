@@ -817,7 +817,7 @@
           applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
           fixApplyErrorsButton.style.display = 'block';
         })
-        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked);
+        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked, currentProposal.purpose);
     });
 
     // Event Listener for Fix Apply Errors button
@@ -1049,7 +1049,8 @@
 
             if (hasHtmlErrors) {
                 htmlWarningsDiv.style.display = 'block';
-            } else {
+            }
+            else {
                 htmlWarningsDiv.style.display = 'none';
             }
 

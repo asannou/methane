@@ -3,9 +3,10 @@
  * @param {string} scriptId - 更新対象のスクリプトID
  * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列
  * @param {boolean} autoDeploy - 変更適用後に自動的にデプロイするかどうか
+ * @param {string} proposalPurpose - AIが提案した変更の主旨
  * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
  */
-function applyProposedChanges(scriptId, proposedFiles, autoDeploy) {
+function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpose) {
   try {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
@@ -56,7 +57,7 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy) {
     let deployResult = null;
     if (autoDeploy) {
       console.log(`自動デプロイを開始します。スクリプトID: ${scriptId}`);
-      deployResult = deployScript(scriptId, "AI-proposed changes applied and auto-deployed.");
+      deployResult = deployScript(scriptId, proposalPurpose);
       console.log("自動デプロイ結果:", JSON.stringify(deployResult, null, 2));
     }
 
@@ -192,7 +193,7 @@ function getScriptLogs(targetScriptId) {
  * appsscript.jsonに定義されたウェブアプリ設定を適用します。
  * 既存の古いウェブアプリデプロイメントは自動的にアーカイブ（削除）されます。
  * @param {string} scriptId - デプロイするスクリプトのID
- * @param {string} description - デプロイの説明（オプション）
+ * @param {string} description - デプロイの説明（オプション、AIの変更主旨または手動入力）
  * @returns {object} - デプロイ結果（成功/失敗、デプロイID、URL）
  */
 function deployScript(scriptId, description = '') {
@@ -204,7 +205,7 @@ function deployScript(scriptId, description = '') {
   try {
     // 1. 新しいバージョンを作成する
     console.log("新しいスクリプトバージョンを作成中...");
-    const createVersionPayload = { description: `Deployment version created by Methane AI Agent: ${description}` };
+    const createVersionPayload = { description: description };
     console.log("バージョン作成リクエストペイロード:", JSON.stringify(createVersionPayload));
 
     const createVersionOptions = {
