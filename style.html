@@ -87,6 +87,9 @@
   }
 
   /* Specific diff line highlighting */
-  .code-content-col > .diff-line-added { background-color: #e6ffe6; } /* Light green for added/new content */
-  .code-content-col > .diff-line-removed { background-color: #ffe6e6; } /* Light red for removed/old content */
+  .code-content-col > .diff-line-equal { background-color: #f4f4f4; } /* No background change, but ensures consistency */
+  .code-content-col > .diff-line-added { background-color: #e6ffe6; } /* Light green for added content */
+  .code-content-col > .diff-line-removed { background-color: #ffe6e6; } /* Light red for removed content */
+  .code-content-col > .diff-line-modified { background-color: #fffacd; } /* Light yellow for modified content */
+  .code-content-col > .diff-line-empty-fill { background-color: transparent; } /* Transparent fill for alignment */
 </style>

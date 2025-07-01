@@ -259,47 +259,108 @@
     }
 
     // Function to generate the formatted HTML for both original and proposed panels for a single file.
-    // This function aims for simple highlighting of changes line-by-line without full diff alignment.
+    // This function implements a simplified line-by-line diff algorithm to detect additions, deletions, and modifications.
     function generateFormattedDiffPanels(originalSource, proposedSource) {
         const originalLines = originalSource ? originalSource.split('\n') : [];
         const proposedLines = proposedSource ? proposedSource.split('\n') : [];
 
+        const diffResult = [];
+        let i = 0; // Pointer for originalLines
+        let j = 0; // Pointer for proposedLines
+        const lookAheadWindow = 5; // How many lines to look ahead for a match
+
+        while (i < originalLines.length || j < proposedLines.length) {
+            const currentOriginalLine = originalLines[i];
+            const currentProposedLine = proposedLines[j];
+
+            if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
+                // Lines are identical, emit an 'equal' diff entry
+                diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
+                i++;
+                j++;
+            } else {
+                // Lines are different. Need to determine if it's an addition, deletion, or modification.
+                let originalFoundInProposedAhead = -1;
+                for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
+                    if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
+                        originalFoundInProposedAhead = k;
+                        break;
+                    }
+                }
+
+                let proposedFoundInOriginalAhead = -1;
+                for (let k = i + 1; k < Math.min(i + 1 + lookAheadWindow, originalLines.length); k++) {
+                    if (j < proposedLines.length && proposedLines[j] === originalLines[k]) {
+                        proposedFoundInOriginalAhead = k;
+                        break;
+                    }
+                }
+
+                if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
+                    // Neither line found ahead in the other stream within window, implies modification.
+                    diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
+                    i++;
+                    j++;
+                } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
+                    // Original line found in proposed, and either proposed not found in original OR original's path is shorter
+                    // This means current proposed line is an addition
+                    diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                    j++;
+                } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
+                    // Proposed line found in original, and either original not found in proposed OR proposed's path is shorter
+                    // This means current original line is a deletion
+                    diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                    i++;
+                } else if (i < originalLines.length) {
+                    // Remaining original lines are removed
+                    diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                    i++;
+                } else if (j < proposedLines.length) {
+                    // Remaining proposed lines are added
+                    diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                    j++;
+                }
+            }
+        }
+
+        // Construct HTML from diffResult
         let originalLineNumbersHtml = '';
         let originalCodeContentHtml = '';
         let proposedLineNumbersHtml = '';
         let proposedCodeContentHtml = '';
 
-        const maxLength = Math.max(originalLines.length, proposedLines.length);
+        let originalLineNum = 0;
+        let proposedLineNum = 0;
 
-        for (let i = 0; i < maxLength; i++) {
-            const originalLine = originalLines[i] !== undefined ? originalLines[i] : '';
-            const proposedLine = proposedLines[i] !== undefined ? proposedLines[i] : '';
-
-            let originalLineClass = '';
-            let proposedLineClass = '';
-
-            if (originalLine === proposedLine) {
-                // Lines are identical at this index, no special highlight
-            } else {
-                // Lines are different at this index.
-                // Mark original line as removed and proposed line as added for simplicity.
-                // This is not a true 'modified' state, but highlights the change.
-                if (originalLine !== '') {
-                    originalLineClass = 'diff-line-removed';
-                }
-                if (proposedLine !== '') {
-                    proposedLineClass = 'diff-line-added';
-                }
+        diffResult.forEach(entry => {
+            if (entry.type === 'equal') {
+                originalLineNum++;
+                proposedLineNum++;
+                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
+                originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.original)}</div>`;
+                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
+                proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.proposed)}</div>`;
+            } else if (entry.type === 'added') {
+                proposedLineNum++;
+                originalLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for original
+                originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`; // Fill for alignment
+                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
+                proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
+            } else if (entry.type === 'removed') {
+                originalLineNum++;
+                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
+                originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
+                proposedLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for proposed
+                proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`; // Fill for alignment
+            } else if (entry.type === 'modified') {
+                originalLineNum++;
+                proposedLineNum++;
+                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
+                originalCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.original)}</div>`;
+                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
+                proposedCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.proposed)}</div>`;
             }
-
-            // Add line numbers, handling cases where one side is shorter
-            originalLineNumbersHtml += `<div>${(i < originalLines.length) ? (i + 1) : '&nbsp;'}</div>`;
-            proposedLineNumbersHtml += `<div>${(i < proposedLines.length) ? (i + 1) : '&nbsp;'}</div>`;
-
-            // Add code content with classes, ensuring empty lines also take space
-            originalCodeContentHtml += `<div class="${originalLineClass}">${escapeHtml(originalLine) || '&nbsp;'}</div>`;
-            proposedCodeContentHtml += `<div class="${proposedLineClass}">${escapeHtml(proposedLine) || '&nbsp;'}</div>`;
-        }
+        });
 
         return {
             originalLineNumbersHtml, originalCodeContentHtml,
