@@ -1,141 +1,213 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <base target="_top">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <?!= include('style'); ?>
 </head>
 <body>
-  <h1>Methane AI Agent</h1>
-  <form id="agent-form">
-    <label for="scriptIdSelect">Target Script ID:</label>
-    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
-      <select id="scriptIdSelect" name="scriptIdSelect" style="flex-grow: 1;">
-        <option value="">-- Select or type manually --</option>
-      </select>
-      <button type="button" id="loadProjectsButton" style="width: auto; margin-bottom: 0;">Load Projects</button>
+  <section class="section">
+    <div class="container">
+      <h1 class="title is-2">Methane AI Agent</h1>
+
+      <form id="agent-form" class="box">
+        <div class="field">
+          <label class="label" for="scriptIdSelect">Target Script ID:</label>
+          <div class="field is-grouped is-align-items-center mb-3">
+            <div class="control is-expanded">
+              <div class="select is-fullwidth">
+                <select id="scriptIdSelect" name="scriptIdSelect">
+                  <option value="">-- Select or type manually --</option>
+                </select>
+              </div>
+            </div>
+            <div class="control">
+              <button type="button" id="loadProjectsButton" class="button is-info">Load Projects</button>
+            </div>
+          </div>
+        </div>
+        <div class="field mb-3">
+          <div class="control">
+            <input type="text" id="scriptIdManualInput" placeholder="Or paste Script ID here (overrides selection)" class="input">
+          </div>
+        </div>
+        <div id="editor-url-display" class="notification is-light is-info is-small mb-4"></div>
+
+        <div class="field">
+          <label class="label" for="prompt">Prompt:</label>
+          <div class="control">
+            <textarea id="prompt" name="prompt" required class="textarea"></textarea>
+          </div>
+        </div>
+        <div class="field is-grouped">
+          <div class="control">
+            <button type="submit" id="generatePolicyButton" class="button is-primary">Generate Policy</button>
+          </div>
+          <div class="control">
+            <button type="button" id="cancelAiOperationButton" class="button is-danger is-light" style="display:none;">Cancel</button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Loading spinner for proposal -->
+      <div id="loading-spinner" class="spinner" style="display:none;"></div>
+
+      <!-- Policy Review Section -->
+      <div id="policy-container" class="box mt-4" style="display:none;">
+        <h2 class="title is-4">AI Generated Policy:</h2>
+        <div id="ai-policy" class="content"></div>
+        <div class="field is-grouped">
+          <div class="control">
+            <button type="button" id="acceptPolicyButton" class="button is-success" style="display:none;">Accept Policy & Propose Changes</button>
+          </div>
+          <div class="control">
+            <button type="button" id="regeneratePolicyButton" class="button is-warning is-light" style="display:none;">Regenerate Policy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proposal Review Section -->
+      <div id="proposal-container" class="box mt-4" style="display:none;">
+        <h2 class="title is-4">AI Proposed Changes:</h2>
+        <p class="content"><strong id="proposal-purpose-label">変更の主旨:</strong> <span id="proposal-purpose"></span></p>
+        <!-- NEW: HTML Validation Warnings -->
+        <div id="html-validation-warnings" class="notification is-danger is-light mb-4" style="display: none;"></div>
+        <p class="content">以下の変更がAIから提案されました。内容を確認し、問題なければ「Apply Changes」ボタンをクリックして適用してください。</p>
+        <div id="proposed-files-display">
+          <!-- File comparisons will be inserted here by JavaScript -->
+        </div>
+        <div class="field mt-3">
+          <label class="checkbox">
+            <input type="checkbox" id="autoDeployAfterApply">
+            適用後自動デプロイ
+          </label>
+        </div>
+        <div class="field is-grouped mt-4">
+          <div class="control">
+            <button type="button" id="applyChangesButton" class="button is-primary" style="display:none;">Apply Changes</button>
+          </div>
+          <div class="control">
+            <button type="button" id="regenerateProposalButton" class="button is-info is-light" style="display:none;">Regenerate Proposal</button>
+          </div>
+        </div>
+        <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
+        <div id="apply-result-container" class="box mt-4" style="display:none;">
+          <h3 class="title is-5">Apply Result:</h3>
+          <pre id="apply-result" class="content"></pre>
+          <!-- NEW BUTTON for fixing errors after apply failure -->
+          <button type="button" id="fixApplyErrorsButton" class="button is-danger mt-3" style="display:none;">Fix Apply Errors with AI</button>
+        </div>
+      </div>
+
+      <hr class="my-5">
+
+      <h2 class="title is-4">Google Cloud Project ID Configuration</h2>
+      <p class="content">ログ取得には、このApps ScriptがリンクされているGoogle Cloud Projectが必要です。APIで自動取得できない場合に備え、GCPプロジェクトIDを手動で設定してください。</p>
+      <div class="field">
+        <label class="label" for="gcpProjectId">GCP Project ID:</label>
+        <div class="control">
+          <input type="text" id="gcpProjectId" name="gcpProjectId" class="input">
+        </div>
+      </div>
+      <div class="control mt-3">
+        <button type="button" id="saveGcpProjectIdButton" class="button is-info">Save GCP Project ID</button>
+      </div>
+      <div id="gcp-save-result-container" class="box mt-4" style="display:none;">
+        <h3 class="title is-5">Save Result:</h3>
+        <pre id="gcp-save-result" class="content"></pre>
+      </div>
+
+      <hr class="my-5">
+
+      <h2 class="title is-4">Get Script Logs</h2>
+      <form id="log-form">
+        <p class="content">Using the Script ID entered above.</p>
+        <div class="control">
+          <button type="submit" id="getLogsButton" class="button is-link">Get Logs</button>
+        </div>
+      </form>
+
+      <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
+
+      <div id="log-result-container" class="box mt-4" style="display:none;">
+        <h3 class="title is-5">Logs:</h3>
+        <pre id="log-result" class="content"></pre>
+      </div>
+
+      <hr class="my-5">
+
+      <h2 class="title is-4">Automated Error Fix from Logs</h2>
+      <p class="content">既存のスクリプトログに基づいて、AIにエラー修正の提案をさせます。提案された変更は上記の「AI Proposed Changes」セクションに表示されます。</p>
+      <form id="fix-errors-form">
+        <p class="content">Using the Script ID entered above.</p>
+        <div class="field is-grouped">
+          <div class="control">
+            <button type="submit" id="fixErrorsButton" class="button is-danger">Fix Errors from Logs</button>
+          </div>
+          <div class="control">
+            <button type="button" id="cancelFixErrorsButton" class="button is-warning is-light" style="display:none;">Cancel</button>
+          </div>
+        </div>
+      </form>
+
+      <div id="fix-loading-spinner" class="spinner" style="display:none;"></div>
+
+      <hr class="my-5">
+
+      <h2 class="title is-4">Deploy Script</h2>
+      <form id="deploy-form">
+        <p class="content">Using the Script ID entered above.</p>
+        <div class="field">
+          <label class="label" for="deploymentDescription">Deployment Description (Optional):</label>
+          <div class="control">
+            <input type="text" id="deploymentDescription" name="deploymentDescription" class="input">
+          </div>
+        </div>
+        <p class="content is-small">This will deploy the current HEAD version as a new Web App deployment, using the Web App settings defined in <code>appsscript.json</code>.</p>
+        <div class="control">
+          <button type="submit" id="deployButton" class="button is-info">Create New Web App Deployment</button>
+        </div>
+      </form>
+
+      <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
+
+      <div id="deploy-result-container" class="box mt-4" style="display:none;">
+        <h3 class="title is-5">Deployment Result:</h3>
+        <pre id="deploy-result" class="content"></pre>
+      </div>
+
+      <hr class="my-5">
+
+      <h2 class="title is-4">Add Apps Script Library</h2>
+      <p class="content">Target Script ID is the one entered above.</p>
+      <form id="add-library-form">
+        <div class="field">
+          <label class="label" for="libraryScriptId">Library Script ID:</label>
+          <div class="control">
+            <input type="text" id="libraryScriptId" name="libraryScriptId" required class="input">
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="libraryVersion">Library Version (Optional, defaults to HEAD):</label>
+          <div class="control">
+            <input type="text" id="libraryVersion" name="libraryVersion" placeholder="e.g., 1, 2, 3 or HEAD" class="input">
+          </div>
+        </div>
+        <div class="control mt-3">
+          <button type="submit" id="addLibraryButton" class="button is-success">Add Library</button>
+        </div>
+      </form>
+
+      <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
+
+      <div id="add-library-result-container" class="box mt-4" style="display:none;">
+        <h3 class="title is-5">Add Library Result:</h3>
+        <pre id="add-library-result" class="content"></pre>
+      </div>
     </div>
-    <input type="text" id="scriptIdManualInput" placeholder="Or paste Script ID here (overrides selection)" style="margin-bottom: 10px;">
-    <div id="editor-url-display" style="margin-bottom: 10px; font-size: 0.9em;"></div>
-
-    <label for="prompt">Prompt:</label>
-    <textarea id="prompt" name="prompt" required></textarea>
-    <button type="submit" id="generatePolicyButton">Generate Policy</button>
-    <button type="button" id="cancelAiOperationButton" style="display:none;">Cancel</button>
-  </form>
-
-  <!-- Loading spinner for proposal -->
-  <div id="loading-spinner" class="spinner" style="display:none;"></div>
-
-  <!-- Policy Review Section -->
-  <div id="policy-container" style="display:none;">
-    <h2>AI Generated Policy:</h2>
-    <div id="ai-policy"></div>
-    <button type="button" id="acceptPolicyButton" style="display:none;">Accept Policy & Propose Changes</button>
-    <button type="button" id="regeneratePolicyButton" style="display:none;">Regenerate Policy</button>
-  </div>
-
-  <!-- Proposal Review Section -->
-  <div id="proposal-container" style="display:none;">
-    <h2>AI Proposed Changes:</h2>
-    <p><strong id="proposal-purpose-label">変更の主旨:</strong> <span id="proposal-purpose"></span></p>
-    <!-- NEW: HTML Validation Warnings -->
-    <div id="html-validation-warnings" style="color: red; margin-bottom: 10px; display: none;"></div>
-    <p>以下の変更がAIから提案されました。内容を確認し、問題なければ「Apply Changes」ボタンをクリックして適用してください。</p>
-    <div id="proposed-files-display">
-      <!-- File comparisons will be inserted here by JavaScript -->
-    </div>
-    <div>
-        <label><input type="checkbox" id="autoDeployAfterApply"> 適用後自動デプロイ</label>
-    </div>
-    <button type="button" id="applyChangesButton" style="display:none;">Apply Changes</button>
-    <button type="button" id="regenerateProposalButton" style="display:none;">Regenerate Proposal</button>
-    <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
-    <div id="apply-result-container" style="display:none;">
-      <h3>Apply Result:</h3>
-      <pre id="apply-result"></pre>
-      <!-- NEW BUTTON for fixing errors after apply failure -->
-      <button type="button" id="fixApplyErrorsButton" style="display:none;">Fix Apply Errors with AI</button>
-    </div>
-  </div>
-
-  <hr>
-
-  <h2>Google Cloud Project ID Configuration</h2>
-  <p>ログ取得には、このApps ScriptがリンクされているGoogle Cloud Projectが必要です。APIで自動取得できない場合に備え、GCPプロジェクトIDを手動で設定してください。</p>
-  <label for="gcpProjectId">GCP Project ID:</label>
-  <input type="text" id="gcpProjectId" name="gcpProjectId">
-  <button type="button" id="saveGcpProjectIdButton">Save GCP Project ID</button>
-  <div id="gcp-save-result-container" style="display:none;">
-    <h3>Save Result:</h3>
-    <pre id="gcp-save-result"></pre>
-  </div>
-
-  <hr>
-
-  <h2>Get Script Logs</h2>
-  <form id="log-form">
-    <p>Using the Script ID entered above.</p>
-    <button type="submit" id="getLogsButton">Get Logs</button>
-  </form>
-
-  <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
-
-  <div id="log-result-container" style="display:none;">
-    <h3>Logs:</h3>
-    <pre id="log-result"></pre>
-  </div>
-
-  <hr>
-
-  <h2>Automated Error Fix from Logs</h2>
-  <p>既存のスクリプトログに基づいて、AIにエラー修正の提案をさせます。提案された変更は上記の「AI Proposed Changes」セクションに表示されます。</p>
-  <form id="fix-errors-form">
-    <p>Using the Script ID entered above.</p>
-    <button type="submit" id="fixErrorsButton">Fix Errors from Logs</button>
-    <button type="button" id="cancelFixErrorsButton" style="display:none;">Cancel</button>
-  </form>
-
-  <div id="fix-loading-spinner" class="spinner" style="display:none;"></div>
-
-  <hr>
-
-  <h2>Deploy Script</h2>
-  <form id="deploy-form">
-    <p>Using the Script ID entered above.</p>
-    <label for="deploymentDescription">Deployment Description (Optional):</label>
-    <input type="text" id="deploymentDescription" name="deploymentDescription">
-    <p>This will deploy the current HEAD version as a new Web App deployment, using the Web App settings defined in <code>appsscript.json</code>.</p>
-    <button type="submit" id="deployButton">Create New Web App Deployment</button>
-  </form>
-
-  <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
-
-  <div id="deploy-result-container" style="display:none;">
-    <h3>Deployment Result:</h3>
-    <pre id="deploy-result"></pre>
-  </div>
-
-  <hr>
-
-  <h2>Add Apps Script Library</h2>
-  <p>Target Script ID is the one entered above.</p>
-  <form id="add-library-form">
-    <label for="libraryScriptId">Library Script ID:</label>
-    <input type="text" id="libraryScriptId" name="libraryScriptId" required>
-
-    <label for="libraryVersion">Library Version (Optional, defaults to HEAD):</label>
-    <input type="text" id="libraryVersion" name="libraryVersion" placeholder="e.g., 1, 2, 3 or HEAD">
-    
-    <button type="submit" id="addLibraryButton">Add Library</button>
-  </form>
-
-  <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
-
-  <div id="add-library-result-container" style="display:none;">
-    <h3>Add Library Result:</h3>
-    <pre id="add-library-result"></pre>
-  </div>
+  </section>
 
   <script>
     let currentPolicyData = null; // Stores AI policy and original prompt

@@ -1,22 +1,5 @@
 <style>
-  body { font-family: sans-serif; margin: 20px; }
-  input, textarea, button, select { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
-  textarea { height: 150px; }
-  /* Updated pre styles for better code display */
-  pre {
-    background-color: #f4f4f4;
-    padding: 0; /* Removed padding from pre itself, apply to inner divs */
-    border-radius: 4px;
-    white-space: pre-wrap; /* Allows wrapping for long lines */
-    word-wrap: break-word;
-    overflow-x: auto;
-    font-family: monospace; /* Ensure monospaced font for code */
-    font-size: 0.9em; /* Slightly smaller font for dense code */
-    line-height: 1.4; /* Better line spacing */
-    display: flex; /* Use flexbox for line numbers */
-  }
-
-  /* Spinner styles */
+  /* Keep custom spinner styles as Bulma doesn't provide them */
   .spinner {
     border: 4px solid #f3f3f3; /* Light grey */
     border-top: 4px solid #3498db; /* Blue */
@@ -32,7 +15,7 @@
     100% { transform: rotate(360deg); }
   }
 
-  /* Layout for diff-like display */
+  /* Layout for diff-like display - Custom, keep these */
   .file-comparison {
     display: flex;
     justify-content: space-between;
@@ -52,15 +35,13 @@
     height: 250px; /* Increased height for more lines */
     overflow-y: scroll;
     border: 1px solid #ccc;
-    /* padding: 0; */ /* Already set above for pre */
-    /* display: flex; */ /* Already set above for pre */
+    display: flex; /* Use flexbox for line numbers */
   }
 
-  /* Styles for line numbers and code content columns */
+  /* Styles for line numbers and code content columns - Custom, keep these */
   .line-numbers-col {
     background-color: #eee;
     color: #888;
-    /* padding: 10px 5px; */ /* Moved to inner divs */
     text-align: right;
     user-select: none;
     flex-shrink: 0;
@@ -71,14 +52,13 @@
     line-height: 1.4;
   }
   .code-content-col {
-    /* padding: 10px; */ /* Moved to inner divs */
     flex-grow: 1;
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
   }
 
-  /* NEW: Styles for individual line divs within the pre blocks */
+  /* NEW: Styles for individual line divs within the pre blocks - Custom, keep these */
   .line-numbers-col > div,
   .code-content-col > div {
     padding: 0 5px; /* Apply padding directly to each line div */
@@ -86,12 +66,12 @@
     box-sizing: border-box; /* Include padding in element's total width/height */
   }
 
-  /* Specific diff line highlighting */
-  .code-content-col > .diff-line-equal { background-color: #f4f4f4; } /* No background change, but ensures consistency */
-  .code-content-col > .diff-line-added { background-color: #e6ffe6; } /* Light green for added content */
-  .code-content-col > .diff-line-removed { background-color: #ffe6e6; } /* Light red for removed content */
-  .code-content-col > .diff-line-modified { background-color: #fffacd; } /* Light yellow for modified content */
-  .code-content-col > .diff-line-empty-fill { background-color: transparent; } /* Transparent fill for alignment */
+  /* Specific diff line highlighting - Custom, keep these */
+  .code-content-col > .diff-line-equal { background-color: #f4f4f4; }
+  .code-content-col > .diff-line-added { background-color: #e6ffe6; }
+  .code-content-col > .diff-line-removed { background-color: #ffe6e6; }
+  .code-content-col > .diff-line-modified { background-color: #fffacd; }
+  .code-content-col > .diff-line-empty-fill { background-color: transparent; }
 
   /* Styles for Markdown rendered content in ai-policy div */
   #ai-policy {
@@ -103,44 +83,15 @@
     line-height: 1.6;
   }
 
-  #ai-policy h1, #ai-policy h2, #ai-policy h3, #ai-policy h4, #ai-policy h5, #ai-policy h6 {
-    margin-top: 1em;
-    margin-bottom: 0.5em;
-    font-weight: bold;
-  }
-  #ai-policy h1 { font-size: 1.8em; border-bottom: 2px solid #eee; padding-bottom: 5px; }
-  #ai-policy h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 3px; }
-  #ai-policy h3 { font-size: 1.2em; }
-
-  #ai-policy p { margin-bottom: 1em; }
-
-  #ai-policy ul, #ai-policy ol {
-    margin-left: 20px;
-    margin-bottom: 1em;
-  }
-  #ai-policy ul li, #ai-policy ol li {
-    margin-bottom: 0.5em;
-  }
-
-  #ai-policy blockquote {
-    border-left: 4px solid #ccc;
-    padding-left: 10px;
-    color: #555;
-    margin: 1em 0;
-  }
-
-  #ai-policy code {
-    font-family: monospace;
-    background-color: #f0f0f0;
-    padding: 2px 4px;
-    border-radius: 3px;
-  }
-
-  #ai-policy pre code {
-    display: block;
-    padding: 10px;
+  #ai-policy pre {
     background-color: #eef;
-    overflow-x: auto;
+    padding: 10px;
     border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-x: auto;
+    font-family: monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
   }
 </style>
