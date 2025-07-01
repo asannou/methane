@@ -78,7 +78,7 @@
     line-height: 1.4;
   }
 
-  /* NEW: Styles for individual line divs within the pre blocks */
+  /* Styles for individual line divs within the pre blocks */
   .line-numbers-col > div,
   .code-content-col > div {
     padding: 0 5px; /* Apply padding directly to each line div */
@@ -92,4 +92,38 @@
   .code-content-col > .diff-line-removed { background-color: #ffe6e6; } /* Light red for removed content */
   .code-content-col > .diff-line-modified { background-color: #fffacd; } /* Light yellow for modified content */
   .code-content-col > .diff-line-empty-fill { background-color: transparent; } /* Transparent fill for alignment */
+
+  /* Collapsed diff styles */
+  .diff-collapsed-group {
+    text-align: center;
+    background-color: #f0f0f0; /* Light grey background for the button area */
+    padding: 5px 0;
+    border-bottom: 1px dashed #ddd;
+    border-top: 1px dashed #ddd;
+    margin-top: -1px; /* Overlap borders for continuous look */
+    margin-bottom: -1px;
+    display: flex; /* Make it flex to center button */
+    justify-content: center;
+    align-items: center;
+    min-height: 34px; /* Consistent height for button area */
+    box-sizing: border-box;
+  }
+  .diff-collapsed-group button.diff-collapse-button {
+    width: auto;
+    padding: 5px 10px;
+    margin: 0;
+    font-size: 0.85em;
+    cursor: pointer;
+    background-color: #e0e0e0;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    color: #555;
+    transition: background-color 0.2s ease;
+  }
+  .diff-collapsed-group button.diff-collapse-button:hover {
+    background-color: #d0d0d0;
+  }
+  .diff-hidden-lines {
+    display: none; /* Initially hidden */
+  }
 </style>

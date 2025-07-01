@@ -258,13 +258,12 @@
         return { isValid: true };
     }
 
-    // Function to generate the formatted HTML for both original and proposed panels for a single file.
-    // This function implements a simplified line-by-line diff algorithm to detect additions, deletions, and modifications.
+    // Function to generate the formatted diff data for both original and proposed panels for a single file.
     function generateFormattedDiffPanels(originalSource, proposedSource) {
         const originalLines = originalSource ? originalSource.split('\n') : [];
         const proposedLines = proposedSource ? proposedSource.split('\n') : [];
 
-        const diffResult = [];
+        const rawDiffResult = []; // Stores the raw diff (equal, added, removed, modified)
         let i = 0; // Pointer for originalLines
         let j = 0; // Pointer for proposedLines
         const lookAheadWindow = 5; // How many lines to look ahead for a match
@@ -274,12 +273,10 @@
             const currentProposedLine = proposedLines[j];
 
             if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
-                // Lines are identical, emit an 'equal' diff entry
-                diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
+                rawDiffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
                 i++;
                 j++;
             } else {
-                // Lines are different. Need to determine if it's an addition, deletion, or modification.
                 let originalFoundInProposedAhead = -1;
                 for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
                     if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
@@ -297,75 +294,106 @@
                 }
 
                 if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
-                    // Neither line found ahead in the other stream within window, implies modification.
-                    diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
+                    rawDiffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
                     i++;
                     j++;
                 } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
-                    // Original line found in proposed, and either proposed not found in original OR original's path is shorter
-                    // This means current proposed line is an addition
-                    diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                    rawDiffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                     j++;
                 } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
-                    // Proposed line found in original, and either original not found in proposed OR proposed's path is shorter
-                    // This means current original line is a deletion
-                    diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                    rawDiffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                     i++;
                 } else if (i < originalLines.length) {
-                    // Remaining original lines are removed
-                    diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                    rawDiffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                     i++;
                 } else if (j < proposedLines.length) {
-                    // Remaining proposed lines are added
-                    diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                    rawDiffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                     j++;
                 }
             }
         }
 
-        // Construct HTML from diffResult
-        let originalLineNumbersHtml = '';
-        let originalCodeContentHtml = '';
-        let proposedLineNumbersHtml = '';
-        let proposedCodeContentHtml = '';
+        // Post-process raw diff to introduce collapsed blocks
+        const processedDiffBlocks = [];
+        let originalLineNumCounter = 0;
+        let proposedLineNumCounter = 0;
+        const minLinesToCollapse = 5; // Threshold for collapsing identical lines
 
-        let originalLineNum = 0;
-        let proposedLineNum = 0;
+        let currentEqualBlock = [];
 
-        diffResult.forEach(entry => {
+        rawDiffResult.forEach(entry => {
             if (entry.type === 'equal') {
-                originalLineNum++;
-                proposedLineNum++;
-                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
-                originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.proposed)}</div>`;
-            } else if (entry.type === 'added') {
-                proposedLineNum++;
-                originalLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for original
-                originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`; // Fill for alignment
-                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
-            } else if (entry.type === 'removed') {
-                originalLineNum++;
-                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
-                originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for proposed
-                proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`; // Fill for alignment
-            } else if (entry.type === 'modified') {
-                originalLineNum++;
-                proposedLineNum++;
-                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
-                originalCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.proposed)}</div>`;
+                originalLineNumCounter++;
+                proposedLineNumCounter++;
+                currentEqualBlock.push({
+                    type: 'equal',
+                    original: entry.original,
+                    proposed: entry.proposed,
+                    originalLineNum: originalLineNumCounter,
+                    proposedLineNum: proposedLineNumCounter
+                });
+            } else {
+                // Non-equal line encountered, process the current equal block if any
+                if (currentEqualBlock.length > 0) {
+                    if (currentEqualBlock.length >= minLinesToCollapse) {
+                        processedDiffBlocks.push({
+                            type: 'collapsed',
+                            count: currentEqualBlock.length,
+                            lines: currentEqualBlock // These lines already have their sequential line numbers
+                        });
+                    } else {
+                        // Not enough lines to collapse, render them normally
+                        processedDiffBlocks.push(...currentEqualBlock);
+                    }
+                    currentEqualBlock = []; // Reset for next block
+                }
+
+                // Now, process the current non-equal line
+                if (entry.type === 'added') {
+                    proposedLineNumCounter++;
+                    processedDiffBlocks.push({
+                        type: 'added',
+                        original: '',
+                        proposed: entry.proposed,
+                        originalLineNum: '&nbsp;', // Placeholder for alignment
+                        proposedLineNum: proposedLineNumCounter
+                    });
+                } else if (entry.type === 'removed') {
+                    originalLineNumCounter++;
+                    processedDiffBlocks.push({
+                        type: 'removed',
+                        original: entry.original,
+                        proposed: '',
+                        originalLineNum: originalLineNumCounter,
+                        proposedLineNum: '&nbsp;' // Placeholder for alignment
+                    });
+                } else if (entry.type === 'modified') {
+                    originalLineNumCounter++;
+                    proposedLineNumCounter++;
+                    processedDiffBlocks.push({
+                        type: 'modified',
+                        original: entry.original,
+                        proposed: entry.proposed,
+                        originalLineNum: originalLineNumCounter,
+                        proposedLineNum: proposedLineNumCounter
+                    });
+                }
             }
         });
 
-        return {
-            originalLineNumbersHtml, originalCodeContentHtml,
-            proposedLineNumbersHtml, proposedCodeContentHtml
-        };
+        // Process any remaining equal block at the end of the file
+        if (currentEqualBlock.length > 0) {
+            if (currentEqualBlock.length >= minLinesToCollapse) {
+                processedDiffBlocks.push({
+                    type: 'collapsed',
+                    count: currentEqualBlock.length,
+                    lines: currentEqualBlock
+                });
+            } else {
+                processedDiffBlocks.push(...currentEqualBlock);
+            }
+        }
+        return processedDiffBlocks;
     }
 
     // Function to display file comparison
@@ -386,878 +414,175 @@
           const originalSource = originalFile ? originalFile.source : '';
           const proposedSource = proposedFile.source;
 
-          const diffHtmlData = generateFormattedDiffPanels(originalSource, proposedSource);
+          const diffBlocks = generateFormattedDiffPanels(originalSource, proposedSource); // Get structured blocks
 
           const fileComparisonDiv = document.createElement('div');
           fileComparisonDiv.className = 'file-comparison';
 
-          // Original content display
+          // Create original panel elements
           const originalContentDiv = document.createElement('div');
-          originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
-              <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
-              <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
-          </pre>`;
-          
-          // Proposed content display
+          originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Original)</h4>`;
+          const originalPre = document.createElement('pre');
+          originalPre.className = 'scroll-sync-target';
+          const originalLineNumbersCol = document.createElement('div');
+          originalLineNumbersCol.className = 'line-numbers-col';
+          const originalCodeContentCol = document.createElement('div');
+          originalCodeContentCol.className = 'code-content-col';
+          originalPre.appendChild(originalLineNumbersCol);
+          originalPre.appendChild(originalCodeContentCol);
+          originalContentDiv.appendChild(originalPre);
+
+          // Create proposed panel elements
           const proposedContentDiv = document.createElement('div');
-          proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
-              <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
-              <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
-          </pre>`;
+          proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Proposed)</h4>`;
+          const proposedPre = document.createElement('pre');
+          proposedPre.className = 'scroll-sync-target';
+          const proposedLineNumbersCol = document.createElement('div');
+          proposedLineNumbersCol.className = 'line-numbers-col';
+          const proposedCodeContentCol = document.createElement('div');
+          proposedCodeContentCol.className = 'code-content-col';
+          proposedPre.appendChild(proposedLineNumbersCol);
+          proposedPre.appendChild(proposedCodeContentCol);
+          proposedContentDiv.appendChild(proposedPre);
           
+          diffBlocks.forEach(block => {
+              if (block.type === 'equal' || block.type === 'added' || block.type === 'removed' || block.type === 'modified') {
+                  const origLineNumDiv = document.createElement('div');
+                  origLineNumDiv.textContent = block.originalLineNum;
+                  originalLineNumbersCol.appendChild(origLineNumDiv);
+
+                  const origCodeDiv = document.createElement('div');
+                  origCodeDiv.className = `diff-line-${block.type === 'equal' ? 'equal' : (block.type === 'added' ? 'empty-fill' : block.type)}`;
+                  origCodeDiv.innerHTML = escapeHtml(block.original);
+                  originalCodeContentCol.appendChild(origCodeDiv);
+
+                  const propLineNumDiv = document.createElement('div');
+                  propLineNumDiv.textContent = block.proposedLineNum;
+                  proposedLineNumbersCol.appendChild(propLineNumDiv);
+
+                  const propCodeDiv = document.createElement('div');
+                  propCodeDiv.className = `diff-line-${block.type === 'equal' ? 'equal' : (block.type === 'removed' ? 'empty-fill' : block.type)}`;
+                  propCodeDiv.innerHTML = escapeHtml(block.proposed);
+                  proposedCodeContentCol.appendChild(propCodeDiv);
+              } else if (block.type === 'collapsed') {
+                  const commonIdBase = `${name}-${block.lines[0].originalLineNum}`;
+
+                  // --- Original Panel Collapsed Group ---
+                  const origCollapseGroupLn = document.createElement('div');
+                  origCollapseGroupLn.className = 'diff-collapsed-group';
+                  const origButtonLn = document.createElement('button');
+                  origButtonLn.className = 'diff-collapse-button';
+                  origButtonLn.textContent = `${block.count} unchanged lines`;
+                  origButtonLn.setAttribute('data-target-ln', `ln-${commonIdBase}-orig`);
+                  origButtonLn.setAttribute('data-target-code', `code-${commonIdBase}-orig`);
+                  origButtonLn.setAttribute('data-lines-count', block.count);
+                  origCollapseGroupLn.appendChild(origButtonLn);
+                  originalLineNumbersCol.appendChild(origCollapseGroupLn);
+
+                  const origCollapseGroupCode = document.createElement('div');
+                  origCollapseGroupCode.className = 'diff-collapsed-group';
+                  const origButtonCode = document.createElement('button');
+                  origButtonCode.className = 'diff-collapse-button';
+                  origButtonCode.textContent = `${block.count} unchanged lines`;
+                  origButtonCode.setAttribute('data-target-ln', `ln-${commonIdBase}-orig`);
+                  origButtonCode.setAttribute('data-target-code', `code-${commonIdBase}-orig`);
+                  origButtonCode.setAttribute('data-lines-count', block.count);
+                  origCollapseGroupCode.appendChild(origButtonCode);
+                  originalCodeContentCol.appendChild(origCollapseGroupCode);
+
+                  // Hidden line numbers div for Original
+                  const origHiddenLnDiv = document.createElement('div');
+                  origHiddenLnDiv.className = 'diff-hidden-lines';
+                  origHiddenLnDiv.id = `ln-${commonIdBase}-orig`;
+                  origHiddenLnDiv.style.display = 'none';
+                  block.lines.forEach(line => {
+                      const div = document.createElement('div');
+                      div.textContent = line.originalLineNum;
+                      origHiddenLnDiv.appendChild(div);
+                  });
+                  originalLineNumbersCol.appendChild(origHiddenLnDiv);
+
+                  // Hidden code content div for Original
+                  const origHiddenCodeDiv = document.createElement('div');
+                  origHiddenCodeDiv.className = 'diff-hidden-lines';
+                  origHiddenCodeDiv.id = `code-${commonIdBase}-orig`;
+                  origHiddenCodeDiv.style.display = 'none';
+                  block.lines.forEach(line => {
+                      const div = document.createElement('div');
+                      div.className = 'diff-line-equal';
+                      div.innerHTML = escapeHtml(line.original);
+                      origHiddenCodeDiv.appendChild(div);
+                  });
+                  originalCodeContentCol.appendChild(origHiddenCodeDiv);
+
+                  // --- Proposed Panel Collapsed Group ---
+                  const propCollapseGroupLn = document.createElement('div');
+                  propCollapseGroupLn.className = 'diff-collapsed-group';
+                  const propButtonLn = document.createElement('button');
+                  propButtonLn.className = 'diff-collapse-button';
+                  propButtonLn.textContent = `${block.count} unchanged lines`;
+                  propButtonLn.setAttribute('data-target-ln', `ln-${commonIdBase}-prop`);
+                  propButtonLn.setAttribute('data-target-code', `code-${commonIdBase}-prop`);
+                  propButtonLn.setAttribute('data-lines-count', block.count);
+                  propCollapseGroupLn.appendChild(propButtonLn);
+                  proposedLineNumbersCol.appendChild(propCollapseGroupLn);
+
+                  const propCollapseGroupCode = document.createElement('div');
+                  propCollapseGroupCode.className = 'diff-collapsed-group';
+                  const propButtonCode = document.createElement('button');
+                  propButtonCode.className = 'diff-collapse-button';
+                  propButtonCode.textContent = `${block.count} unchanged lines`;
+                  propButtonCode.setAttribute('data-target-ln', `ln-${commonIdBase}-prop`);
+                  propButtonCode.setAttribute('data-target-code', `code-${commonIdBase}-prop`);
+                  propButtonCode.setAttribute('data-lines-count', block.count);
+                  propCollapseGroupCode.appendChild(propButtonCode);
+                  proposedCodeContentCol.appendChild(propCollapseGroupCode);
+
+                  // Hidden line numbers div for Proposed
+                  const propHiddenLnDiv = document.createElement('div');
+                  propHiddenLnDiv.className = 'diff-hidden-lines';
+                  propHiddenLnDiv.id = `ln-${commonIdBase}-prop`;
+                  propHiddenLnDiv.style.display = 'none';
+                  block.lines.forEach(line => {
+                      const div = document.createElement('div');
+                      div.textContent = line.proposedLineNum;
+                      propHiddenLnDiv.appendChild(div);
+                  });
+                  proposedLineNumbersCol.appendChild(propHiddenLnDiv);
+
+                  // Hidden code content div for Proposed
+                  const propHiddenCodeDiv = document.createElement('div');
+                  propHiddenCodeDiv.className = 'diff-hidden-lines';
+                  propHiddenCodeDiv.id = `code-${commonIdBase}-prop`;
+                  propHiddenCodeDiv.style.display = 'none';
+                  block.lines.forEach(line => {
+                      const div = document.createElement('div');
+                      div.className = 'diff-line-equal';
+                      div.innerHTML = escapeHtml(line.proposed);
+                      propHiddenCodeDiv.appendChild(div);
+                  });
+                  proposedCodeContentCol.appendChild(propHiddenCodeDiv);
+              }
+          });
+
           fileComparisonDiv.appendChild(originalContentDiv);
           fileComparisonDiv.appendChild(proposedContentDiv);
           displayArea.appendChild(fileComparisonDiv);
 
-          // Scroll synchronization
-          const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
-          if (preElements.length === 2) {
-              const pre1 = preElements[0];
-              const pre2 = preElements[1];
-
-              let isSyncing = false; // Flag to prevent infinite recursion between scroll events
-
-              pre1.addEventListener('scroll', function() {
-                  if (!isSyncing) {
-                      isSyncing = true;
-                      pre2.scrollTop = pre1.scrollTop;
-                      isSyncing = false;
-                  }
-              });
-
-              pre2.addEventListener('scroll', function() {
-                  if (!isSyncing) {
-                      isSyncing = true;
-                      pre1.scrollTop = pre2.scrollTop;
-                      isSyncing = false;
-                  }
-              });
-          }
-      });
-    }
-
-    function getFileExtension(type) {
-      switch (type) {
-        case 'SERVER_JS': return 'gs';
-        case 'JSON': return 'json';
-        case 'HTML': return 'html';
-        default: return 'txt';
-      }
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.appendChild(document.createTextNode(text));
-      return div.innerHTML;
-    }
-
-    // Main form submission handler for both policy generation and proposal generation
-    document.getElementById('agent-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const submitterId = e.submitter.id;
-
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const loadingSpinner = document.getElementById('loading-spinner');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
-
-      const scriptId = getEffectiveScriptId();
-      const promptText = document.getElementById('prompt').value;
-
-      if (!scriptId) {
-        alert('Please select or enter a Script ID.');
-        return;
-      }
-      if (!promptText.trim()) {
-        alert('Prompt cannot be empty.');
-        return;
-      }
-
-      // Save scriptId to localStorage regardless of operation
-      saveScriptIdToLocalStorage(scriptId);
-
-      // Reset UI for new operation
-      loadingSpinner.style.display = 'block';
-      generatePolicyButton.disabled = true;
-      // document.getElementById('prompt').readOnly = true; // Disable prompt input during operation - Removed as per user instruction
-      cancelAiOperationButton.style.display = 'inline-block';
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
-      document.getElementById('regenerateProposalButton').style.display = 'none'; // Hide new button
-      document.getElementById('policy-container').style.display = 'none';
-      document.getElementById('proposal-container').style.display = 'none';
-      document.getElementById('applyChangesButton').style.display = 'none';
-      document.getElementById('apply-result-container').style.display = 'none';
-      document.getElementById('fixApplyErrorsButton').style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('ai-policy').textContent = '';
-      document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
-      document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
-
-      const formData = { scriptId: scriptId, prompt: promptText };
-
-      // Generate a unique ID for this request and set it as active
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      if (submitterId === 'generatePolicyButton') {
-        console.log('Generating policy...');
-        google.script.run
-          .withSuccessHandler(function(response) {
-            if (activeRequestId !== requestId) {
-              console.log('Ignoring stale success response for generateProposalPolicy.');
-              return;
-            }
-            activeRequestId = null;
-            loadingSpinner.style.display = 'none';
-            generatePolicyButton.disabled = false;
-            document.getElementById('prompt').readOnly = false; // Re-enable prompt input
-            cancelAiOperationButton.style.display = 'none';
-
-            if (response.status === 'policy') {
-              currentPolicyData = response; // Store policy data
-              document.getElementById('ai-policy').textContent = response.policy;
-              document.getElementById('policy-container').style.display = 'block';
-              document.getElementById('acceptPolicyButton').style.display = 'inline-block';
-              regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button
-              generatePolicyButton.style.display = 'none'; // Hide generate policy button
-              // document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled - Removed as per user instruction
-            } else if (response.status === 'error') {
-              document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
-              document.getElementById('policy-container').style.display = 'block';
-            }
-          })
-          .withFailureHandler(function(error) {
-            if (activeRequestId !== requestId) {
-              console.log('Ignoring stale failure response for generateProposalPolicy.');
-              return;
-            }
-            activeRequestId = null;
-            loadingSpinner.style.display = 'none';
-            generatePolicyButton.disabled = false;
-            document.getElementById('prompt').readOnly = false;
-            cancelAiOperationButton.style.display = 'none';
-            document.getElementById('ai-policy').textContent = 'Error generating policy: ' + error.message;
-            document.getElementById('policy-container').style.display = 'block';
-          })
-          .generateProposalPolicy(formData);
-      }
-    });
-
-    // Event Listener for Accept Policy & Propose Changes button
-    document.getElementById('acceptPolicyButton').addEventListener('click', function() {
-      if (!currentPolicyData) {
-        alert('No policy to accept. Please generate a policy first.');
-        return;
-      }
-
-      const acceptPolicyButton = this;
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const loadingSpinner = document.getElementById('loading-spinner');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-
-      // Reset UI for proposal generation
-      loadingSpinner.style.display = 'block';
-      acceptPolicyButton.disabled = true;
-      acceptPolicyButton.style.display = 'none'; // Hide accept policy button
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate policy button
-      regenerateProposalButton.style.display = 'none'; // Hide new button during generation
-      cancelAiOperationButton.style.display = 'inline-block';
-      // Removed: document.getElementById('policy-container').style.display = 'none'; // Hide policy container
-      // document.getElementById('prompt').readOnly = true; // Keep prompt read-only during proposal - Removed as per user instruction
-
-      const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt, policy: currentPolicyData.policy };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Generating code proposal...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for processPrompt (after policy).');
-            return;
-          }
-          activeRequestId = null;
-          loadingSpinner.style.display = 'none';
-          acceptPolicyButton.disabled = false;
-          generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
-          document.getElementById('prompt').readOnly = false; // Re-enable prompt input
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response; // Store the proposal
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。'; // Display the purpose
-            
-            // NEW: HTML Validation
-            const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
-                    }
-                }
-            });
-
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
-            } else {
-                htmlWarningsDiv.style.display = 'none';
-            }
-
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            document.getElementById('proposal-container').style.display = 'block';
-            document.getElementById('applyChangesButton').style.display = 'block'; // Show apply button
-            regenerateProposalButton.style.display = 'inline-block'; // Show regenerate proposal button
-            document.getElementById('apply-result').textContent = response.message; // Display initial message
-            document.getElementById('apply-result-container').style.display = 'block';
-          } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
-            document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block'; // Show container to display error
-          } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
-            document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block'; // Show container to display error
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for processPrompt (after policy).');
-            return;
-          }
-          activeRequestId = null;
-          loadingSpinner.style.display = 'none';
-          acceptPolicyButton.disabled = false;
-          generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
-          document.getElementById('prompt').readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          document.getElementById('apply-result').textContent = 'Error calling AI: ' + error.message;
-          document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
-        })
-        .processPrompt(formData);
-    });
-
-    // Event Listener for general AI operation cancel button
-    document.getElementById('cancelAiOperationButton').addEventListener('click', function() {
-      activeRequestId = null; // Invalidate the current active request
-
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const loadingSpinner = document.getElementById('loading-spinner');
-      const policyContainer = document.getElementById('policy-container');
-      const proposalContainer = document.getElementById('proposal-container');
-      const acceptPolicyButton = document.getElementById('acceptPolicyButton');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const applyChangesButton = document.getElementById('applyChangesButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
-
-      loadingSpinner.style.display = 'none';
-      generatePolicyButton.disabled = false;
-      document.getElementById('prompt').readOnly = false;
-      cancelAiOperationButton.style.display = 'none';
-
-      currentPolicyData = null; // Clear any partial policy
-      currentProposal = null; // Clear any partial proposal
-      document.getElementById('ai-policy').textContent = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('apply-result').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
-
-      policyContainer.style.display = 'none';
-      proposalContainer.style.display = 'none';
-      acceptPolicyButton.style.display = 'none';
-      regeneratePolicyButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none';
-      applyChangesButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-
-      generatePolicyButton.style.display = 'inline-block'; // Ensure primary button is visible
-
-      alert('AI操作はユーザーによってキャンセルされました。');
-    });
-
-    // Event Listener for Regenerate Policy button
-    document.getElementById('regeneratePolicyButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId();
-      const promptText = document.getElementById('prompt').value;
-
-      if (!scriptId) {
-        alert('Please select or enter a Script ID.');
-        return;
-      }
-      if (!promptText.trim()) {
-        alert('Prompt cannot be empty.');
-        return;
-      }
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      // UI Reset and loading state
-      const loadingSpinner = document.getElementById('loading-spinner');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const acceptPolicyButton = document.getElementById('acceptPolicyButton');
-      const regeneratePolicyButton = this; // The button itself
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const policyContainer = document.getElementById('policy-container');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesButton = document.getElementById('applyChangesButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
-
-      loadingSpinner.style.display = 'block';
-      generatePolicyButton.disabled = true; // Disable original generate button
-      acceptPolicyButton.disabled = true; // Disable accept button
-      regeneratePolicyButton.disabled = true; // Disable regenerate button
-      // document.getElementById('prompt').readOnly = true; // Removed as per user instruction
-      cancelAiOperationButton.style.display = 'inline-block';
-
-      // Hide all related sections and clear content
-      policyContainer.style.display = 'none';
-      proposalContainer.style.display = 'none';
-      applyChangesButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('ai-policy').textContent = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
-
-      currentPolicyData = null; // Clear previous policy data
-      currentProposal = null; // Clear previous proposal data
-
-      const formData = { scriptId: scriptId, prompt: promptText };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Regenerating policy...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for regeneratePolicy.');
-            return;
-          }
-          activeRequestId = null;
-          loadingSpinner.style.display = 'none';
-          generatePolicyButton.disabled = false; // Re-enable original generate button
-          acceptPolicyButton.disabled = false; // Re-enable accept button
-          regeneratePolicyButton.disabled = false; // Re-enable regenerate button
-          document.getElementById('prompt').readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'policy') {
-            currentPolicyData = response;
-            document.getElementById('ai-policy').textContent = response.policy;
-            policyContainer.style.display = 'block';
-            acceptPolicyButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button again
-            generatePolicyButton.style.display = 'none'; // Keep original generate button hidden
-            // document.getElementById('prompt').readOnly = true; // Keep prompt read-only until accepted or cancelled - Removed as per user instruction
-          } else if (response.status === 'error') {
-            document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
-            policyContainer.style.display = 'block';
-            generatePolicyButton.style.display = 'inline-block'; // Show original generate button on error
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for regeneratePolicy.');
-            return;
-          }
-          activeRequestId = null;
-          loadingSpinner.style.display = 'none';
-          generatePolicyButton.disabled = false;
-          acceptPolicyButton.disabled = false;
-          regeneratePolicyButton.disabled = false;
-          document.getElementById('prompt').readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          document.getElementById('ai-policy').textContent = 'Error regenerating policy: ' + error.message;
-          policyContainer.style.display = 'block';
-          generatePolicyButton.style.display = 'inline-block'; // Show original generate button on error
-        })
-        .generateProposalPolicy(formData);
-    });
-
-    // Event Listener for Apply Changes
-    document.getElementById('applyChangesButton').addEventListener('click', function() {
-      if (!currentProposal) {
-        document.getElementById('apply-result').textContent = 'Error: No proposal to apply.';
-        document.getElementById('apply-result-container').style.display = 'block';
-        return;
-      }
-
-      // --- Save scriptId to localStorage before applying changes ---
-      saveScriptIdToLocalStorage(currentProposal.scriptId);
-
-      const applyButton = this;
-      const applySpinner = document.getElementById('apply-loading-spinner');
-      const applyResultText = document.getElementById('apply-result');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const autoDeployChecked = document.getElementById('autoDeployAfterApply').checked;
-
-      applyButton.disabled = true;
-      fixApplyErrorsButton.style.display = 'none';
-      regenerateProposalButton.disabled = true; // Disable regenerate proposal button
-      applySpinner.style.display = 'block';
-      applyResultText.textContent = 'Applying changes...';
-      if (autoDeployChecked) {
-          applyResultText.textContent += '\n自動デプロイを伴います...';
-      }
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          applySpinner.style.display = 'none';
-          applyButton.disabled = false;
-          regenerateProposalButton.disabled = false;
-          
-          if (response.status === 'success') {
-            let message = response.message;
-            if (response.deploymentStatus) { // Check if deployment attempt was made
-              message += `<br><br><strong>自動デプロイ結果:</strong><br>`;
-              if (response.deploymentStatus === 'success') {
-                message += `状態: 成功<br>メッセージ: ${response.deploymentMessage}`;
-                if (response.deploymentId) message += `<br>デプロイID: ${response.deploymentId}`;
-                if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
-                  message += `<br>WebアプリURL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
-                } else if (response.webappUrl === 'URL not found in response') {
-                  message += `<br>WebアプリURL: ${response.webappUrl}`;
-                }
-              }
-            } else if (response.deploymentStatus === 'error') {
-              message += `状態: エラー<br>メッセージ: ${response.deploymentMessage}`; 
-            } else { // not_attempted
-              message += `状態: 未実行<br>メッセージ: ${response.deploymentMessage}`; 
-            }
-            applyResultText.innerHTML = message; // Use innerHTML because of HTML links
-            currentProposal = null; // Clear proposal
-            document.getElementById('applyChangesButton').style.display = 'none';
-            regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button after applying
-            document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
-            document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
-            document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
-            fixApplyErrorsButton.style.display = 'none';
-          } else { // response.status === 'error'
-            let errorMessage = response.message;
-            if (response.fullErrorText) {
-                errorMessage += '\nAPI Response: ' + response.fullErrorText;
-            }
-            else if (response.apiErrorDetails) {
-                errorMessage += '\nAPI Details: ' + JSON.stringify(response.apiErrorDetails, null, 2);
-            }
-            applyResultText.textContent = errorMessage;
-            fixApplyErrorsButton.style.display = 'block';
-          }
-        })
-        .withFailureHandler(function(error) {
-          applySpinner.style.display = 'none';
-          applyButton.disabled = false;
-          regenerateProposalButton.disabled = false;
-          applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
-          fixApplyErrorsButton.style.display = 'block';
-        })
-        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked, currentProposal.purpose);
-    });
-
-    // Event Listener for Fix Apply Errors button
-    document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId();
-      if (!scriptId) {
-        document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
-        document.getElementById('apply-result-container').style.display = 'block';
-        return;
-      }
-
-      // Re-use the existing fix errors logic
-      const fixButton = this; // The fixApplyErrorsButton itself
-      const spinner = document.getElementById('fix-loading-spinner'); // Re-use the existing fix spinner
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
-      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
-
-      // Generate a unique ID for this request and set it as active
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      fixButton.disabled = true;
-      generatePolicyButton.disabled = true;
-      promptInput.readOnly = true; // Disable prompt input during operation
-      cancelFixErrorsButton.style.display = 'inline-block';
-      regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button during fix
-      spinner.style.display = 'block';
-      proposalContainer.style.display = 'none';
-      applyButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
-
-      // Save scriptId to localStorage
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for fixErrorsFromLogs.');
-            return; 
-          }
-          activeRequestId = null;
-          spinner.style.display = 'none';
-          fixButton.disabled = false;
-          generatePolicyButton.disabled = false; 
-          promptInput.readOnly = false; 
-          cancelFixErrorsButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
-            
-            // NEW: HTML Validation
-            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
-                    }
-                }
-            });
-
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
-            } else {
-                htmlWarningsDiv.style.display = 'none';
-            }
-
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyButton.style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block'; // Show regenerate proposal button
-            document.getElementById('apply-result').textContent = response.message;
-            applyResultContainer.style.display = 'block';
-            fixButton.style.display = 'none'; 
-          } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-          } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for fixErrorsFromLogs.');
-            return; 
-          }
-          activeRequestId = null;
-          spinner.style.display = 'none';
-          fixButton.disabled = false;
-          generatePolicyButton.disabled = false; 
-          promptInput.readOnly = false; 
-          cancelFixErrorsButton.style.display = 'none';
-
-          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
-          document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block';
-        })
-        .fixErrorsFromLogs(scriptId);
-    });
-
-    // Event Listener for Cancel Fix Errors
-    document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
-      activeRequestId = null; // Invalidate the current active request
-
-      const fixButton = document.getElementById('fixErrorsButton');
-      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
-      const spinner = document.getElementById('fix-loading-spinner');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
-
-      spinner.style.display = 'none';
-      fixButton.disabled = false;
-      generatePolicyButton.disabled = false; 
-      promptInput.readOnly = false; 
-      cancelFixErrorsButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button on cancel
-      
-      currentProposal = null; // Clear any partial proposal
-      document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('proposed-files-display').innerHTML = '<p>AIによるエラー修正はユーザーによってキャンセルされました。</p>';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
-      proposalContainer.style.display = 'block'; 
-      applyButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-    });
-
-    // Event Listener for Regenerate Proposal button
-    document.getElementById('regenerateProposalButton').addEventListener('click', function() {
-      if (!currentPolicyData || !currentPolicyData.scriptId || !currentPolicyData.userPrompt || !currentPolicyData.policy) {
-        alert('Cannot regenerate proposal. Policy data is missing.');
-        return;
-      }
-
-      const scriptId = currentPolicyData.scriptId;
-      const promptText = currentPolicyData.userPrompt;
-      const policyText = currentPolicyData.policy;
-
-      const regenerateButton = this;
-      const loadingSpinner = document.getElementById('loading-spinner'); // Reuse main spinner
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesButton = document.getElementById('applyChangesButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
-
-      // UI Reset and loading state
-      loadingSpinner.style.display = 'block';
-      regenerateButton.disabled = true; // Disable itself
-      applyChangesButton.disabled = true; // Disable apply button
-      cancelAiOperationButton.style.display = 'inline-block';
-
-      // Hide all related sections and clear content
-      proposalContainer.style.display = 'none';
-      applyChangesButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('apply-result').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
-
-      currentProposal = null; // Clear previous proposal data
-
-      const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Regenerating AI proposed changes...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for regenerateProposal.');
-            return;
-          }
-          activeRequestId = null;
-          loadingSpinner.style.display = 'none';
-          regenerateButton.disabled = false;
-          applyChangesButton.disabled = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || '説明がありません。';
-            
-            // NEW: HTML Validation
-            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
-                    }
-                }
-            });
-
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
-            }
-            else {
-                htmlWarningsDiv.style.display = 'none';
-            }
-
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyChangesButton.style.display = 'block';
-            regenerateButton.style.display = 'inline-block'; // Keep it visible after success
-            document.getElementById('apply-result').textContent = response.message;
-            applyResultContainer.style.display = 'block';
-          } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
-            regenerateButton.style.display = 'inline-block'; // Keep visible to allow retry
-          } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
-            regenerateButton.style.display = 'inline-block'; // Keep visible
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for regenerateProposal.');
-            return;
-          }
-          activeRequestId = null;
-          loadingSpinner.style.display = 'none';
-          regenerateButton.disabled = false;
-          applyChangesButton.disabled = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          document.getElementById('apply-result').textContent = 'Error regenerating proposal: ' + error.message;
-          applyResultContainer.style.display = 'block';
-          proposalContainer.style.display = 'block'; // Show container for error
-          regenerateButton.style.display = 'inline-block'; // Keep visible
-        })
-        .processPrompt(formData);
-    });
-
-    // Event Listener for Save GCP Project ID
-    document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
-      const gcpProjectIdInput = document.getElementById('gcpProjectId');
-      const gcpProjectId = gcpProjectIdInput.value.trim();
-      const saveResultContainer = document.getElementById('gcp-save-result-container');
-      const saveResultText = document.getElementById('gcp-save-result');
-
-      saveResultContainer.style.display = 'block';
-      saveResultText.textContent = 'Saving...';
-
-      if (!gcpProjectId) {
-        saveResultText.textContent = 'Error: GCP Project ID cannot be empty.';
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          saveResultText.textContent = response.message;
-          if (response.status === 'success') {
-            saveGcpProjectIdToLocalStorage(gcpProjectId); // Save to localStorage on success
-          }
-        })
-        .withFailureHandler(function(error) {
-          saveResultText.textContent = 'Error saving GCP Project ID: ' + error.message;
-        })
-        .setGcpProjectId(gcpProjectId);
-    });
-
-    document.getElementById('log-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const submitButton = form.querySelector('#getLogsButton');
-      const spinner = document.getElementById('log-loading-spinner');
-
-      submitButton.disabled = true;
-      spinner.style.display = 'block';
-
-      const scriptId = getEffectiveScriptId();
-
-      // --- Save scriptId to localStorage when getting logs ---
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          document.getElementById('log-result').textContent = response;
-          document.getElementById('log-result-container').style.display = 'block';
-          submitButton.disabled = false;
-          spinner.style.display = 'none';
-        })
-        .withFailureHandler(function(error) {
-          document.getElementById('log-result').textContent = 'Error: ' + error.message;
-          document.getElementById('log-result-container').style.display = 'block';
-          submitButton.disabled = false;
-          spinner.style.display = 'none';
-        })
-        .getScriptLogs(scriptId);
-    });
-
-    // Event Listener for Deploy Script
-    document.getElementById('deploy-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const submitButton = form.querySelector('#deployButton');
-      const spinner = document.getElementById('deploy-loading-spinner');
-      const resultContainer = document.getElementById('deploy-result-container');
-      const resultText = document.getElementById('deploy-result');
-
-      submitButton.disabled = true;
-      spinner.style.display = 'block';
-      resultContainer.style.display = 'none';
-      resultText.textContent = '';
-
-      const scriptId = getEffectiveScriptId();
-      const description = document.getElementById('deploymentDescription').value;
-
-      // Save scriptId to localStorage when deploying
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
-          resultContainer.style.display = 'block';
-          if (response.status === 'success') {
-            let webappUrlHtml = `Web App URL: ${response.webappUrl}`;
-            if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
-              webappUrlHtml = `Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
-            }
-            resultText.innerHTML = `${response.message}<br>Deployment ID: ${response.deploymentId}<br>${webappUrlHtml}`;
-          } else {
-            resultText.textContent = `Error: ${response.message}`;
-          }
-        })
-        .withFailureHandler(function(error) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
-          resultContainer.style.display = 'block';
-          resultText.textContent = `Error deploying script: ${error.message}`;
-        })
-        .deployScript(scriptId, description);
-    });
-
-    // Event listener for Load Projects button
-    document.getElementById('loadProjectsButton').addEventListener('click', function() {
-        loadProjectsIntoDropdown(getEffectiveScriptId()); // Pass current ID to try and re-select
-    });
-  </script>
-</body>
-</html>
+          // Add event listeners for collapse buttons after they are in the DOM
+          fileComparisonDiv.querySelectorAll('.diff-collapse-button').forEach(button => {
+              button.addEventListener('click', function() {
+                  const targetIdLn = this.getAttribute('data-target-ln');
+                  const targetIdCode = this.getAttribute('data-target-code');
+                  const linesCount = this.getAttribute('data-lines-count');
+
+                  const targetElementLn = document.getElementById(targetIdLn);
+                  const targetElementCode = document.getElementById(targetIdCode);
+
+                  if (targetElementLn && targetElementCode) {
+                      const isHidden = targetElementLn.style.display === 'none';
+                      const newDisplay = isHidden ? 'block' : 'none';
+                      const newText = isHidden ? 'Hide unchanged lines' : `${linesCount} unchanged lines`;
+
+                      // Find all 4 buttons linked to this logical collapsed group and update them
+                      const commonIdBase = targetIdLn.substring(targetIdLn.indexOf('-') + 1, targetIdLn.lastIndexOf('-')); // e.g., 
