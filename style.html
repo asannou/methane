@@ -28,16 +28,37 @@
   /* Layout for diff-like display - Custom, keep these */
   .file-comparison {
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap; /* Allow items to wrap onto new lines on smaller screens */
     margin-bottom: 20px;
     border: 1px solid #ddd;
-    padding: 10px;
+    padding: 10px; /* Padding for the container */
     background-color: #f9f9f9;
   }
-  .file-comparison div {
-    flex: 1 1 50%; /* Adjust to ensure each panel takes roughly 50% width */
-    margin: 0 5px;
+
+  /* Default to full width on small screens, with vertical spacing */
+  .file-comparison > div {
+    width: 100%;
+    margin-bottom: 10px;
   }
+  .file-comparison > div:last-child {
+    margin-bottom: 0; /* No margin after the last stacked panel */
+  }
+
+  /* For screens wider than 768px (Bulma's 'tablet' breakpoint) */
+  @media screen and (min-width: 769px) {
+    .file-comparison {
+      flex-wrap: nowrap; /* Prevent wrapping on larger screens */
+      justify-content: space-between; /* Space between panels when side-by-side */
+    }
+    .file-comparison > div {
+      flex: 1 1 calc(50% - 5px); /* Each panel takes roughly 50% width, accounting for a small gap */
+      margin-bottom: 0; /* No vertical margin when side-by-side */
+    }
+    .file-comparison > div:first-child {
+      margin-right: 5px; /* Small gap between the two panels */
+    }
+  }
+
   .file-comparison h4 {
     margin-top: 0;
   }
@@ -47,6 +68,7 @@
     overflow-x: auto; /* ADDED: Enable horizontal scrolling for long lines */
     border: 1px solid #ccc;
     display: flex; /* Use flexbox for line numbers */
+    width: 100%; /* Ensure pre fills its parent div's width */
   }
 
   /* Styles for line numbers and code content columns - Custom, keep these */
