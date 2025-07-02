@@ -8,11 +8,20 @@
 <?!= include('style'); ?>
 </head>
 <body>
+  <section class="hero is-primary is-bold">
+    <div class="hero-body">
+      <div class="container">
+        <p class="title">Methane AI Agent</p>
+        <p class="subtitle">Google Apps Script AI Assistant</p>
+      </div>
+    </div>
+  </section>
+
   <section class="section">
     <div class="container">
-      <h1 class="title is-2">Methane AI Agent</h1>
-
-      <form id="agent-form" class="box">
+      <div class="box mb-5">
+        <h2 class="title is-5">Target Apps Script Configuration</h2>
+        <p class="content is-small">Select or manually enter the Script ID for operations. Auto-saves selection.</p>
         <div class="field mb-3">
           <label class="label" for="scriptIdSelect">Target Script ID:</label>
           <div class="control is-expanded">
@@ -28,237 +37,229 @@
             <input type="text" id="scriptIdManualInput" placeholder="Or paste Script ID here (overrides selection)" class="input">
           </div>
         </div>
-        <div id="editor-url-display" class="notification is-light is-info is-small mb-4"></div>
+        <div id="editor-url-display" class="notification is-light is-info is-small mb-0"></div>
+      </div>
 
-        <div class="field">
-          <label class="label" for="prompt">Prompt:</label>
-          <div class="control">
-            <textarea id="prompt" name="prompt" required class="textarea"></textarea>
+      <div class="tabs is-boxed is-centered">
+        <ul>
+          <li class="is-active" data-tab-content-id="ai-operations-tab"><a>AI Operations</a></li>
+          <li data-tab-content-id="management-tools-tab"><a>Management & Tools</a></li>
+          <li data-tab-content-id="configuration-tab"><a>Configuration</a></li>
+        </ul>
+      </div>
+
+      <div id="ai-operations-tab" class="tab-content is-active">
+        <h2 class="title is-4 mt-5">AI Code Generation & Application</h2>
+        <form id="agent-form" class="box">
+          <div class="field">
+            <label class="label" for="prompt">Prompt:</label>
+            <div class="control">
+              <textarea id="prompt" name="prompt" required class="textarea"></textarea>
+            </div>
+          </div>
+          <div class="field is-grouped">
+            <div class="control">
+              <button type="submit" id="generatePolicyButton" class="button is-primary">Generate Policy</button>
+            </div>
+            <div class="control">
+              <button type="button" id="cancelAiOperationButton" class="button is-danger is-light" style="display:none;">Cancel</button>
+            </div>
+          </div>
+        </form>
+
+        <div id="policy-loading-spinner" class="spinner" style="display:none;"></div>
+
+        <div id="policy-container" class="box mt-4" style="display:none;">
+          <h2 class="title is-4">AI Generated Policy:</h2>
+          <div class="field is-grouped is-flex is-justify-content-space-between is-align-items-center mb-3">
+            <div class="control">
+            </div>
+            <div class="control">
+              <button type="button" id="togglePolicyEditButton" class="button is-small is-light">Edit Policy</button>
+            </div>
+          </div>
+          <div id="ai-policy" class="content"></div>
+          <textarea id="policyEditor" class="textarea is-small" style="display:none; height: 200px;"></textarea>
+          <div class="field is-grouped mt-3">
+            <div class="control">
+              <button type="button" id="acceptPolicyButton" class="button is-success" style="display:none;">Accept Policy & Propose Changes</button>
+            </div>
+            <div class="control">
+              <button type="button" id="regeneratePolicyButton" class="button is-warning is-light" style="display:none;">Regenerate Policy</button>
+            </div>
           </div>
         </div>
-        <div class="field is-grouped">
-          <div class="control">
-            <button type="submit" id="generatePolicyButton" class="button is-primary">Generate Policy</button>
-          </div>
-          <div class="control">
-            <button type="button" id="cancelAiOperationButton" class="button is-danger is-light" style="display:none;">Cancel</button>
-          </div>
-        </div>
-      </form>
 
-      <!-- Loading spinner for policy generation -->
-      <div id="policy-loading-spinner" class="spinner" style="display:none;"></div>
+        <div id="proposal-loading-spinner" class="spinner" style="display:none;"></div>
 
-      <!-- Policy Review Section -->
-      <div id="policy-container" class="box mt-4" style="display:none;">
-        <h2 class="title is-4">AI Generated Policy:</h2>
-        <div class="field is-grouped is-flex is-justify-content-space-between is-align-items-center mb-3">
-          <div class="control">
-            <!-- Policy editing controls (placeholder for future expansion) -->
+        <div id="proposal-container" class="box mt-4" style="display:none;">
+          <h2 class="title is-4">AI Proposed Changes:</h2>
+          <p class="content"><strong id="proposal-purpose-label">Purpose of Change:</strong> <span id="proposal-purpose"></span></p>
+          <div id="html-validation-warnings" class="notification is-danger is-light mb-4" style="display: none;"></div>
+          <p class="content">The following changes have been proposed by the AI. Please review the content and click the "Apply Changes" button to apply if there are no issues.</p>
+          <div id="proposed-files-display">
           </div>
-          <div class="control">
-            <button type="button" id="togglePolicyEditButton" class="button is-small is-light">Edit Policy</button>
+          <div class="field mt-3">
+            <label class="checkbox">
+              <input type="checkbox" id="autoDeployAfterApply" checked>
+              Auto-deploy after applying
+            </label>
           </div>
-        </div>
-        <div id="ai-policy" class="content"></div>
-        <textarea id="policyEditor" class="textarea is-small" style="display:none; height: 200px;"></textarea>
-        <div class="field is-grouped mt-3">
-          <div class="control">
-            <button type="button" id="acceptPolicyButton" class="button is-success" style="display:none;">Accept Policy & Propose Changes</button>
+          <div class="field is-grouped mt-4">
+            <div class="control">
+              <button type="button" id="applyChangesButton" class="button is-primary" style="display:none;">Apply Changes</button>
+            </div>
+            <div class="control">
+              <button type="button" id="regenerateProposalButton" class="button is-info is-light" style="display:none;">Regenerate Proposal</button>
+            </div>
           </div>
-          <div class="control">
-            <button type="button" id="regeneratePolicyButton" class="button is-warning is-light" style="display:none;">Regenerate Policy</button>
+          <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
+          <div id="apply-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Apply Result:</h3>
+            <div id="apply-result-content"></div>
+            <button type="button" id="fixApplyErrorsButton" class="button is-danger mt-3" style="display:none;">Fix Apply Errors with AI</button>
           </div>
         </div>
       </div>
 
-      <!-- Loading spinner for proposal generation -->
-      <div id="proposal-loading-spinner" class="spinner" style="display:none;"></div>
-
-      <!-- Proposal Review Section -->
-      <div id="proposal-container" class="box mt-4" style="display:none;">
-        <h2 class="title is-4">AI Proposed Changes:</h2>
-        <p class="content"><strong id="proposal-purpose-label">Purpose of Change:</strong> <span id="proposal-purpose"></span></p>
-        <!-- NEW: HTML Validation Warnings -->
-        <div id="html-validation-warnings" class="notification is-danger is-light mb-4" style="display: none;"></div>
-        <p class="content">The following changes have been proposed by the AI. Please review the content and click the "Apply Changes" button to apply if there are no issues.</p>
-        <div id="proposed-files-display">
-          <!-- File comparisons will be inserted here by JavaScript -->
-        </div>
-        <div class="field mt-3">
-          <label class="checkbox">
-            <input type="checkbox" id="autoDeployAfterApply" checked>
-            Auto-deploy after applying
-          </label>
-        </div>
-        <div class="field is-grouped mt-4">
+      <div id="management-tools-tab" class="tab-content" style="display: none;">
+        <h2 class="title is-4 mt-5">Script Logs</h2>
+        <form id="log-form" class="box">
+          <p class="content">Retrieves Apps Script logs for the selected Script ID from Google Cloud Logging.</p>
           <div class="control">
-            <button type="button" id="applyChangesButton" class="button is-primary" style="display:none;">Apply Changes</button>
+            <button type="submit" id="getLogsButton" class="button is-link">Get Logs</button>
           </div>
+        </form>
+        <div id="log-result-container" class="box mt-4" style="display:none;">
+          <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
+          <h3 class="title is-5">Logs:</h3>
+          <pre id="log-result" class="content"></pre>
+        </div>
+        
+        <h2 class="title is-4 mt-5">Automated Error Fix</h2>
+        <form id="fix-errors-form" class="box">
+          <p class="content">Allows AI to propose error fixes based on existing script logs. Proposed changes will appear in the "AI Proposed Changes" section under "AI Operations" tab.</p>
+          <div class="field is-grouped">
+            <div class="control">
+              <button type="submit" id="fixErrorsButton" class="button is-danger">Fix Errors from Logs</button>
+            </div>
+            <div class="control">
+              <button type="button" id="cancelFixErrorsButton" class="button is-warning is-light" style="display:none;">Cancel</button>
+            </div>
+          </div>
+        </form>
+
+        <h2 class="title is-4 mt-5">Deploy Script</h2>
+        <form id="deploy-form" class="box">
+          <div class="field">
+            <label class="label" for="deploymentDescription">Deployment Description (Optional):</label>
+            <div class="control">
+              <input type="text" id="deploymentDescription" name="deploymentDescription" class="input">
+            </div>
+          </div>
+          <p class="content is-small">This will deploy the current HEAD version as a new Web App deployment, using the Web App settings defined in <code>appsscript.json</code>. Older web app deployments might be automatically archived if limits are reached.</p>
           <div class="control">
-            <button type="button" id="regenerateProposalButton" class="button is-info is-light" style="display:none;">Regenerate Proposal</button>
+            <button type="submit" id="deployButton" class="button is-info">Create New Web App Deployment</button>
+          </div>
+        </form>
+        <div id="deploy-result-container" class="box mt-4" style="display:none;">
+          <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
+          <h3 class="title is-5">Deployment Result:</h3>
+          <pre id="deploy-result" class="content"></pre>
+        </div>
+
+        <h2 class="title is-4 mt-5">Add Apps Script Library</h2>
+        <form id="add-library-form" class="box">
+          <div class="field">
+            <label class="label" for="libraryScriptId">Library Script ID:</label>
+            <div class="control">
+              <input type="text" id="libraryScriptId" name="libraryScriptId" required class="input">
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="libraryVersion">Library Version (Optional, defaults to HEAD):</label>
+            <div class="control">
+              <input type="text" id="libraryVersion" name="libraryVersion" placeholder="e.g., 1, 2, 3 or HEAD" class="input">
+            </div>
+          </div>
+          <div class="control mt-3">
+            <button type="submit" id="addLibraryButton" class="button is-success">Add Library</button>
+          </div>
+        </form>
+        <div id="add-library-result-container" class="box mt-4" style="display:none;">
+          <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
+          <h3 class="title is-5">Add Library Result:</h3>
+          <pre id="add-library-result" class="content"></pre>
+        </div>
+
+        <h2 class="title is-4 mt-5">Version Control</h2>
+        <div class="box">
+          <p class="content">View script version history and revert to a specific past version.</p>
+          <div class="field is-grouped">
+            <div class="control">
+              <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
+            </div>
+            <div class="control is-expanded">
+              <div class="select is-fullwidth">
+                <select id="versionSelect">
+                  <option value="">-- Select a version --</option>
+                </select>
+              </div>
+            </div>
+            <div class="control">
+              <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
+            </div>
+          </div>
+          <div id="version-loading-spinner" class="spinner" style="display:none;"></div>
+          <div id="version-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Version Operation Result:</h3>
+            <pre id="version-result" class="content"></pre>
           </div>
         </div>
-        <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
-        <div id="apply-result-container" class="box mt-4" style="display:none;">
-          <h3 class="title is-5">Apply Result:</h3>
-          <div id="apply-result-content"></div> <!-- MODIFIED: Replaced pre with div for rich content -->
-          <!-- NEW BUTTON for fixing errors after apply failure -->
-          <button type="button" id="fixApplyErrorsButton" class="button is-danger mt-3" style="display:none;">Fix Apply Errors with AI</button>
-        </div>
-      </div>
 
-      <hr class="my-5">
-
-      <h2 class="title is-4">Google Cloud Project ID Configuration</h2>
-      <p class="content">A Google Cloud Project linked to this Apps Script is required for log retrieval. Please manually set your GCP Project ID in case automatic retrieval via API fails.</p>
-      <div class="field">
-        <label class="label" for="gcpProjectId">GCP Project ID:</label>
-        <div class="control">
-          <input type="text" id="gcpProjectId" name="gcpProjectId" class="input">
-        </div>
-      </div>
-      <div class="control mt-3">
-        <button type="button" id="saveGcpProjectIdButton" class="button is-info">Save GCP Project ID</button>
-      </div>
-      <div id="gcp-save-result-container" class="box mt-4" style="display:none;">
-        <h3 class="title is-5">Save Result:</h3>
-        <pre id="gcp-save-result" class="content"></pre>
-      </div>
-
-      <hr class="my-5">
-
-      <h2 class="title is-4">Get Script Logs</h2>
-      <form id="log-form">
-        <p class="content">Using the Script ID entered above.</p>
-        <div class="control">
-          <button type="submit" id="getLogsButton" class="button is-link">Get Logs</button>
-        </div>
-      </form>
-
-      <div id="log-result-container" class="box mt-4" style="display:none;">
-        <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
-        <h3 class="title is-5">Logs:</h3>
-        <pre id="log-result" class="content"></pre>
-      </div>
-
-      <hr class="my-5">
-
-      <h2 class="title is-4">Automated Error Fix from Logs</h2>
-      <p class="content">Allows AI to propose error fixes based on existing script logs. Proposed changes will appear in the "AI Proposed Changes" section above.</p>
-      <form id="fix-errors-form">
-        <p class="content">Using the Script ID entered above.</p>
-        <div class="field is-grouped">
-          <div class="control">
-            <button type="submit" id="fixErrorsButton" class="button is-danger">Fix Errors from Logs</button>
+        <h2 class="title is-4 mt-5">Target Script Files</h2>
+        <div class="box">
+          <p class="content">View the list of files within the selected Target Script ID.</p>
+          <div class="field">
+            <div class="control">
+              <button type="button" id="getFilesListButton" class="button is-link">Get Files List</button>
+            </div>
           </div>
-          <div class="control">
-            <button type="button" id="cancelFixErrorsButton" class="button is-warning is-light" style="display:none;">Cancel</button>
+          <div id="filesListContainer" class="box mt-4" style="display:none;">
+            <div id="filesListLoadingSpinner" class="spinner" style="display:none;"></div>
+            <h3 class="title is-5">Files in Script:</h3>
+            <div id="filesListDisplay" class="files-grid"></div>
           </div>
         </div>
-      </form>
+      </div>
 
-      <hr class="my-5">
-
-      <h2 class="title is-4">Deploy Script</h2>
-      <form id="deploy-form">
-        <p class="content">Using the Script ID entered above.</p>
-        <div class="field">
-          <label class="label" for="deploymentDescription">Deployment Description (Optional):</label>
-          <div class="control">
-            <input type="text" id="deploymentDescription" name="deploymentDescription" class="input">
+      <div id="configuration-tab" class="tab-content" style="display: none;">
+        <h2 class="title is-4 mt-5">Google Cloud Project ID Configuration</h2>
+        <div class="box">
+          <p class="content">A Google Cloud Project linked to this Apps Script is required for log retrieval. Please manually set your GCP Project ID in case automatic retrieval via API fails.</p>
+          <div class="field">
+            <label class="label" for="gcpProjectId">GCP Project ID:</label>
+            <div class="control">
+              <input type="text" id="gcpProjectId" name="gcpProjectId" class="input">
+            </div>
+          </div>
+          <div class="control mt-3">
+            <button type="button" id="saveGcpProjectIdButton" class="button is-info">Save GCP Project ID</button>
+          </div>
+          <div id="gcp-save-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Save Result:</h3>
+            <pre id="gcp-save-result" class="content"></pre>
           </div>
         </div>
-        <p class="content is-small">This will deploy the current HEAD version as a new Web App deployment, using the Web App settings defined in <code>appsscript.json</code>.</p>
-        <div class="control">
-          <button type="submit" id="deployButton" class="button is-info">Create New Web App Deployment</button>
-        </div>
-      </form>
-
-      <div id="deploy-result-container" class="box mt-4" style="display:none;">
-        <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
-        <h3 class="title is-5">Deployment Result:</h3>
-        <pre id="deploy-result" class="content"></pre>
       </div>
-
-      <hr class="my-5">
-
-      <h2 class="title is-4">Add Apps Script Library</h2>
-      <p class="content">Target Script ID is the one entered above.</p>
-      <form id="add-library-form">
-        <div class="field">
-          <label class="label" for="libraryScriptId">Library Script ID:</label>
-          <div class="control">
-            <input type="text" id="libraryScriptId" name="libraryScriptId" required class="input">
-          </div>
-        </div>
-        <div class="field">
-          <label class="label" for="libraryVersion">Library Version (Optional, defaults to HEAD):</label>
-          <div class="control">
-            <input type="text" id="libraryVersion" name="libraryVersion" placeholder="e.g., 1, 2, 3 or HEAD" class="input">
-          </div>
-        </div>
-        <div class="control mt-3">
-          <button type="submit" id="addLibraryButton" class="button is-success">Add Library</button>
-        </div>
-      </form>
-
-      <div id="add-library-result-container" class="box mt-4" style="display:none;">
-        <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
-        <h3 class="title is-5">Add Library Result:</h3>
-        <pre id="add-library-result" class="content"></pre>
-      </div>
-
-      <!-- NEW: Version Control Section -->
-      <hr class="my-5">
-
-      <h2 class="title is-4">Version Control</h2>
-      <p class="content">View script version history and revert to a specific past version.</p>
-      <div class="field is-grouped">
-        <div class="control">
-          <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
-        </div>
-        <div class="control is-expanded">
-          <div class="select is-fullwidth">
-            <select id="versionSelect">
-              <option value="">-- Select a version --</option>
-            </select>
-          </div>
-        </div>
-        <div class="control">
-          <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
-        </div>
-      </div>
-
-      <div id="version-loading-spinner" class="spinner" style="display:none;"></div>
-      <div id="version-result-container" class="box mt-4" style="display:none;">
-        <h3 class="title is-5">Version Operation Result:</h3>
-        <pre id="version-result" class="content"></pre>
-      </div>
-
-      <!-- NEW: Target Script Files Section -->
-      <hr class="my-5">
-      <h2 class="title is-4">Target Script Files</h2>
-      <p class="content">View the list of files within the selected Target Script ID.</p>
-      <div class="field">
-        <div class="control">
-          <button type="button" id="getFilesListButton" class="button is-link">Get Files List</button>
-        </div>
-      </div>
-      <div id="filesListContainer" class="box mt-4" style="display:none;">
-        <div id="filesListLoadingSpinner" class="spinner" style="display:none;"></div>
-        <h3 class="title is-5">Files in Script:</h3>
-        <div id="filesListDisplay" class="files-grid"></div>
-      </div>
-
     </div>
   </section>
 
   <script>
-    let currentPolicyData = null; 
-    let currentProposal = null; 
-    let activeRequestId = null; 
-    let isPolicyEditing = false; 
+    let currentPolicyData = null;
+    let currentProposal = null;
+    let activeRequestId = null;
+    let isPolicyEditing = false;
 
     function getEffectiveScriptId() {
         const manualId = document.getElementById('scriptIdManualInput').value.trim();
@@ -311,7 +312,7 @@
         const scriptId = getEffectiveScriptId();
         const editorUrlDisplayDiv = document.getElementById('editor-url-display');
         
-        editorUrlDisplayDiv.innerHTML = ''; 
+        editorUrlDisplayDiv.innerHTML = '';
 
         if (!scriptId) {
             editorUrlDisplayDiv.textContent = 'Apps Script Editor URL: (Script ID needed)';
@@ -361,7 +362,7 @@
       document.getElementById('regeneratePolicyButton').style.display = 'none';
       
       document.getElementById('version-result-container').style.display = 'none';
-      document.getElementById('filesListContainer').style.display = 'none'; // Initialize new container to hidden
+      document.getElementById('filesListContainer').style.display = 'none';
 
       updateEditorUrlDisplay();
 
@@ -374,6 +375,32 @@
           }
         });
       }
+
+      // Tab logic
+      const tabs = document.querySelectorAll('.tabs li');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          tabs.forEach(item => item.classList.remove('is-active'));
+          this.classList.add('is-active');
+
+          const targetId = this.dataset.tabContentId;
+          tabContents.forEach(content => {
+            if (content.id === targetId) {
+              content.style.display = 'block';
+            } else {
+              content.style.display = 'none';
+            }
+          });
+        });
+      });
+
+      // Initially activate the first tab
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+
     });
 
     document.getElementById('scriptIdSelect').addEventListener('change', updateEditorUrlDisplay);
@@ -448,16 +475,16 @@
             }
         }
 
-        const OMIT_THRESHOLD = 8; // If more than this many consecutive equal lines, consider omitting
-        const CONTEXT_LINES = 3;  // Number of lines to show before and after an omitted block
+        const OMIT_THRESHOLD = 8;
+        const CONTEXT_LINES = 3;
 
         let originalLineNumbersHtml = '';
         let originalCodeContentHtml = '';
         let proposedLineNumbersHtml = '';
         let proposedCodeContentHtml = '';
 
-        let currentOriginalLineNum = 1; // Tracks actual line number for original source
-        let currentProposedLineNum = 1; // Tracks actual line number for proposed source
+        let currentOriginalLineNum = 1;
+        let currentProposedLineNum = 1;
 
         let k = 0;
         while (k < diffResult.length) {
@@ -467,15 +494,12 @@
                 let equalBlockStartIndex = k;
                 let equalCount = 0;
 
-                // Find the end of the contiguous equal block
                 while (k < diffResult.length && diffResult[k].type === 'equal') {
                     equalCount++;
                     k++;
                 }
 
-                // If the equal block is long enough to omit
                 if (equalCount > OMIT_THRESHOLD) {
-                    // Render CONTEXT_LINES at the beginning of the equal block
                     for (let l = 0; l < CONTEXT_LINES; l++) {
                         const lineEntry = diffResult[equalBlockStartIndex + l];
                         originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
@@ -486,7 +510,6 @@
                         currentProposedLineNum++;
                     }
 
-                    // Render the omitted block
                     const omittedLinesCount = equalCount - (2 * CONTEXT_LINES);
                     const originalOmittedStart = currentOriginalLineNum;
                     const proposedOmittedStart = currentProposedLineNum;
@@ -499,7 +522,6 @@
                     proposedLineNumbersHtml += `<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLineNum - 1}</div>`;
                     proposedCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
 
-                    // Render CONTEXT_LINES at the end of the equal block
                     for (let l = 0; l < CONTEXT_LINES; l++) {
                         const lineEntry = diffResult[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
                         originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
@@ -511,7 +533,6 @@
                     }
 
                 } else {
-                    // If not long enough to omit, render all lines normally
                     for (let l = 0; l < equalCount; l++) {
                         const lineEntry = diffResult[equalBlockStartIndex + l];
                         originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
@@ -523,9 +544,8 @@
                     }
                 }
             } else {
-                // Handle added, removed, modified lines normally
                 if (entry.type === 'added') {
-                    originalLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for added line in original
+                    originalLineNumbersHtml += `<div>&nbsp;</div>`;
                     originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
                     proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
                     proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
@@ -533,7 +553,7 @@
                 } else if (entry.type === 'removed') {
                     originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
                     originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
-                    proposedLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for removed line in proposed
+                    proposedLineNumbersHtml += `<div>&nbsp;</div>`;
                     proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
                     currentOriginalLineNum++;
                 } else if (entry.type === 'modified') {
@@ -544,7 +564,7 @@
                     currentOriginalLineNum++;
                     currentProposedLineNum++;
                 }
-                k++; // Move to the next entry (only for non-equal types)
+                k++;
             }
         }
 
@@ -556,7 +576,7 @@
 
     function displayFileComparison(originalFiles, proposedFiles) {
       const displayArea = document.getElementById('proposed-files-display');
-      displayArea.innerHTML = ''; 
+      displayArea.innerHTML = '';
 
       if (!proposedFiles || proposedFiles.length === 0) {
         displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
@@ -565,7 +585,7 @@
 
       proposedFiles.forEach(proposedFile => {
           const name = proposedFile.name;
-          const fileType = proposedFile.type; 
+          const fileType = proposedFile.type;
 
           const originalFile = (originalFiles || []).find(f => f.name === name);
           const originalSource = originalFile ? originalFile.source : '';
@@ -597,7 +617,7 @@
               const pre1 = preElements[0];
               const pre2 = preElements[1];
 
-              let isSyncing = false; 
+              let isSyncing = false;
 
               pre1.addEventListener('scroll', function() {
                   if (!isSyncing) {
@@ -669,13 +689,13 @@
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').innerHTML = '';
-      document.getElementById('html-validation-warnings').style.display = 'none'; 
-      document.getElementById('html-validation-warnings').innerHTML = ''; 
+      document.getElementById('html-validation-warnings').style.display = 'none';
+      document.getElementById('html-validation-warnings').innerHTML = '';
       document.getElementById('version-result-container').style.display = 'none';
       document.getElementById('policyEditor').style.display = 'none';
       document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
-      document.getElementById('apply-result-content').innerHTML = ''; // Clear apply result content
+      document.getElementById('apply-result-content').innerHTML = '';
 
       const formData = { scriptId: scriptId, prompt: promptText };
 
@@ -696,7 +716,7 @@
             cancelAiOperationButton.style.display = 'none';
 
             if (response.status === 'policy') {
-              currentPolicyData = response; 
+              currentPolicyData = response;
               document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
               document.getElementById('policy-container').style.display = 'block';
               document.getElementById('acceptPolicyButton').style.display = 'inline-block';
@@ -779,7 +799,7 @@
       document.getElementById('policyEditor').style.display = 'none';
       document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
-      document.getElementById('apply-result-content').innerHTML = ''; // Clear apply result content
+      document.getElementById('apply-result-content').innerHTML = '';
 
       const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt, policy: currentPolicyData.policy };
 
@@ -801,11 +821,11 @@
           cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'proposal') {
-            currentProposal = response; 
+            currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
             const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-            htmlWarningsDiv.innerHTML = ''; 
+            htmlWarningsDiv.innerHTML = '';
             let hasHtmlErrors = false;
 
             response.proposedFiles.forEach(file => {
@@ -828,8 +848,8 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             document.getElementById('proposal-container').style.display = 'block';
-            document.getElementById('applyChangesButton').style.display = 'block'; 
-            regenerateProposalButton.style.display = 'inline-block'; 
+            document.getElementById('applyChangesButton').style.display = 'block';
+            regenerateProposalButton.style.display = 'inline-block';
           } else if (response.status === 'error') {
             const applyResultContent = document.getElementById('apply-result-content');
             applyResultContent.innerHTML = `
@@ -839,7 +859,7 @@
                 </div>
             `;
             document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block'; 
+            document.getElementById('proposal-container').style.display = 'block';
           } else {
             const applyResultContent = document.getElementById('apply-result-content');
             applyResultContent.innerHTML = `
@@ -849,7 +869,7 @@
                 </div>
             `;
             document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block'; 
+            document.getElementById('proposal-container').style.display = 'block';
           }
         })
         .withFailureHandler(function(error) {
@@ -872,13 +892,13 @@
               </div>
           `;
           document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block'; 
+          document.getElementById('proposal-container').style.display = 'block';
         })
         .processPrompt(formData);
     });
 
     document.getElementById('cancelAiOperationButton').addEventListener('click', function() {
-      activeRequestId = null; 
+      activeRequestId = null;
 
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
@@ -892,11 +912,11 @@
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
-      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
+      const applyResultContent = document.getElementById('apply-result-content');
 
       policyLoadingSpinner.style.display = 'none';
       proposalLoadingSpinner.style.display = 'none';
@@ -909,9 +929,9 @@
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '';
-      applyResultContent.innerHTML = ''; // Clear the new element
-      htmlWarningsDiv.style.display = 'none'; 
-      htmlWarningsDiv.innerHTML = ''; 
+      applyResultContent.innerHTML = '';
+      htmlWarningsDiv.style.display = 'none';
+      htmlWarningsDiv.innerHTML = '';
 
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
@@ -922,7 +942,7 @@
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
 
-      generatePolicyButton.style.display = 'inline-block'; 
+      generatePolicyButton.style.display = 'inline-block';
 
       policyEditorTextarea.style.display = 'none';
       togglePolicyEditButton.textContent = 'Edit Policy';
@@ -949,7 +969,7 @@
       const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
-      const regeneratePolicyButton = this; 
+      const regeneratePolicyButton = this;
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
@@ -957,17 +977,17 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
-      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
+      const applyResultContent = document.getElementById('apply-result-content');
 
       policyLoadingSpinner.style.display = 'block';
-      generatePolicyButton.disabled = true; 
-      acceptPolicyButton.disabled = true; 
-      regeneratePolicyButton.disabled = true; 
-      promptInput.readOnly = true; 
+      generatePolicyButton.disabled = true;
+      acceptPolicyButton.disabled = true;
+      regeneratePolicyButton.disabled = true;
+      promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
 
       policyContainer.style.display = 'none';
@@ -979,12 +999,12 @@
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; 
-      htmlWarningsDiv.innerHTML = ''; 
+      htmlWarningsDiv.style.display = 'none';
+      htmlWarningsDiv.innerHTML = '';
       policyEditorTextarea.style.display = 'none';
       togglePolicyEditButton.textContent = 'Edit Policy';
       isPolicyEditing = false;
-      applyResultContent.innerHTML = ''; // Clear the new element
+      applyResultContent.innerHTML = '';
 
       currentPolicyData = null;
       currentProposal = null;
@@ -1014,12 +1034,12 @@
             document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
             policyContainer.style.display = 'block';
             acceptPolicyButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; 
-            generatePolicyButton.style.display = 'none'; 
+            regeneratePolicyButton.style.display = 'inline-block';
+            generatePolicyButton.style.display = 'none';
           } else if (response.status === 'error') {
             document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
             policyContainer.style.display = 'block';
-            generatePolicyButton.style.display = 'inline-block'; 
+            generatePolicyButton.style.display = 'inline-block';
           }
         })
         .withFailureHandler(function(error) {
@@ -1037,7 +1057,7 @@
 
           document.getElementById('ai-policy').textContent = 'Error regenerating policy: ' + error.message;
           policyContainer.style.display = 'block';
-          generatePolicyButton.style.display = 'inline-block'; 
+          generatePolicyButton.style.display = 'inline-block';
         })
         .generateProposalPolicy(formData);
     });
@@ -1058,7 +1078,7 @@
 
       const applyButton = this;
       const applySpinner = document.getElementById('apply-loading-spinner');
-      const applyResultContent = document.getElementById('apply-result-content'); // Changed from apply-result-text
+      const applyResultContent = document.getElementById('apply-result-content');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const autoDeployChecked = document.getElementById('autoDeployAfterApply').checked;
@@ -1073,26 +1093,24 @@
           ${autoDeployChecked ? '<p>Auto-deploying...</p>' : ''}
         </div>
       `;
-      document.getElementById('apply-result-container').style.display = 'block'; 
+      document.getElementById('apply-result-container').style.display = 'block';
 
       google.script.run
         .withSuccessHandler(function(response) {
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
           regenerateProposalButton.disabled = false;
-          applyResultContent.innerHTML = ''; // Clear previous loading message
+          applyResultContent.innerHTML = '';
 
           if (response.status === 'success') {
-            // Main success notification for file changes
             const successNotification = document.createElement('div');
             successNotification.className = 'notification is-success';
             successNotification.innerHTML = `<p><strong>${escapeHtml(response.message)}</strong></p>`;
             applyResultContent.appendChild(successNotification);
 
-            // Auto-deploy result section
-            if (response.deploymentStatus) { 
+            if (response.deploymentStatus) {
               const deployMessageContainer = document.createElement('article');
-              deployMessageContainer.className = 'message mt-3'; // Base Bulma message class
+              deployMessageContainer.className = 'message mt-3';
 
               let headerText = 'Auto-deploy Result';
               let messageBodyContent = '';
@@ -1123,11 +1141,11 @@
                     <li><strong>Status:</strong> Error</li>
                     <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
                 `;
-                if (response.deploymentId) { // Still show ID if it was obtained before error
+                if (response.deploymentId) {
                   messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
                 }
                 messageBodyContent += `</ul>`;
-              } else { // not_attempted
+              } else {
                 messageClass = 'is-warning';
                 headerText += ' (Not Executed)';
                 messageBodyContent += `
@@ -1150,15 +1168,15 @@
               applyResultContent.appendChild(deployMessageContainer);
             }
 
-            currentProposal = null; 
+            currentProposal = null;
             document.getElementById('applyChangesButton').style.display = 'none';
-            regenerateProposalButton.style.display = 'none'; 
+            regenerateProposalButton.style.display = 'none';
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
-            document.getElementById('html-validation-warnings').style.display = 'none'; 
-            document.getElementById('html-validation-warnings').innerHTML = ''; 
+            document.getElementById('html-validation-warnings').style.display = 'none';
+            document.getElementById('html-validation-warnings').innerHTML = '';
             fixApplyErrorsButton.style.display = 'none';
             document.getElementById('autoDeployAfterApply').parentElement.parentElement.style.display = 'none';
-          } else { // response.status === 'error' for apply changes itself
+          } else {
             const errorNotification = document.createElement('div');
             errorNotification.className = 'notification is-danger';
             let errorMessage = `<strong>Failed to Apply Changes:</strong> ${escapeHtml(response.message)}`;
@@ -1201,17 +1219,17 @@
         return;
       }
 
-      const fixButton = this; 
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); 
+      const fixButton = this;
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const generatePolicyButton = document.getElementById('generatePolicyButton'); 
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
-      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
+      const applyResultContent = document.getElementById('apply-result-content');
 
       const requestId = Date.now();
       activeRequestId = requestId;
@@ -1220,15 +1238,15 @@
       generatePolicyButton.disabled = true;
       promptInput.readOnly = true;
       cancelFixErrorsButton.style.display = 'inline-block';
-      regenerateProposalButton.style.display = 'none'; 
+      regenerateProposalButton.style.display = 'none';
       proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
-      applyResultContent.innerHTML = ''; // Clear previous result
+      applyResultContent.innerHTML = '';
       document.getElementById('proposed-files-display').innerHTML = '';
-      htmlWarningsDiv.style.display = 'none'; 
-      htmlWarningsDiv.innerHTML = ''; 
+      htmlWarningsDiv.style.display = 'none';
+      htmlWarningsDiv.innerHTML = '';
 
       saveScriptIdToLocalStorage(scriptId);
 
@@ -1236,13 +1254,13 @@
         .withSuccessHandler(function(response) {
           if (activeRequestId !== requestId) {
             console.log('Ignoring stale success response for fixErrorsFromLogs.');
-            return; 
+            return;
           }
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           fixButton.disabled = false;
-          generatePolicyButton.disabled = false; 
-          promptInput.readOnly = false; 
+          generatePolicyButton.disabled = false;
+          promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
           if (response.status === 'proposal') {
@@ -1273,8 +1291,8 @@
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyButton.style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block'; 
-            fixButton.style.display = 'none'; 
+            regenerateProposalButton.style.display = 'inline-block';
+            fixButton.style.display = 'none';
           } else if (response.status === 'error') {
             const applyResultContent = document.getElementById('apply-result-content');
             applyResultContent.innerHTML = `
@@ -1300,13 +1318,13 @@
         .withFailureHandler(function(error) {
           if (activeRequestId !== requestId) {
             console.log('Ignoring stale failure response for fixErrorsFromLogs.');
-            return; 
+            return;
           }
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           fixButton.disabled = false;
-          generatePolicyButton.disabled = false; 
-          promptInput.readOnly = false; 
+          generatePolicyButton.disabled = false;
+          promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
           const applyResultContent = document.getElementById('apply-result-content');
@@ -1348,16 +1366,16 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
+      const applyResultContent = document.getElementById('apply-result-content');
 
       const requestId = Date.now();
       activeRequestId = requestId;
 
       fixErrorsButton.disabled = true;
       generatePolicyButton.disabled = true;
-      promptInput.readOnly = true; 
+      promptInput.readOnly = true;
       cancelFixErrorsButton.style.display = 'inline-block';
-      regenerateProposalButton.style.display = 'none'; 
+      regenerateProposalButton.style.display = 'none';
       proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
@@ -1365,7 +1383,7 @@
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
-      applyResultContent.innerHTML = ''; // Clear previous result
+      applyResultContent.innerHTML = '';
       htmlWarningsDiv.style.display = 'none';
       htmlWarningsDiv.innerHTML = '';
 
@@ -1375,13 +1393,13 @@
         .withSuccessHandler(function(response) {
           if (activeRequestId !== requestId) {
             console.log('Ignoring stale success response for fixErrorsFromLogs (via form submit).');
-            return; 
+            return;
           }
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           fixErrorsButton.disabled = false;
-          generatePolicyButton.disabled = false; 
-          promptInput.readOnly = false; 
+          generatePolicyButton.disabled = false;
+          promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
           if (response.status === 'proposal') {
@@ -1405,15 +1423,16 @@
 
             if (hasHtmlErrors) {
                 htmlWarningsDiv.style.display = 'block';
-            } else {
+            }
+            else {
                 htmlWarningsDiv.style.display = 'none';
             }
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyButton.style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block'; 
-            fixApplyErrorsButton.style.display = 'none'; 
+            regenerateProposalButton.style.display = 'inline-block';
+            fixApplyErrorsButton.style.display = 'none';
           } else if (response.status === 'error') {
             const applyResultContent = document.getElementById('apply-result-content');
             applyResultContent.innerHTML = `
@@ -1439,13 +1458,13 @@
         .withFailureHandler(function(error) {
           if (activeRequestId !== requestId) {
             console.log('Ignoring stale failure response for fixErrorsFromLogs (via form submit).');
-            return; 
+            return;
           }
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           fixErrorsButton.disabled = false;
-          generatePolicyButton.disabled = false; 
-          promptInput.readOnly = false; 
+          generatePolicyButton.disabled = false;
+          promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
           const applyResultContent = document.getElementById('apply-result-content');
@@ -1462,7 +1481,7 @@
     });
 
     document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
-      activeRequestId = null; 
+      activeRequestId = null;
 
       const fixErrorsButton = document.getElementById('fixErrorsButton');
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
@@ -1471,28 +1490,28 @@
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const generatePolicyButton = document.getElementById('generatePolicyButton'); 
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
-      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
+      const applyResultContent = document.getElementById('apply-result-content');
 
       proposalLoadingSpinner.style.display = 'none';
       fixErrorsButton.disabled = false;
-      generatePolicyButton.disabled = false; 
-      promptInput.readOnly = false; 
+      generatePolicyButton.disabled = false;
+      promptInput.readOnly = false;
       cancelFixErrorsButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none'; 
+      regenerateProposalButton.style.display = 'none';
       
-      currentProposal = null; 
+      currentProposal = null;
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '<p>AI error fix canceled by user.</p>';
-      htmlWarningsDiv.style.display = 'none'; 
-      htmlWarningsDiv.innerHTML = ''; 
-      proposalContainer.style.display = 'block'; 
+      htmlWarningsDiv.style.display = 'none';
+      htmlWarningsDiv.innerHTML = '';
+      proposalContainer.style.display = 'block';
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
-      applyResultContent.innerHTML = ''; // Clear the new element
+      applyResultContent.innerHTML = '';
       fixApplyErrorsButton.style.display = 'none';
     });
 
@@ -1507,20 +1526,20 @@
       const policyText = currentPolicyData.policy;
 
       const regenerateButton = this;
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); 
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const proposalContainer = document.getElementById('proposal-container');
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const promptInput = document.getElementById('prompt');
-      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
+      const applyResultContent = document.getElementById('apply-result-content');
 
       proposalLoadingSpinner.style.display = 'block';
-      regenerateButton.disabled = true; 
-      applyChangesButton.disabled = true; 
-      promptInput.readOnly = true; 
+      regenerateButton.disabled = true;
+      applyChangesButton.disabled = true;
+      promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
 
       proposalContainer.style.display = 'none';
@@ -1529,11 +1548,11 @@
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
-      applyResultContent.innerHTML = ''; // Clear previous result
-      htmlWarningsDiv.style.display = 'none'; 
-      htmlWarningsDiv.innerHTML = ''; 
+      applyResultContent.innerHTML = '';
+      htmlWarningsDiv.style.display = 'none';
+      htmlWarningsDiv.innerHTML = '';
 
-      currentProposal = null; 
+      currentProposal = null;
 
       const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
 
@@ -1551,14 +1570,14 @@
           proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
           applyChangesButton.disabled = false;
-          promptInput.readOnly = false; 
+          promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'proposal') {
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
-            htmlWarningsDiv.innerHTML = ''; 
+            htmlWarningsDiv.innerHTML = '';
             let hasHtmlErrors = false;
 
             response.proposedFiles.forEach(file => {
@@ -1583,7 +1602,7 @@
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyChangesButton.style.display = 'block';
-            regenerateButton.style.display = 'inline-block'; 
+            regenerateButton.style.display = 'inline-block';
           } else if (response.status === 'error') {
             const applyResultContent = document.getElementById('apply-result-content');
             applyResultContent.innerHTML = `
@@ -1593,8 +1612,8 @@
                 </div>
             `;
             applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; 
-            regenerateButton.style.display = 'inline-block'; 
+            proposalContainer.style.display = 'block';
+            regenerateButton.style.display = 'inline-block';
           } else {
             const applyResultContent = document.getElementById('apply-result-content');
             applyResultContent.innerHTML = `
@@ -1604,8 +1623,8 @@
                 </div>
             `;
             applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; 
-            regenerateButton.style.display = 'inline-block'; 
+            proposalContainer.style.display = 'block';
+            regenerateButton.style.display = 'inline-block';
           }
         })
         .withFailureHandler(function(error) {
@@ -1617,7 +1636,7 @@
           proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
           applyChangesButton.disabled = false;
-          promptInput.readOnly = false; 
+          promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
           const applyResultContent = document.getElementById('apply-result-content');
@@ -1628,8 +1647,8 @@
               </div>
           `;
           applyResultContainer.style.display = 'block';
-          proposalContainer.style.display = 'block'; 
-          regenerateButton.style.display = 'inline-block'; 
+          proposalContainer.style.display = 'block';
+          regenerateButton.style.display = 'inline-block';
         })
         .processPrompt(formData);
     });
@@ -1747,7 +1766,7 @@
 
       const targetScriptId = getEffectiveScriptId();
       const libraryScriptId = document.getElementById('libraryScriptId').value.trim();
-      const libraryVersion = document.getElementById('libraryVersion').value.trim(); 
+      const libraryVersion = document.getElementById('libraryVersion').value.trim();
 
       if (!targetScriptId) {
         resultText.textContent = 'Error: Please select or enter a Target Script ID.';
@@ -1766,7 +1785,6 @@
 
       saveScriptIdToLocalStorage(targetScriptId);
 
-      // Moved effectiveVersion definition to outside the success handler
       const effectiveVersion = libraryVersion.trim() === '' ? 'HEAD' : libraryVersion.trim();
 
       google.script.run
@@ -1800,12 +1818,12 @@
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
-      versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>'; 
+      versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>';
       versionsSelect.disabled = true;
       getVersionsButton.disabled = true;
       revertVersionButton.disabled = true;
       versionLoadingSpinner.style.display = 'block';
-      versionResultContainer.style.display = 'none'; 
+      versionResultContainer.style.display = 'none';
 
       if (!scriptId) {
         versionsSelect.innerHTML = '<option value="">-- Select a Script ID first --</option>';
@@ -1817,17 +1835,17 @@
         return;
       }
 
-      saveScriptIdToLocalStorage(scriptId); 
+      saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
         .withSuccessHandler(function(response) {
           versionLoadingSpinner.style.display = 'none';
           getVersionsButton.disabled = false;
           versionsSelect.disabled = false;
-          revertVersionButton.disabled = false; 
+          revertVersionButton.disabled = false;
 
           if (response.status === 'success') {
-            versionsSelect.innerHTML = '<option value="">-- Select a version --</option>'; 
+            versionsSelect.innerHTML = '<option value="">-- Select a version --</option>';
             if (response.versions && response.versions.length > 0) {
               response.versions.forEach(version => {
                 const option = document.createElement('option');
@@ -1839,13 +1857,13 @@
             } else {
               versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
               versionResultText.textContent = response.message;
-              revertVersionButton.disabled = true; 
+              revertVersionButton.disabled = true;
             }
           }
           else {
             versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
             versionResultText.textContent = `Error: ${response.message}`;
-            revertVersionButton.disabled = true; 
+            revertVersionButton.disabled = true;
           }
           versionResultContainer.style.display = 'block';
         })
@@ -1890,10 +1908,10 @@
       getVersionsButton.disabled = true;
       versionSelect.disabled = true;
       versionLoadingSpinner.style.display = 'block';
-      versionResultContainer.style.display = 'block'; 
+      versionResultContainer.style.display = 'block';
       versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
 
-      saveScriptIdToLocalStorage(scriptId); 
+      saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -1922,7 +1940,6 @@
         .revertToVersion(scriptId, parseInt(selectedVersion));
     });
 
-    // New Event Listener for Get Files List Button
     document.getElementById('getFilesListButton').addEventListener('click', function() {
         const scriptId = getEffectiveScriptId();
         const filesListContainer = document.getElementById('filesListContainer');
@@ -1931,7 +1948,7 @@
         const getFilesListButton = this;
 
         filesListContainer.style.display = 'block';
-        filesListDisplay.innerHTML = ''; // Clear previous list
+        filesListDisplay.innerHTML = '';
         filesListLoadingSpinner.style.display = 'block';
         getFilesListButton.disabled = true;
 
@@ -1951,7 +1968,7 @@
 
                 if (response.status === 'success') {
                     if (response.files && response.files.length > 0) {
-                        filesListDisplay.innerHTML = ''; // Ensure it's clear before adding items
+                        filesListDisplay.innerHTML = '';
                         response.files.forEach(file => {
                             const fileItem = document.createElement('div');
                             fileItem.className = 'file-item';

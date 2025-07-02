@@ -7,8 +7,8 @@
     width: 20px;
     height: 20px;
     animation: spin 1s linear infinite;
-    margin: 10px auto; /* Center the spinner */
-    display: block; /* Ensure it's a block element for margin: auto to work */
+    margin: 10px auto;
+    display: block;
   }
 
   @keyframes spin {
@@ -21,17 +21,17 @@
     width: 14px;
     height: 14px;
     margin: 0 5px;
-    display: inline-block; /* Override for inline context */
+    display: inline-block;
     vertical-align: middle;
   }
 
   /* Layout for diff-like display - Custom, keep these */
   .file-comparison {
     display: flex;
-    flex-wrap: wrap; /* Allow items to wrap onto new lines on smaller screens */
+    flex-wrap: wrap;
     margin-bottom: 20px;
     border: 1px solid #ddd;
-    padding: 10px; /* Padding for the container */
+    padding: 10px;
     background-color: #f9f9f9;
   }
 
@@ -41,21 +41,21 @@
     margin-bottom: 10px;
   }
   .file-comparison > div:last-child {
-    margin-bottom: 0; /* No margin after the last stacked panel */
+    margin-bottom: 0;
   }
 
   /* For screens wider than 768px (Bulma's 'tablet' breakpoint) */
   @media screen and (min-width: 769px) {
     .file-comparison {
-      flex-wrap: nowrap; /* Prevent wrapping on larger screens */
-      justify-content: space-between; /* Space between panels when side-by-side */
+      flex-wrap: nowrap;
+      justify-content: space-between;
     }
     .file-comparison > div {
-      flex: 1 1 calc(50% - 5px); /* Each panel takes roughly 50% width, accounting for a small gap */
-      margin-bottom: 0; /* No vertical margin when side-by-side */
+      flex: 1 1 calc(50% - 5px);
+      margin-bottom: 0;
     }
     .file-comparison > div:first-child {
-      margin-right: 5px; /* Small gap between the two panels */
+      margin-right: 5px;
     }
   }
 
@@ -63,12 +63,12 @@
     margin-top: 0;
   }
   .file-comparison pre {
-    height: 250px; /* Increased height for more lines */
+    height: 250px;
     overflow-y: scroll;
-    overflow-x: auto; /* ADDED: Enable horizontal scrolling for long lines */
+    overflow-x: auto;
     border: 1px solid #ccc;
-    display: flex; /* Use flexbox for line numbers */
-    width: 100%; /* Ensure pre fills its parent div's width */
+    display: flex;
+    width: 100%;
   }
 
   /* Styles for line numbers and code content columns - Custom, keep these */
@@ -78,7 +78,7 @@
     text-align: right;
     user-select: none;
     flex-shrink: 0;
-    width: max-content; /* Ensure width is natural based on content */
+    width: max-content;
     border-right: 1px solid #ddd;
     font-family: monospace;
     font-size: 0.9em;
@@ -94,9 +94,9 @@
   /* NEW: Styles for individual line divs within the pre blocks - Custom, keep these */
   .line-numbers-col > div,
   .code-content-col > div {
-    padding: 0 5px; /* Apply padding directly to each line div */
-    min-height: 1.4em; /* Ensure consistent height for each line, including empty ones */
-    box-sizing: border-box; /* Include padding in element's total width/height */
+    padding: 0 5px;
+    min-height: 1.4em;
+    box-sizing: border-box;
   }
 
   /* Specific diff line highlighting - Custom, keep these */
@@ -108,17 +108,17 @@
 
   /* Style for omitted lines in diff view */
   .code-content-col > .diff-line-omitted {
-    background-color: #f0f0f0; /* A light grey to indicate skipped content */
-    color: #666; /* Darker text for readability */
-    font-style: italic; /* Emphasize that it's summary text */
-    text-align: center; /* Center the "N lines omitted" message */
-    border-top: 1px dashed #ccc; /* Visual separation */
-    border-bottom: 1px dashed #ccc; /* Visual separation */
-    padding: 5px; /* Add some padding */
+    background-color: #f0f0f0;
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    border-top: 1px dashed #ccc;
+    border-bottom: 1px dashed #ccc;
+    padding: 5px;
   }
 
   .line-numbers-col > .diff-line-omitted {
-    background-color: #e0e0e0; /* A slightly darker grey for the line number column */
+    background-color: #e0e0e0;
     color: #666;
     font-style: italic;
     text-align: center;
@@ -135,8 +135,8 @@
     border-radius: 4px;
     margin-bottom: 20px;
     line-height: 1.6;
-    word-break: break-word; /* 長い単語やURLがはみ出すのを防ぎ、自動で改行します */
-    overflow-x: auto; /* コンテンツが幅を超える場合に水平スクロールバーを表示します */
+    word-break: break-word;
+    overflow-x: auto;
   }
 
   #ai-policy pre {
@@ -153,18 +153,18 @@
 
   /* Script Logs display area scrolling */
   #log-result {
-    max-height: 300px; /* Adjust as needed */
+    max-height: 300px;
     overflow-y: auto;
-    white-space: pre-wrap; /* Ensure text wraps within the container */
-    word-wrap: break-word; /* For long words */
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 
 /* NEW: Styles for Target Script Files display */
 .files-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Responsive grid */
-  gap: 15px; /* Spacing between grid items */
-  padding: 10px 0; /* Padding around the grid */
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  padding: 10px 0;
 }
 
 .file-item {
@@ -190,34 +190,57 @@
   border-radius: 4px;
   margin-right: 12px;
   text-align: center;
-  min-width: 45px; /* Ensure consistent badge width */
+  min-width: 45px;
   text-transform: uppercase;
-  color: #fff; /* Default text color for badges */
+  color: #fff;
 }
 
 .file-name {
   flex-grow: 1;
-  font-family: monospace; /* Monospace for file names */
+  font-family: monospace;
   font-size: 0.9em;
   color: #333;
-  word-break: break-all; /* Break long file names */
+  word-break: break-all;
 }
 
 /* Specific styles for different file types */
 .file-item.is-server-js .file-type-badge {
-  background-color: #4CAF50; /* Green */
+  background-color: #4CAF50;
 }
 
 .file-item.is-json .file-type-badge {
-  background-color: #FFC107; /* Amber */
-  color: #333; /* Darker text for amber */
+  background-color: #FFC107;
+  color: #333;
 }
 
 .file-item.is-html .file-type-badge {
-  background-color: #2196F3; /* Blue */
+  background-color: #2196F3;
 }
 
 .file-item.is-unknown .file-type-badge {
-  background-color: #9E9E9E; /* Grey */
+  background-color: #9E9E9E;
+}
+
+/* Styles for Bulma Tabs integration */
+.tabs {
+  margin-bottom: 2rem;
+}
+
+.tab-content {
+}
+
+.tab-content .box {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.tab-content h2.title,
+.tab-content h3.title {
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+}
+.tab-content hr {
+  margin: 3rem 0;
+  background-color: #f0f0f0;
+  height: 1px;
 }
 </style>
