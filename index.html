@@ -1195,11 +1195,132 @@
         .fixErrorsFromLogs(scriptId);
     });
 
+    // NEW Event Listener for Fix Errors from Logs (fix-errors-form submit)
+    document.getElementById('fix-errors-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const scriptId = getEffectiveScriptId();
+      if (!scriptId) {
+        document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
+        document.getElementById('apply-result-container').style.display = 'block';
+        return;
+      }
+
+      const fixErrorsButton = document.getElementById('fixErrorsButton');
+      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
+      const proposalContainer = document.getElementById('proposal-container');
+      const applyButton = document.getElementById('applyChangesButton');
+      const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const generatePolicyButton = document.getElementById('generatePolicyButton');
+      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const promptInput = document.getElementById('prompt');
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
+
+      // Generate a unique ID for this request and set it as active
+      const requestId = Date.now();
+      activeRequestId = requestId;
+
+      // UI state management
+      fixErrorsButton.disabled = true;
+      generatePolicyButton.disabled = true;
+      promptInput.readOnly = true; 
+      cancelFixErrorsButton.style.display = 'inline-block';
+      regenerateProposalButton.style.display = 'none'; 
+      proposalLoadingSpinner.style.display = 'block';
+      proposalContainer.style.display = 'none';
+      applyButton.style.display = 'none';
+      applyResultContainer.style.display = 'none';
+      fixApplyErrorsButton.style.display = 'none';
+      document.getElementById('proposed-files-display').innerHTML = '';
+      document.getElementById('proposal-purpose').textContent = '';
+      document.getElementById('apply-result').textContent = '';
+      htmlWarningsDiv.style.display = 'none';
+      htmlWarningsDiv.innerHTML = '';
+
+      saveScriptIdToLocalStorage(scriptId);
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale success response for fixErrorsFromLogs (via form submit).');
+            return; 
+          }
+          activeRequestId = null;
+          proposalLoadingSpinner.style.display = 'none';
+          fixErrorsButton.disabled = false;
+          generatePolicyButton.disabled = false; 
+          promptInput.readOnly = false; 
+          cancelFixErrorsButton.style.display = 'none';
+
+          if (response.status === 'proposal') {
+            currentProposal = response;
+            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
+            
+            // HTML Validation
+            htmlWarningsDiv.innerHTML = '';
+            let hasHtmlErrors = false;
+
+            response.proposedFiles.forEach(file => {
+                if (file.type === 'HTML') {
+                    const validationResult = validateHtml(file.source, file.name);
+                    if (!validationResult.isValid) {
+                        hasHtmlErrors = true;
+                        const warningP = document.createElement('p');
+                        warningP.textContent = validationResult.message;
+                        htmlWarningsDiv.appendChild(warningP);
+                    }
+                }
+            });
+
+            if (hasHtmlErrors) {
+                htmlWarningsDiv.style.display = 'block';
+            } else {
+                htmlWarningsDiv.style.display = 'none';
+            }
+
+            displayFileComparison(response.originalFiles, response.proposedFiles);
+            proposalContainer.style.display = 'block';
+            applyButton.style.display = 'block';
+            regenerateProposalButton.style.display = 'inline-block'; 
+            document.getElementById('apply-result').textContent = response.message;
+            applyResultContainer.style.display = 'block';
+            fixApplyErrorsButton.style.display = 'none'; 
+          } else if (response.status === 'error') {
+            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block';
+          } else {
+            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            applyResultContainer.style.display = 'block';
+            proposalContainer.style.display = 'block';
+          }
+        })
+        .withFailureHandler(function(error) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale failure response for fixErrorsFromLogs (via form submit).');
+            return; 
+          }
+          activeRequestId = null;
+          proposalLoadingSpinner.style.display = 'none';
+          fixErrorsButton.disabled = false;
+          generatePolicyButton.disabled = false; 
+          promptInput.readOnly = false; 
+          cancelFixErrorsButton.style.display = 'none';
+
+          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
+          document.getElementById('apply-result-container').style.display = 'block';
+          document.getElementById('proposal-container').style.display = 'block';
+        })
+        .fixErrorsFromLogs(scriptId);
+    });
+
     // Event Listener for Cancel Fix Errors
     document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
       activeRequestId = null; // Invalidate the current active request
 
-      const fixButton = document.getElementById('fixErrorsButton');
+      const fixErrorsButton = document.getElementById('fixErrorsButton');
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
@@ -1212,7 +1333,7 @@
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
 
       proposalLoadingSpinner.style.display = 'none';
-      fixButton.disabled = false;
+      fixErrorsButton.disabled = false;
       generatePolicyButton.disabled = false; 
       promptInput.readOnly = false; 
       cancelFixErrorsButton.style.display = 'none';
