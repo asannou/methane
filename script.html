@@ -98,7 +98,8 @@
 
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
-      document.getElementById('applyChangesButton').style.display = 'none';
+      document.getElementById('applyChangesNoDeployButton').style.display = 'none';
+      document.getElementById('applyAndDeployButton').style.display = 'none';
       document.getElementById('regenerateProposalButton').style.display = 'none';
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
@@ -429,9 +430,10 @@
       promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
       document.getElementById('regenerateProposalButton').style.display = 'none';
+      document.getElementById('applyChangesNoDeployButton').style.display = 'none';
+      document.getElementById('applyAndDeployButton').style.display = 'none';
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
-      document.getElementById('applyChangesButton').style.display = 'none';
       document.getElementById('apply-result-container').style.display = 'none';
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
@@ -543,6 +545,8 @@
       regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy button during proposal generation
       generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button remains hidden
       regenerateProposalButton.style.display = 'none';
+      document.getElementById('applyChangesNoDeployButton').style.display = 'none';
+      document.getElementById('applyAndDeployButton').style.display = 'none';
       cancelAiOperationButton.style.display = 'inline-block';
       promptInput.readOnly = true;
       
@@ -597,7 +601,8 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             document.getElementById('proposal-container').style.display = 'block';
-            document.getElementById('applyChangesButton').style.display = 'block';
+            document.getElementById('applyChangesNoDeployButton').style.display = 'block';
+            document.getElementById('applyAndDeployButton').style.display = 'block';
             regenerateProposalButton.style.display = 'inline-block';
             regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button again
             generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
@@ -665,7 +670,8 @@
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
       const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const applyChangesButton = document.getElementById('applyChangesButton');
+      const applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
@@ -692,7 +698,8 @@
       proposalContainer.style.display = 'none';
       acceptPolicyButton.style.display = 'none';
       regenerateProposalButton.style.display = 'none';
-      applyChangesButton.style.display = 'none';
+      applyChangesNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
 
@@ -729,7 +736,8 @@
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesButton = document.getElementById('applyChangesButton');
+      const applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
@@ -750,7 +758,8 @@
 
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
-      applyChangesButton.style.display = 'none';
+      applyChangesNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       regenerateProposalButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
@@ -820,7 +829,15 @@
         .generateProposalPolicy(formData);
     });
 
-    document.getElementById('applyChangesButton').addEventListener('click', function() {
+    document.getElementById('applyChangesNoDeployButton').addEventListener('click', function() {
+      handleApplyChanges(false); // No deploy
+    });
+
+    document.getElementById('applyAndDeployButton').addEventListener('click', function() {
+      handleApplyChanges(true); // Deploy
+    });
+
+    function handleApplyChanges(autoDeploy) {
       if (!currentProposal) {
         const applyResultContent = document.getElementById('apply-result-content');
         applyResultContent.innerHTML = `
@@ -834,21 +851,22 @@
 
       saveScriptIdToLocalStorage(currentProposal.scriptId);
 
-      const applyButton = this;
+      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applySpinner = document.getElementById('apply-loading-spinner');
       const applyResultContent = document.getElementById('apply-result-content');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const autoDeployChecked = document.getElementById('autoDeployAfterApply').checked;
 
-      applyButton.disabled = true;
+      applyNoDeployButton.disabled = true;
+      applyAndDeployButton.disabled = true;
       fixApplyErrorsButton.style.display = 'none';
       regenerateProposalButton.disabled = true;
       applySpinner.style.display = 'block';
       applyResultContent.innerHTML = `
         <div class="notification is-info is-light">
           <p>Applying changes...</p>
-          ${autoDeployChecked ? '<p>Auto-deploying...</p>' : ''}
+          ${autoDeploy ? '<p>Auto-deploying...</p>' : ''}
         </div>
       `;
       document.getElementById('apply-result-container').style.display = 'block';
@@ -856,7 +874,8 @@
       google.script.run
         .withSuccessHandler(function(response) {
           applySpinner.style.display = 'none';
-          applyButton.disabled = false;
+          applyNoDeployButton.disabled = false;
+          applyAndDeployButton.disabled = false;
           regenerateProposalButton.disabled = false;
           applyResultContent.innerHTML = '';
 
@@ -866,7 +885,7 @@
             successNotification.innerHTML = `<p><strong>${escapeHtml(response.message)}</strong></p>`;
             applyResultContent.appendChild(successNotification);
 
-            if (response.deploymentStatus) {
+            if (autoDeploy) { // Only show deployment status if auto-deploy was attempted
               const deployMessageContainer = document.createElement('article');
               deployMessageContainer.className = 'message mt-3';
 
@@ -903,12 +922,12 @@
                   messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
                 }
                 messageBodyContent += `</ul>`;
-              } else {
+              } else { // This case should theoretically not be reached if autoDeploy is true
                 messageClass = 'is-warning';
-                headerText += ' (Not Executed)';
+                headerText += ' (Unknown Status)';
                 messageBodyContent += `
                   <ul>
-                    <li><strong>Status:</strong> Not Executed</li>
+                    <li><strong>Status:</strong> Unknown</li>
                     <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
                   </ul>
                 `;
@@ -927,13 +946,13 @@
             }
 
             currentProposal = null;
-            document.getElementById('applyChangesButton').style.display = 'none';
+            applyNoDeployButton.style.display = 'none';
+            applyAndDeployButton.style.display = 'none';
             regenerateProposalButton.style.display = 'none';
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
             document.getElementById('html-validation-warnings').style.display = 'none';
             document.getElementById('html-validation-warnings').innerHTML = '';
             fixApplyErrorsButton.style.display = 'none';
-            document.getElementById('autoDeployAfterApply').parentElement.parentElement.style.display = 'none';
           } else {
             const errorNotification = document.createElement('div');
             errorNotification.className = 'notification is-danger';
@@ -951,7 +970,8 @@
         })
         .withFailureHandler(function(error) {
           applySpinner.style.display = 'none';
-          applyButton.disabled = false;
+          applyNoDeployButton.disabled = false;
+          applyAndDeployButton.disabled = false;
           regenerateProposalButton.disabled = false;
           applyResultContent.innerHTML = `
               <div class="notification is-danger">
@@ -961,8 +981,8 @@
           `;
           fixApplyErrorsButton.style.display = 'block';
         })
-        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked, currentProposal.purpose);
-    });
+        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeploy, currentProposal.purpose);
+    }
 
     document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
@@ -980,7 +1000,8 @@
       const fixButton = this;
       const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
+      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
@@ -1002,7 +1023,8 @@
       regenerateProposalButton.style.display = 'none';
       proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
-      applyButton.style.display = 'none';
+      applyNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       applyResultContent.innerHTML = '';
       document.getElementById('proposed-files-display').innerHTML = '';
@@ -1050,7 +1072,8 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
-            applyButton.style.display = 'block';
+            applyNoDeployButton.style.display = 'block';
+            applyAndDeployButton.style.display = 'block';
             regenerateProposalButton.style.display = 'inline-block';
             fixButton.style.display = 'none';
             regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
@@ -1126,7 +1149,8 @@
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
+      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
@@ -1147,7 +1171,8 @@
       regenerateProposalButton.style.display = 'none';
       proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
-      applyButton.style.display = 'none';
+      applyNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
@@ -1198,7 +1223,8 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
-            applyButton.style.display = 'block';
+            applyNoDeployButton.style.display = 'block';
+            applyAndDeployButton.style.display = 'block';
             regenerateProposalButton.style.display = 'inline-block';
             fixApplyErrorsButton.style.display = 'none';
             regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
@@ -1262,7 +1288,8 @@
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyButton = document.getElementById('applyChangesButton');
+      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
@@ -1284,7 +1311,8 @@
       htmlWarningsDiv.style.display = 'none';
       htmlWarningsDiv.innerHTML = '';
       proposalContainer.style.display = 'block';
-      applyButton.style.display = 'none';
+      applyNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       applyResultContent.innerHTML = '';
       fixApplyErrorsButton.style.display = 'none';
@@ -1308,7 +1336,8 @@
       const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesButton = document.getElementById('applyChangesButton');
+      const applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
@@ -1319,12 +1348,14 @@
 
       proposalLoadingSpinner.style.display = 'block';
       regenerateButton.disabled = true;
-      applyChangesButton.disabled = true;
+      applyChangesNoDeployButton.disabled = true;
+      applyAndDeployButton.disabled = true;
       promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
 
       proposalContainer.style.display = 'none';
-      applyChangesButton.style.display = 'none';
+      applyChangesNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
@@ -1350,7 +1381,8 @@
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
-          applyChangesButton.disabled = false;
+          applyChangesNoDeployButton.disabled = false;
+          applyAndDeployButton.disabled = false;
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
@@ -1382,7 +1414,8 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
-            applyChangesButton.style.display = 'block';
+            applyChangesNoDeployButton.style.display = 'block';
+            applyAndDeployButton.style.display = 'block';
             regenerateButton.style.display = 'inline-block';
             regeneratePolicyButton.style.display = 'inline-block'; // Keep Regenerate Policy button visible
             generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
@@ -1422,7 +1455,8 @@
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
-          applyChangesButton.disabled = false;
+          applyChangesNoDeployButton.disabled = false;
+          applyAndDeployButton.disabled = false;
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 

@@ -99,15 +99,12 @@
           <p class="content">The following changes have been proposed by the AI. Please review the content and click the "Apply Changes" button to apply if there are no issues.</p>
           <div id="proposed-files-display">
           </div>
-          <div class="field mt-3">
-            <label class="checkbox">
-              <input type="checkbox" id="autoDeployAfterApply" checked>
-              Auto-deploy after applying
-            </label>
-          </div>
           <div class="field is-grouped mt-4">
             <div class="control">
-              <button type="button" id="applyChangesButton" class="button is-primary" style="display:none;">Apply Changes</button>
+              <button type="button" id="applyChangesNoDeployButton" class="button is-primary" style="display:none;">Apply Changes (No Deploy)</button>
+            </div>
+            <div class="control">
+              <button type="button" id="applyAndDeployButton" class="button is-success" style="display:none;">Apply & Deploy</button>
             </div>
             <div class="control">
               <button type="button" id="regenerateProposalButton" class="button is-info is-light" style="display:none;">Regenerate Proposal</button>
