@@ -432,43 +432,105 @@
             }
         }
 
+        const OMIT_THRESHOLD = 8; // If more than this many consecutive equal lines, consider omitting
+        const CONTEXT_LINES = 3;  // Number of lines to show before and after an omitted block
+
         let originalLineNumbersHtml = '';
         let originalCodeContentHtml = '';
         let proposedLineNumbersHtml = '';
         let proposedCodeContentHtml = '';
 
-        let originalLineNum = 0;
-        let proposedLineNum = 0;
+        let currentOriginalLineNum = 1; // Tracks actual line number for original source
+        let currentProposedLineNum = 1; // Tracks actual line number for proposed source
 
-        diffResult.forEach(entry => {
+        let k = 0;
+        while (k < diffResult.length) {
+            const entry = diffResult[k];
+
             if (entry.type === 'equal') {
-                originalLineNum++;
-                proposedLineNum++;
-                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
-                originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.proposed)}</div>`;
-            } else if (entry.type === 'added') {
-                proposedLineNum++;
-                originalLineNumbersHtml += `<div>&nbsp;</div>`;
-                originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
-                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
-            } else if (entry.type === 'removed') {
-                originalLineNum++;
-                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
-                originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>&nbsp;</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
-            } else if (entry.type === 'modified') {
-                originalLineNum++;
-                proposedLineNum++;
-                originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
-                originalCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
-                proposedCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.proposed)}</div>`;
+                let equalBlockStartIndex = k;
+                let equalCount = 0;
+
+                // Find the end of the contiguous equal block
+                while (k < diffResult.length && diffResult[k].type === 'equal') {
+                    equalCount++;
+                    k++;
+                }
+
+                // If the equal block is long enough to omit
+                if (equalCount > OMIT_THRESHOLD) {
+                    // Render CONTEXT_LINES at the beginning of the equal block
+                    for (let l = 0; l < CONTEXT_LINES; l++) {
+                        const lineEntry = diffResult[equalBlockStartIndex + l];
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.proposed)}</div>`;
+                        currentOriginalLineNum++;
+                        currentProposedLineNum++;
+                    }
+
+                    // Render the omitted block
+                    const omittedLinesCount = equalCount - (2 * CONTEXT_LINES);
+                    const originalOmittedStart = currentOriginalLineNum;
+                    const proposedOmittedStart = currentProposedLineNum;
+
+                    currentOriginalLineNum += omittedLinesCount;
+                    currentProposedLineNum += omittedLinesCount;
+
+                    originalLineNumbersHtml += `<div class="diff-line-omitted">${originalOmittedStart}-${currentOriginalLineNum - 1}</div>`;
+                    originalCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
+                    proposedLineNumbersHtml += `<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLineNum - 1}</div>`;
+                    proposedCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
+
+                    // Render CONTEXT_LINES at the end of the equal block
+                    for (let l = 0; l < CONTEXT_LINES; l++) {
+                        const lineEntry = diffResult[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.proposed)}</div>`;
+                        currentOriginalLineNum++;
+                        currentProposedLineNum++;
+                    }
+
+                } else {
+                    // If not long enough to omit, render all lines normally
+                    for (let l = 0; l < equalCount; l++) {
+                        const lineEntry = diffResult[equalBlockStartIndex + l];
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.proposed)}</div>`;
+                        currentOriginalLineNum++;
+                        currentProposedLineNum++;
+                    }
+                }
+            } else {
+                // Handle added, removed, modified lines normally
+                if (entry.type === 'added') {
+                    originalLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for added line in original
+                    originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
+                    proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                    proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
+                    currentProposedLineNum++;
+                } else if (entry.type === 'removed') {
+                    originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                    originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
+                    proposedLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for removed line in proposed
+                    proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
+                    currentOriginalLineNum++;
+                } else if (entry.type === 'modified') {
+                    originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                    originalCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.original)}</div>`;
+                    proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                    proposedCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.proposed)}</div>`;
+                    currentOriginalLineNum++;
+                    currentProposedLineNum++;
+                }
+                k++; // Move to the next entry (only for non-equal types)
             }
-        });
+        }
 
         return {
             originalLineNumbersHtml, originalCodeContentHtml,

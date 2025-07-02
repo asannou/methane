@@ -106,6 +106,27 @@
   .code-content-col > .diff-line-modified { background-color: #fffacd; }
   .code-content-col > .diff-line-empty-fill { background-color: transparent; }
 
+  /* Style for omitted lines in diff view */
+  .code-content-col > .diff-line-omitted {
+    background-color: #f0f0f0; /* A light grey to indicate skipped content */
+    color: #666; /* Darker text for readability */
+    font-style: italic; /* Emphasize that it's summary text */
+    text-align: center; /* Center the "N lines omitted" message */
+    border-top: 1px dashed #ccc; /* Visual separation */
+    border-bottom: 1px dashed #ccc; /* Visual separation */
+    padding: 5px; /* Add some padding */
+  }
+
+  .line-numbers-col > .diff-line-omitted {
+    background-color: #e0e0e0; /* A slightly darker grey for the line number column */
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    border-top: 1px dashed #bbb;
+    border-bottom: 1px dashed #bbb;
+    padding: 5px;
+  }
+
   /* Styles for Markdown rendered content in ai-policy div */
   #ai-policy {
     background-color: #ffffff;
