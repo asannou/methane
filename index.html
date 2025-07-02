@@ -240,12 +240,11 @@
   </section>
 
   <script>
-    let currentPolicyData = null; // Stores AI policy and original prompt
-    let currentProposal = null; // Store the AI's code proposal globally for applyChanges
-    let activeRequestId = null; // Global flag for the currently active request ID
-    let isPolicyEditing = false; // NEW: State variable for policy editing mode
+    let currentPolicyData = null; 
+    let currentProposal = null; 
+    let activeRequestId = null; 
+    let isPolicyEditing = false; 
 
-    // Helper to get the effective script ID
     function getEffectiveScriptId() {
         const manualId = document.getElementById('scriptIdManualInput').value.trim();
         if (manualId) {
@@ -254,25 +253,21 @@
         return document.getElementById('scriptIdSelect').value.trim();
     }
 
-    // --- Helper function to save scriptId to localStorage ---
     function saveScriptIdToLocalStorage(id) {
         if (id) {
             localStorage.setItem('targetScriptId', id);
         }
     }
 
-    // Helper function to save gcpProjectId to localStorage
     function saveGcpProjectIdToLocalStorage(id) {
         if (id) {
             localStorage.setItem('gcpProjectId', id);
         }
     }
 
-    // Function to load projects and populate the dropdown
     function loadProjectsIntoDropdown(selectedId = null) {
         const scriptIdSelect = document.getElementById('scriptIdSelect');
 
-        // Clear existing options except the placeholder
         scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
 
         google.script.run
@@ -285,7 +280,7 @@
                         scriptIdSelect.appendChild(option);
                     });
                     if (selectedId) {
-                        scriptIdSelect.value = selectedId; // Set selected if saved ID was passed
+                        scriptIdSelect.value = selectedId;
                     }
                 } else {
                     alert('Failed to load Apps Script projects: ' + response.message);
@@ -297,12 +292,11 @@
             .listAppsScriptProjects();
     }
 
-    // Function to display the Apps Script Editor URL based on current Script ID
     function updateEditorUrlDisplay() {
         const scriptId = getEffectiveScriptId();
         const editorUrlDisplayDiv = document.getElementById('editor-url-display');
         
-        editorUrlDisplayDiv.innerHTML = ''; // Clear previous content
+        editorUrlDisplayDiv.innerHTML = ''; 
 
         if (!scriptId) {
             editorUrlDisplayDiv.textContent = 'Apps Script Editor URL: (Script ID needed)';
@@ -311,7 +305,6 @@
 
         editorUrlDisplayDiv.innerHTML = 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...';
 
-        // Save scriptId to localStorage every time it's used/updated
         saveScriptIdToLocalStorage(scriptId);
 
         google.script.run
@@ -328,7 +321,6 @@
             .getScriptEditorUrl(scriptId);
     }
 
-    // --- Load scriptId from localStorage on page load ---
     document.addEventListener('DOMContentLoaded', function() {
       const scriptIdManualInput = document.getElementById('scriptIdManualInput');
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
@@ -338,16 +330,13 @@
         scriptIdManualInput.value = savedScriptId;
       }
 
-      // Load GCP Project ID from localStorage
       const savedGcpProjectId = localStorage.getItem('gcpProjectId');
       if (savedGcpProjectId) {
         gcpProjectIdInput.value = savedGcpProjectId;
       }
 
-      // Auto-load projects on page load
-      loadProjectsIntoDropdown(savedScriptId); // Pass the saved ID so it tries to pre-select
+      loadProjectsIntoDropdown(savedScriptId);
 
-      // Initial UI state setup
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
       document.getElementById('applyChangesButton').style.display = 'none';
@@ -356,31 +345,24 @@
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('regeneratePolicyButton').style.display = 'none';
       
-      // NEW: Version control UI initial state
       document.getElementById('version-result-container').style.display = 'none';
 
-      // Initial display of editor URL
       updateEditorUrlDisplay();
 
-      // Add Ctrl+Enter to submit functionality for the prompt textarea
       const promptTextarea = document.getElementById('prompt');
       if (promptTextarea) {
         promptTextarea.addEventListener('keydown', function(event) {
-          // Check for Ctrl+Enter (Windows/Linux) or Cmd+Enter (macOS)
           if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-            event.preventDefault(); // Prevent new line in textarea
-            // Simulate submission of the form via the 'Generate Policy' button
+            event.preventDefault();
             document.getElementById('agent-form').requestSubmit(document.getElementById('generatePolicyButton'));
           }
         });
       }
     });
 
-    // NEW: Add event listeners for script ID changes
     document.getElementById('scriptIdSelect').addEventListener('change', updateEditorUrlDisplay);
     document.getElementById('scriptIdManualInput').addEventListener('input', updateEditorUrlDisplay);
 
-    // NEW: Function to validate HTML content using DOMParser
     function validateHtml(htmlString, fileName) {
         console.log(`HTML validation started for file: ${fileName}`);
         const parser = new DOMParser();
@@ -388,7 +370,6 @@
         const parseError = doc.querySelector('parsererror');
 
         if (parseError) {
-            // DOMParser finds errors and inserts <parsererror> in the parsed document.
             const errorMessage = parseError.textContent;
             console.error(`HTML validation failed in ${fileName}:`, errorMessage);
             return { isValid: false, message: `Syntax error found in HTML file "${fileName}": ${errorMessage}` };
@@ -397,28 +378,24 @@
         return { isValid: true };
     }
 
-    // Function to generate the formatted HTML for both original and proposed panels for a single file.
-    // This function implements a simplified line-by-line diff algorithm to detect additions, deletions, and modifications.
     function generateFormattedDiffPanels(originalSource, proposedSource) {
         const originalLines = originalSource ? originalSource.split('\n') : [];
         const proposedLines = proposedSource ? proposedSource.split('\n') : [];
 
         const diffResult = [];
-        let i = 0; // Pointer for originalLines
-        let j = 0; // Pointer for proposedLines
-        const lookAheadWindow = 5; // How many lines to look ahead for a match
+        let i = 0;
+        let j = 0;
+        const lookAheadWindow = 5;
 
         while (i < originalLines.length || j < proposedLines.length) {
             const currentOriginalLine = originalLines[i];
             const currentProposedLine = proposedLines[j];
 
             if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
-                // Lines are identical, emit an 'equal' diff entry
                 diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
                 i++;
                 j++;
             } else {
-                // Lines are different. Need to determine if it's an addition, deletion, or modification.
                 let originalFoundInProposedAhead = -1;
                 for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
                     if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
@@ -436,33 +413,25 @@
                 }
 
                 if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
-                    // Neither line found ahead in the other stream within window, implies modification.
                     diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
                     i++;
                     j++;
                 } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
-                    // Original line found in proposed, and either proposed not found in original OR original's path is shorter
-                    // This means current proposed line is an addition
                     diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                     j++;
                 } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
-                    // Proposed line found in original, and either original not found in proposed OR proposed's path is shorter
-                    // This means current original line is a deletion
                     diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                     i++;
                 } else if (i < originalLines.length) {
-                    // Remaining original lines are removed
                     diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                     i++;
                 } else if (j < proposedLines.length) {
-                    // Remaining proposed lines are added
                     diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                     j++;
                 }
             }
         }
 
-        // Construct HTML from diffResult
         let originalLineNumbersHtml = '';
         let originalCodeContentHtml = '';
         let proposedLineNumbersHtml = '';
@@ -481,16 +450,16 @@
                 proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(entry.proposed)}</div>`;
             } else if (entry.type === 'added') {
                 proposedLineNum++;
-                originalLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for original
-                originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`; // Fill for alignment
+                originalLineNumbersHtml += `<div>&nbsp;</div>`;
+                originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
                 proposedLineNumbersHtml += `<div>${proposedLineNum}</div>`;
                 proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
             } else if (entry.type === 'removed') {
                 originalLineNum++;
                 originalLineNumbersHtml += `<div>${originalLineNum}</div>`;
                 originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
-                proposedLineNumbersHtml += `<div>&nbsp;</div>`; // Empty line number for proposed
-                proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`; // Fill for alignment
+                proposedLineNumbersHtml += `<div>&nbsp;</div>`;
+                proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
             } else if (entry.type === 'modified') {
                 originalLineNum++;
                 proposedLineNum++;
@@ -507,10 +476,9 @@
         };
     }
 
-    // Function to display file comparison
     function displayFileComparison(originalFiles, proposedFiles) {
       const displayArea = document.getElementById('proposed-files-display');
-      displayArea.innerHTML = ''; // Clear previous content
+      displayArea.innerHTML = ''; 
 
       if (!proposedFiles || proposedFiles.length === 0) {
         displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
@@ -519,7 +487,7 @@
 
       proposedFiles.forEach(proposedFile => {
           const name = proposedFile.name;
-          const fileType = proposedFile.type; // Get type from the proposed file
+          const fileType = proposedFile.type; 
 
           const originalFile = (originalFiles || []).find(f => f.name === name);
           const originalSource = originalFile ? originalFile.source : '';
@@ -530,14 +498,12 @@
           const fileComparisonDiv = document.createElement('div');
           fileComparisonDiv.className = 'file-comparison';
 
-          // Original content display
           const originalContentDiv = document.createElement('div');
           originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
               <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
               <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
           </pre>`;
           
-          // Proposed content display
           const proposedContentDiv = document.createElement('div');
           proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
               <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
@@ -548,13 +514,12 @@
           fileComparisonDiv.appendChild(proposedContentDiv);
           displayArea.appendChild(fileComparisonDiv);
 
-          // Scroll synchronization
           const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
           if (preElements.length === 2) {
               const pre1 = preElements[0];
               const pre2 = preElements[1];
 
-              let isSyncing = false; // Flag to prevent infinite recursion between scroll events
+              let isSyncing = false; 
 
               pre1.addEventListener('scroll', function() {
                   if (!isSyncing) {
@@ -589,7 +554,6 @@
       return div.innerHTML;
     }
 
-    // Main form submission handler for both policy generation and proposal generation
     document.getElementById('agent-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const submitterId = e.submitter.id;
@@ -612,16 +576,14 @@
         return;
       }
 
-      // Save scriptId to localStorage regardless of operation
       saveScriptIdToLocalStorage(scriptId);
 
-      // Reset UI for new operation
       policyLoadingSpinner.style.display = 'block';
       generatePolicyButton.disabled = true;
-      promptInput.readOnly = true; // Disable prompt input during operation
+      promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button
-      document.getElementById('regenerateProposalButton').style.display = 'none'; // Hide new button
+      regeneratePolicyButton.style.display = 'none';
+      document.getElementById('regenerateProposalButton').style.display = 'none';
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
       document.getElementById('applyChangesButton').style.display = 'none';
@@ -629,18 +591,15 @@
       document.getElementById('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').innerHTML = '';
-      document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
-      document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
-      // NEW: Hide version control result too
+      document.getElementById('html-validation-warnings').style.display = 'none'; 
+      document.getElementById('html-validation-warnings').innerHTML = ''; 
       document.getElementById('version-result-container').style.display = 'none';
-      // NEW: Hide policy editor
       document.getElementById('policyEditor').style.display = 'none';
       document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
 
       const formData = { scriptId: scriptId, prompt: promptText };
 
-      // Generate a unique ID for this request and set it as active
       const requestId = Date.now();
       activeRequestId = requestId;
 
@@ -655,21 +614,20 @@
             activeRequestId = null;
             policyLoadingSpinner.style.display = 'none';
             generatePolicyButton.disabled = false;
-            // promptInput.readOnly = false; // Re-enable prompt input after policy generation
             cancelAiOperationButton.style.display = 'none';
 
             if (response.status === 'policy') {
-              currentPolicyData = response; // Store policy data
+              currentPolicyData = response; 
               document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
               document.getElementById('policy-container').style.display = 'block';
               document.getElementById('acceptPolicyButton').style.display = 'inline-block';
-              regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button
-              generatePolicyButton.style.display = 'none'; // Hide generate policy button
-              promptInput.readOnly = false; // Enable prompt for potential editing
+              regeneratePolicyButton.style.display = 'inline-block';
+              generatePolicyButton.style.display = 'none';
+              promptInput.readOnly = false;
             } else if (response.status === 'error') {
               document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
               document.getElementById('policy-container').style.display = 'block';
-              promptInput.readOnly = false; // Enable prompt on error
+              promptInput.readOnly = false;
             }
           })
           .withFailureHandler(function(error) {
@@ -689,7 +647,6 @@
       }
     });
 
-    // NEW: Event Listener for Toggle Policy Edit button
     document.getElementById('togglePolicyEditButton').addEventListener('click', function() {
       const aiPolicyDiv = document.getElementById('ai-policy');
       const policyEditorTextarea = document.getElementById('policyEditor');
@@ -697,30 +654,27 @@
       const promptInput = document.getElementById('prompt');
 
       if (isPolicyEditing) {
-        // Exit edit mode
-        currentPolicyData.policy = policyEditorTextarea.value; // Save edited policy
-        aiPolicyDiv.innerHTML = marked.parse(currentPolicyData.policy); // Render Markdown
+        currentPolicyData.policy = policyEditorTextarea.value;
+        aiPolicyDiv.innerHTML = marked.parse(currentPolicyData.policy);
         aiPolicyDiv.style.display = 'block';
         policyEditorTextarea.style.display = 'none';
         toggleButton.textContent = 'Edit Policy';
-        promptInput.readOnly = false; // Re-enable prompt after editing policy
+        promptInput.readOnly = false;
       } else {
-        // Enter edit mode
         if (!currentPolicyData || !currentPolicyData.policy) {
           alert('No policy to edit. Please generate a policy first.');
           return;
         }
-        policyEditorTextarea.value = currentPolicyData.policy; // Load raw policy text
+        policyEditorTextarea.value = currentPolicyData.policy;
         aiPolicyDiv.style.display = 'none';
         policyEditorTextarea.style.display = 'block';
         toggleButton.textContent = 'Finish Editing';
-        promptInput.readOnly = false; // Ensure prompt is editable during policy editing
+        promptInput.readOnly = false;
         policyEditorTextarea.focus();
       }
       isPolicyEditing = !isPolicyEditing;
     });
 
-    // Event Listener for Accept Policy & Propose Changes button
     document.getElementById('acceptPolicyButton').addEventListener('click', function() {
       if (!currentPolicyData) {
         alert('No policy to accept. Please generate a policy first.');
@@ -735,16 +689,14 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
 
-      // Reset UI for proposal generation
       proposalLoadingSpinner.style.display = 'block';
       acceptPolicyButton.disabled = true;
-      acceptPolicyButton.style.display = 'none'; // Hide accept policy button
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate policy button
-      regenerateProposalButton.style.display = 'none'; // Hide new button during generation
+      acceptPolicyButton.style.display = 'none';
+      regeneratePolicyButton.style.display = 'none';
+      regenerateProposalButton.style.display = 'none';
       cancelAiOperationButton.style.display = 'inline-block';
-      promptInput.readOnly = true; // Disable prompt during proposal generation
+      promptInput.readOnly = true;
       
-      // NEW: Hide policy editor if visible
       document.getElementById('policyEditor').style.display = 'none';
       document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
@@ -764,17 +716,16 @@
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           acceptPolicyButton.disabled = false;
-          generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
-          promptInput.readOnly = false; // Re-enable prompt input
+          generatePolicyButton.style.display = 'inline-block';
+          promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'proposal') {
-            currentProposal = response; // Store the proposal
+            currentProposal = response; 
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
-            // NEW: HTML Validation
             const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
+            htmlWarningsDiv.innerHTML = ''; 
             let hasHtmlErrors = false;
 
             response.proposedFiles.forEach(file => {
@@ -797,18 +748,16 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             document.getElementById('proposal-container').style.display = 'block';
-            document.getElementById('applyChangesButton').style.display = 'block'; // Show apply button
-            regenerateProposalButton.style.display = 'inline-block'; // Show regenerate proposal button
-            document.getElementById('apply-result').textContent = response.message; // Display initial message
-            document.getElementById('apply-result-container').style.display = 'block';
+            document.getElementById('applyChangesButton').style.display = 'block'; 
+            regenerateProposalButton.style.display = 'inline-block'; 
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
             document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block'; // Show container to display error
+            document.getElementById('proposal-container').style.display = 'block'; 
           } else {
             document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
             document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block'; // Show container to display error
+            document.getElementById('proposal-container').style.display = 'block'; 
           }
         })
         .withFailureHandler(function(error) {
@@ -819,20 +768,19 @@
           activeRequestId = null;
           proposalLoadingSpinner.style.display = 'none';
           acceptPolicyButton.disabled = false;
-          generatePolicyButton.style.display = 'inline-block'; // Show generate policy button again
+          generatePolicyButton.style.display = 'inline-block';
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
           document.getElementById('apply-result').textContent = 'Error calling AI: ' + error.message;
           document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block'; // Show container for error
+          document.getElementById('proposal-container').style.display = 'block'; 
         })
         .processPrompt(formData);
     });
 
-    // Event Listener for general AI operation cancel button
     document.getElementById('cancelAiOperationButton').addEventListener('click', function() {
-      activeRequestId = null; // Invalidate the current active request
+      activeRequestId = null; 
 
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
@@ -846,7 +794,7 @@
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
@@ -854,17 +802,17 @@
       policyLoadingSpinner.style.display = 'none';
       proposalLoadingSpinner.style.display = 'none';
       generatePolicyButton.disabled = false;
-      promptInput.readOnly = false; // Always re-enable prompt on cancel
+      promptInput.readOnly = false;
       cancelAiOperationButton.style.display = 'none';
 
-      currentPolicyData = null; // Clear any partial policy
-      currentProposal = null; // Clear any partial proposal
+      currentPolicyData = null;
+      currentProposal = null;
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('apply-result').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
+      htmlWarningsDiv.style.display = 'none'; 
+      htmlWarningsDiv.innerHTML = ''; 
 
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
@@ -875,9 +823,8 @@
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
 
-      generatePolicyButton.style.display = 'inline-block'; // Ensure primary button is visible
+      generatePolicyButton.style.display = 'inline-block'; 
 
-      // NEW: Reset policy editing state
       policyEditorTextarea.style.display = 'none';
       togglePolicyEditButton.textContent = 'Edit Policy';
       isPolicyEditing = false;
@@ -885,7 +832,6 @@
       alert('AI operation canceled by user.');
     });
 
-    // Event Listener for Regenerate Policy button
     document.getElementById('regeneratePolicyButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
       const promptText = document.getElementById('prompt').value;
@@ -901,11 +847,10 @@
 
       saveScriptIdToLocalStorage(scriptId);
 
-      // UI Reset and loading state
       const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const acceptPolicyButton = document.getElementById('acceptPolicyButton');
-      const regeneratePolicyButton = this; // The button itself
+      const regeneratePolicyButton = this; 
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
@@ -913,19 +858,18 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
 
       policyLoadingSpinner.style.display = 'block';
-      generatePolicyButton.disabled = true; // Disable original generate button
-      acceptPolicyButton.disabled = true; // Disable accept button
-      regeneratePolicyButton.disabled = true; // Disable regenerate button
-      promptInput.readOnly = true; // Disable prompt during operation
+      generatePolicyButton.disabled = true; 
+      acceptPolicyButton.disabled = true; 
+      regeneratePolicyButton.disabled = true; 
+      promptInput.readOnly = true; 
       cancelAiOperationButton.style.display = 'inline-block';
 
-      // Hide all related sections and clear content
       policyContainer.style.display = 'none';
       proposalContainer.style.display = 'none';
       applyChangesButton.style.display = 'none';
@@ -935,15 +879,14 @@
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
-      // NEW: Hide policy editor
+      htmlWarningsDiv.style.display = 'none'; 
+      htmlWarningsDiv.innerHTML = ''; 
       policyEditorTextarea.style.display = 'none';
       togglePolicyEditButton.textContent = 'Edit Policy';
       isPolicyEditing = false;
 
-      currentPolicyData = null; // Clear previous policy data
-      currentProposal = null; // Clear previous proposal data
+      currentPolicyData = null;
+      currentProposal = null;
 
       const formData = { scriptId: scriptId, prompt: promptText };
 
@@ -959,10 +902,10 @@
           }
           activeRequestId = null;
           policyLoadingSpinner.style.display = 'none';
-          generatePolicyButton.disabled = false; // Re-enable original generate button
-          acceptPolicyButton.disabled = false; // Re-enable accept button
-          regeneratePolicyButton.disabled = false; // Re-enable regenerate button
-          promptInput.readOnly = false; // Re-enable prompt after policy generation
+          generatePolicyButton.disabled = false;
+          acceptPolicyButton.disabled = false;
+          regeneratePolicyButton.disabled = false;
+          promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'policy') {
@@ -970,12 +913,12 @@
             document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
             policyContainer.style.display = 'block';
             acceptPolicyButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show regenerate button again
-            generatePolicyButton.style.display = 'none'; // Keep original generate button hidden
+            regeneratePolicyButton.style.display = 'inline-block'; 
+            generatePolicyButton.style.display = 'none'; 
           } else if (response.status === 'error') {
             document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
             policyContainer.style.display = 'block';
-            generatePolicyButton.style.display = 'inline-block'; // Show original generate button on error
+            generatePolicyButton.style.display = 'inline-block'; 
           }
         })
         .withFailureHandler(function(error) {
@@ -993,12 +936,11 @@
 
           document.getElementById('ai-policy').textContent = 'Error regenerating policy: ' + error.message;
           policyContainer.style.display = 'block';
-          generatePolicyButton.style.display = 'inline-block'; // Show original generate button on error
+          generatePolicyButton.style.display = 'inline-block'; 
         })
         .generateProposalPolicy(formData);
     });
 
-    // Event Listener for Apply Changes
     document.getElementById('applyChangesButton').addEventListener('click', function() {
       if (!currentProposal) {
         document.getElementById('apply-result').textContent = 'Error: No proposal to apply.';
@@ -1006,7 +948,6 @@
         return;
       }
 
-      // --- Save scriptId to localStorage before applying changes ---
       saveScriptIdToLocalStorage(currentProposal.scriptId);
 
       const applyButton = this;
@@ -1018,12 +959,13 @@
 
       applyButton.disabled = true;
       fixApplyErrorsButton.style.display = 'none';
-      regenerateProposalButton.disabled = true; // Disable regenerate proposal button
+      regenerateProposalButton.disabled = true;
       applySpinner.style.display = 'block';
       applyResultText.textContent = 'Applying changes...';
       if (autoDeployChecked) {
           applyResultText.textContent += '\nAuto-deploying...';
       }
+      document.getElementById('apply-result-container').style.display = 'block'; 
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -1033,7 +975,7 @@
           
           if (response.status === 'success') {
             let message = response.message;
-            if (response.deploymentStatus) { // Check if deployment attempt was made
+            if (response.deploymentStatus) { 
               message += `<br><br><strong>Auto-deploy Result:</strong><br>`;
               if (response.deploymentStatus === 'success') {
                 message += `Status: Success<br>Message: ${response.deploymentMessage}`;
@@ -1046,18 +988,18 @@
               }
             } else if (response.deploymentStatus === 'error') {
               message += `Status: Error<br>Message: ${response.deploymentMessage}`; 
-            } else { // not_attempted
+            } else { 
               message += `Status: Not Executed<br>Message: ${response.deploymentMessage}`; 
             }
-            applyResultText.innerHTML = message; // Use innerHTML because of HTML links
-            currentProposal = null; // Clear proposal
+            applyResultText.innerHTML = message; 
+            currentProposal = null; 
             document.getElementById('applyChangesButton').style.display = 'none';
-            regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button after applying
+            regenerateProposalButton.style.display = 'none'; 
             document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
-            document.getElementById('html-validation-warnings').style.display = 'none'; // NEW: Hide HTML warnings
-            document.getElementById('html-validation-warnings').innerHTML = ''; // NEW: Clear HTML warnings
+            document.getElementById('html-validation-warnings').style.display = 'none'; 
+            document.getElementById('html-validation-warnings').innerHTML = ''; 
             fixApplyErrorsButton.style.display = 'none';
-          } else { // response.status === 'error'
+          } else { 
             let errorMessage = response.message;
             if (response.fullErrorText) {
                 errorMessage += '\nAPI Response: ' + response.fullErrorText;
@@ -1079,7 +1021,6 @@
         .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked, currentProposal.purpose);
     });
 
-    // Event Listener for Fix Apply Errors button
     document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
       if (!scriptId) {
@@ -1088,36 +1029,33 @@
         return;
       }
 
-      // Re-use the existing fix errors logic
-      const fixButton = this; // The fixApplyErrorsButton itself
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); // Re-use the proposal spinner
+      const fixButton = this; 
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); 
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
+      const generatePolicyButton = document.getElementById('generatePolicyButton'); 
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
 
-      // Generate a unique ID for this request and set it as active
       const requestId = Date.now();
       activeRequestId = requestId;
 
       fixButton.disabled = true;
       generatePolicyButton.disabled = true;
-      promptInput.readOnly = true; // Disable prompt input during operation
+      promptInput.readOnly = true;
       cancelFixErrorsButton.style.display = 'inline-block';
-      regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button during fix
+      regenerateProposalButton.style.display = 'none'; 
       proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
+      htmlWarningsDiv.style.display = 'none'; 
+      htmlWarningsDiv.innerHTML = ''; 
 
-      // Save scriptId to localStorage
       saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
@@ -1137,8 +1075,7 @@
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
-            // NEW: HTML Validation
-            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
+            htmlWarningsDiv.innerHTML = ''; 
             let hasHtmlErrors = false;
 
             response.proposedFiles.forEach(file => {
@@ -1162,9 +1099,7 @@
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyButton.style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block'; // Show regenerate proposal button
-            document.getElementById('apply-result').textContent = response.message;
-            applyResultContainer.style.display = 'block';
+            regenerateProposalButton.style.display = 'inline-block'; 
             fixButton.style.display = 'none'; 
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
@@ -1195,7 +1130,6 @@
         .fixErrorsFromLogs(scriptId);
     });
 
-    // NEW Event Listener for Fix Errors from Logs (fix-errors-form submit)
     document.getElementById('fix-errors-form').addEventListener('submit', function(e) {
       e.preventDefault();
 
@@ -1218,11 +1152,9 @@
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
 
-      // Generate a unique ID for this request and set it as active
       const requestId = Date.now();
       activeRequestId = requestId;
 
-      // UI state management
       fixErrorsButton.disabled = true;
       generatePolicyButton.disabled = true;
       promptInput.readOnly = true; 
@@ -1258,7 +1190,6 @@
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
-            // HTML Validation
             htmlWarningsDiv.innerHTML = '';
             let hasHtmlErrors = false;
 
@@ -1284,8 +1215,6 @@
             proposalContainer.style.display = 'block';
             applyButton.style.display = 'block';
             regenerateProposalButton.style.display = 'inline-block'; 
-            document.getElementById('apply-result').textContent = response.message;
-            applyResultContainer.style.display = 'block';
             fixApplyErrorsButton.style.display = 'none'; 
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
@@ -1316,9 +1245,8 @@
         .fixErrorsFromLogs(scriptId);
     });
 
-    // Event Listener for Cancel Fix Errors
     document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
-      activeRequestId = null; // Invalidate the current active request
+      activeRequestId = null; 
 
       const fixErrorsButton = document.getElementById('fixErrorsButton');
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
@@ -1327,30 +1255,29 @@
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const generatePolicyButton = document.getElementById('generatePolicyButton'); // Updated from proposeChangesButton
+      const generatePolicyButton = document.getElementById('generatePolicyButton'); 
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
 
       proposalLoadingSpinner.style.display = 'none';
       fixErrorsButton.disabled = false;
       generatePolicyButton.disabled = false; 
       promptInput.readOnly = false; 
       cancelFixErrorsButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none'; // Hide regenerate proposal button on cancel
+      regenerateProposalButton.style.display = 'none'; 
       
-      currentProposal = null; // Clear any partial proposal
+      currentProposal = null; 
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '<p>AI error fix canceled by user.</p>';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
+      htmlWarningsDiv.style.display = 'none'; 
+      htmlWarningsDiv.innerHTML = ''; 
       proposalContainer.style.display = 'block'; 
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
       fixApplyErrorsButton.style.display = 'none';
     });
 
-    // Event Listener for Regenerate Proposal button
     document.getElementById('regenerateProposalButton').addEventListener('click', function() {
       if (!currentPolicyData || !currentPolicyData.scriptId || !currentPolicyData.userPrompt || !currentPolicyData.policy) {
         alert('Cannot regenerate proposal. Policy data is missing.');
@@ -1362,23 +1289,21 @@
       const policyText = currentPolicyData.policy;
 
       const regenerateButton = this;
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); // Reuse main spinner
+      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner'); 
       const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
       const proposalContainer = document.getElementById('proposal-container');
       const applyChangesButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); // NEW
+      const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
       const promptInput = document.getElementById('prompt');
 
-      // UI Reset and loading state
       proposalLoadingSpinner.style.display = 'block';
-      regenerateButton.disabled = true; // Disable itself
-      applyChangesButton.disabled = true; // Disable apply button
-      promptInput.readOnly = true; // Disable prompt during operation
+      regenerateButton.disabled = true; 
+      applyChangesButton.disabled = true; 
+      promptInput.readOnly = true; 
       cancelAiOperationButton.style.display = 'inline-block';
 
-      // Hide all related sections and clear content
       proposalContainer.style.display = 'none';
       applyChangesButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
@@ -1386,10 +1311,10 @@
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('apply-result').textContent = '';
-      htmlWarningsDiv.style.display = 'none'; // NEW: Hide HTML warnings
-      htmlWarningsDiv.innerHTML = ''; // NEW: Clear HTML warnings
+      htmlWarningsDiv.style.display = 'none'; 
+      htmlWarningsDiv.innerHTML = ''; 
 
-      currentProposal = null; // Clear previous proposal data
+      currentProposal = null; 
 
       const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
 
@@ -1407,15 +1332,14 @@
           proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
           applyChangesButton.disabled = false;
-          promptInput.readOnly = false; // Re-enable prompt after proposal generation
+          promptInput.readOnly = false; 
           cancelAiOperationButton.style.display = 'none';
 
           if (response.status === 'proposal') {
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
-            // NEW: HTML Validation
-            htmlWarningsDiv.innerHTML = ''; // Clear previous warnings
+            htmlWarningsDiv.innerHTML = ''; 
             let hasHtmlErrors = false;
 
             response.proposedFiles.forEach(file => {
@@ -1440,19 +1364,17 @@
             displayFileComparison(response.originalFiles, response.proposedFiles);
             proposalContainer.style.display = 'block';
             applyChangesButton.style.display = 'block';
-            regenerateButton.style.display = 'inline-block'; // Keep it visible after success
-            document.getElementById('apply-result').textContent = response.message;
-            applyResultContainer.style.display = 'block';
+            regenerateButton.style.display = 'inline-block'; 
           } else if (response.status === 'error') {
             document.getElementById('apply-result').textContent = 'Error: ' + response.message;
             applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
-            regenerateButton.style.display = 'inline-block'; // Keep visible to allow retry
+            proposalContainer.style.display = 'block'; 
+            regenerateButton.style.display = 'inline-block'; 
           } else {
             document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
             applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block'; // Show container to display error
-            regenerateButton.style.display = 'inline-block'; // Keep visible
+            proposalContainer.style.display = 'block'; 
+            regenerateButton.style.display = 'inline-block'; 
           }
         })
         .withFailureHandler(function(error) {
@@ -1464,18 +1386,17 @@
           proposalLoadingSpinner.style.display = 'none';
           regenerateButton.disabled = false;
           applyChangesButton.disabled = false;
-          promptInput.readOnly = false; // Re-enable prompt on failure
+          promptInput.readOnly = false; 
           cancelAiOperationButton.style.display = 'none';
 
           document.getElementById('apply-result').textContent = 'Error regenerating proposal: ' + error.message;
           applyResultContainer.style.display = 'block';
-          proposalContainer.style.display = 'block'; // Show container for error
-          regenerateButton.style.display = 'inline-block'; // Keep visible
+          proposalContainer.style.display = 'block'; 
+          regenerateButton.style.display = 'inline-block'; 
         })
         .processPrompt(formData);
     });
 
-    // Event Listener for Save GCP Project ID
     document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
       const gcpProjectId = gcpProjectIdInput.value.trim();
@@ -1514,7 +1435,6 @@
 
       const scriptId = getEffectiveScriptId();
 
-      // --- Save scriptId to localStorage when getting logs ---
       saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
@@ -1533,7 +1453,6 @@
         .getScriptLogs(scriptId);
     });
 
-    // Event Listener for Deploy Script
     document.getElementById('deploy-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const form = this;
@@ -1550,7 +1469,6 @@
       const scriptId = getEffectiveScriptId();
       const description = document.getElementById('deploymentDescription').value;
 
-      // Save scriptId to localStorage when deploying
       saveScriptIdToLocalStorage(scriptId);
 
       google.script.run
@@ -1577,9 +1495,6 @@
         .deployScript(scriptId, description);
     });
 
-    // Removed Event listener for Load Projects button
-
-    // New event listener for adding library
     document.getElementById('add-library-form').addEventListener('submit', function(e) {
       e.preventDefault();
       const form = this;
@@ -1595,7 +1510,7 @@
 
       const targetScriptId = getEffectiveScriptId();
       const libraryScriptId = document.getElementById('libraryScriptId').value.trim();
-      const libraryVersion = document.getElementById('libraryVersion').value.trim(); // Can be empty string for HEAD
+      const libraryVersion = document.getElementById('libraryVersion').value.trim(); 
 
       if (!targetScriptId) {
         resultText.textContent = 'Error: Please select or enter a Target Script ID.';
@@ -1612,7 +1527,6 @@
         return;
       }
 
-      // Save targetScriptId to localStorage
       saveScriptIdToLocalStorage(targetScriptId);
 
       google.script.run
@@ -1622,7 +1536,6 @@
           resultContainer.style.display = 'block';
           if (response.status === 'success') {
             resultText.textContent = response.message;
-            // Optionally clear input fields on success
             document.getElementById('libraryScriptId').value = '';
             document.getElementById('libraryVersion').value = '';
           } else {
@@ -1638,7 +1551,6 @@
         .addLibraryToProject(targetScriptId, libraryScriptId, effectiveVersion);
     });
 
-    // NEW: Version Control Functions and Event Listeners
     document.getElementById('getVersionsButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
       const versionsSelect = document.getElementById('versionSelect');
@@ -1648,12 +1560,12 @@
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
-      versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>'; // Clear and show loading
+      versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>'; 
       versionsSelect.disabled = true;
       getVersionsButton.disabled = true;
       revertVersionButton.disabled = true;
       versionLoadingSpinner.style.display = 'block';
-      versionResultContainer.style.display = 'none'; // Hide previous results
+      versionResultContainer.style.display = 'none'; 
 
       if (!scriptId) {
         versionsSelect.innerHTML = '<option value="">-- Select a Script ID first --</option>';
@@ -1665,17 +1577,17 @@
         return;
       }
 
-      saveScriptIdToLocalStorage(scriptId); // Save script ID when fetching versions
+      saveScriptIdToLocalStorage(scriptId); 
 
       google.script.run
         .withSuccessHandler(function(response) {
           versionLoadingSpinner.style.display = 'none';
           getVersionsButton.disabled = false;
           versionsSelect.disabled = false;
-          revertVersionButton.disabled = false; // Enable revert after versions loaded
+          revertVersionButton.disabled = false; 
 
           if (response.status === 'success') {
-            versionsSelect.innerHTML = '<option value="">-- Select a version --</option>'; // Reset
+            versionsSelect.innerHTML = '<option value="">-- Select a version --</option>'; 
             if (response.versions && response.versions.length > 0) {
               response.versions.forEach(version => {
                 const option = document.createElement('option');
@@ -1687,12 +1599,12 @@
             } else {
               versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
               versionResultText.textContent = response.message;
-              revertVersionButton.disabled = true; // Disable if no versions
+              revertVersionButton.disabled = true; 
             }
           } else {
             versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
             versionResultText.textContent = `Error: ${response.message}`;
-            revertVersionButton.disabled = true; // Disable on error
+            revertVersionButton.disabled = true; 
           }
           versionResultContainer.style.display = 'block';
         })
@@ -1737,10 +1649,10 @@
       getVersionsButton.disabled = true;
       versionSelect.disabled = true;
       versionLoadingSpinner.style.display = 'block';
-      versionResultContainer.style.display = 'block'; // Show container immediately
+      versionResultContainer.style.display = 'block'; 
       versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
 
-      saveScriptIdToLocalStorage(scriptId); // Save script ID when reverting
+      saveScriptIdToLocalStorage(scriptId); 
 
       google.script.run
         .withSuccessHandler(function(response) {
@@ -1751,7 +1663,6 @@
 
           if (response.status === 'success') {
             versionResultText.textContent = response.message;
-            // Optionally, refresh versions or clear selection after successful revert
             versionSelect.innerHTML = '<option value="">-- Select a version --</option>';
             revertButton.disabled = true;
           }
