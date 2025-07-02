@@ -1075,27 +1075,63 @@
 
             // Auto-deploy result section
             if (response.deploymentStatus) { 
-              const deployNotification = document.createElement('div');
-              let deployMessage = '<strong>Auto-deploy Result:</strong><br>';
+              const deployMessageContainer = document.createElement('article');
+              deployMessageContainer.className = 'message mt-3'; // Base Bulma message class
+
+              let headerText = 'Auto-deploy Result';
+              let messageBodyContent = '';
+              let messageClass = '';
 
               if (response.deploymentStatus === 'success') {
-                deployNotification.className = 'notification is-info is-light mt-3'; // info for successful deploy
-                deployMessage += `Status: Success<br>Message: ${escapeHtml(response.deploymentMessage)}`;
-                if (response.deploymentId) deployMessage += `<br>Deployment ID: ${escapeHtml(response.deploymentId)}`;
-                if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
-                  deployMessage += `<br>Web App URL: <a href="${escapeHtml(response.webappUrl)}" target="_blank">${escapeHtml(response.webappUrl)}</a>`;
-                } else if (response.webappUrl === 'URL not found in response') {
-                  deployMessage += `<br>Web App URL: ${escapeHtml(response.webappUrl)}`;
+                messageClass = 'is-success';
+                headerText += ' (Success)';
+                messageBodyContent += `
+                  <ul>
+                    <li><strong>Status:</strong> Success</li>
+                    <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
+                `;
+                if (response.deploymentId) {
+                  messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
                 }
+                if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
+                  messageBodyContent += `<li><strong>Web App URL:</strong> <a href="${escapeHtml(response.webappUrl)}" target="_blank">${escapeHtml(response.webappUrl)}</a></li>`;
+                } else if (response.webappUrl === 'URL not found in response') {
+                  messageBodyContent += `<li><strong>Web App URL:</strong> ${escapeHtml(response.webappUrl)}</li>`;
+                }
+                messageBodyContent += `</ul>`;
               } else if (response.deploymentStatus === 'error') {
-                deployNotification.className = 'notification is-danger is-light mt-3'; // danger for deploy error
-                deployMessage += `Status: Error<br>Message: ${escapeHtml(response.deploymentMessage)}`;
+                messageClass = 'is-danger';
+                headerText += ' (Error)';
+                messageBodyContent += `
+                  <ul>
+                    <li><strong>Status:</strong> Error</li>
+                    <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
+                `;
+                if (response.deploymentId) { // Still show ID if it was obtained before error
+                  messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
+                }
+                messageBodyContent += `</ul>`;
               } else { // not_attempted
-                deployNotification.className = 'notification is-warning is-light mt-3'; // warning for not attempted
-                deployMessage += `Status: Not Executed<br>Message: ${escapeHtml(response.deploymentMessage)}`; 
+                messageClass = 'is-warning';
+                headerText += ' (Not Executed)';
+                messageBodyContent += `
+                  <ul>
+                    <li><strong>Status:</strong> Not Executed</li>
+                    <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
+                  </ul>
+                `;
               }
-              deployNotification.innerHTML = `<p>${deployMessage}</p>`;
-              applyResultContent.appendChild(deployNotification);
+              
+              deployMessageContainer.classList.add(messageClass);
+              deployMessageContainer.innerHTML = `
+                <div class="message-header">
+                  <p>${headerText}</p>
+                </div>
+                <div class="message-body">
+                  ${messageBodyContent}
+                </div>
+              `;
+              applyResultContent.appendChild(deployMessageContainer);
             }
 
             currentProposal = null; 
