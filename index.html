@@ -102,7 +102,7 @@
         <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
         <div id="apply-result-container" class="box mt-4" style="display:none;">
           <h3 class="title is-5">Apply Result:</h3>
-          <pre id="apply-result" class="content"></pre>
+          <div id="apply-result-content"></div> <!-- MODIFIED: Replaced pre with div for rich content -->
           <!-- NEW BUTTON for fixing errors after apply failure -->
           <button type="button" id="fixApplyErrorsButton" class="button is-danger mt-3" style="display:none;">Fix Apply Errors with AI</button>
         </div>
@@ -659,6 +659,7 @@
       document.getElementById('policyEditor').style.display = 'none';
       document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
+      document.getElementById('apply-result-content').innerHTML = ''; // Clear apply result content
 
       const formData = { scriptId: scriptId, prompt: promptText };
 
@@ -762,6 +763,7 @@
       document.getElementById('policyEditor').style.display = 'none';
       document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
       isPolicyEditing = false;
+      document.getElementById('apply-result-content').innerHTML = ''; // Clear apply result content
 
       const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt, policy: currentPolicyData.policy };
 
@@ -813,11 +815,23 @@
             document.getElementById('applyChangesButton').style.display = 'block'; 
             regenerateProposalButton.style.display = 'inline-block'; 
           } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-danger">
+                    <p><strong>Error:</strong> Failed to generate proposal.</p>
+                    <p>${escapeHtml(response.message)}</p>
+                </div>
+            `;
             document.getElementById('apply-result-container').style.display = 'block';
             document.getElementById('proposal-container').style.display = 'block'; 
           } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-warning">
+                    <p><strong>Unexpected response status:</strong></p>
+                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
+                </div>
+            `;
             document.getElementById('apply-result-container').style.display = 'block';
             document.getElementById('proposal-container').style.display = 'block'; 
           }
@@ -834,7 +848,13 @@
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
-          document.getElementById('apply-result').textContent = 'Error calling AI: ' + error.message;
+          const applyResultContent = document.getElementById('apply-result-content');
+          applyResultContent.innerHTML = `
+              <div class="notification is-danger">
+                  <p><strong>Error calling AI:</strong></p>
+                  <p>${escapeHtml(error.message)}</p>
+              </div>
+          `;
           document.getElementById('apply-result-container').style.display = 'block';
           document.getElementById('proposal-container').style.display = 'block'; 
         })
@@ -860,6 +880,7 @@
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
+      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
 
       policyLoadingSpinner.style.display = 'none';
       proposalLoadingSpinner.style.display = 'none';
@@ -872,7 +893,7 @@
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
       document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('apply-result').textContent = '';
+      applyResultContent.innerHTML = ''; // Clear the new element
       htmlWarningsDiv.style.display = 'none'; 
       htmlWarningsDiv.innerHTML = ''; 
 
@@ -924,6 +945,7 @@
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
+      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
 
       policyLoadingSpinner.style.display = 'block';
       generatePolicyButton.disabled = true; 
@@ -946,6 +968,7 @@
       policyEditorTextarea.style.display = 'none';
       togglePolicyEditButton.textContent = 'Edit Policy';
       isPolicyEditing = false;
+      applyResultContent.innerHTML = ''; // Clear the new element
 
       currentPolicyData = null;
       currentProposal = null;
@@ -1005,7 +1028,12 @@
 
     document.getElementById('applyChangesButton').addEventListener('click', function() {
       if (!currentProposal) {
-        document.getElementById('apply-result').textContent = 'Error: No proposal to apply.';
+        const applyResultContent = document.getElementById('apply-result-content');
+        applyResultContent.innerHTML = `
+            <div class="notification is-danger">
+                <p><strong>Error:</strong> No proposal to apply.</p>
+            </div>
+        `;
         document.getElementById('apply-result-container').style.display = 'block';
         return;
       }
@@ -1014,7 +1042,7 @@
 
       const applyButton = this;
       const applySpinner = document.getElementById('apply-loading-spinner');
-      const applyResultText = document.getElementById('apply-result');
+      const applyResultContent = document.getElementById('apply-result-content'); // Changed from apply-result-text
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const autoDeployChecked = document.getElementById('autoDeployAfterApply').checked;
@@ -1023,10 +1051,12 @@
       fixApplyErrorsButton.style.display = 'none';
       regenerateProposalButton.disabled = true;
       applySpinner.style.display = 'block';
-      applyResultText.textContent = 'Applying changes...';
-      if (autoDeployChecked) {
-          applyResultText.textContent += '\nAuto-deploying...';
-      }
+      applyResultContent.innerHTML = `
+        <div class="notification is-info is-light">
+          <p>Applying changes...</p>
+          ${autoDeployChecked ? '<p>Auto-deploying...</p>' : ''}
+        </div>
+      `;
       document.getElementById('apply-result-container').style.display = 'block'; 
 
       google.script.run
@@ -1034,26 +1064,40 @@
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
           regenerateProposalButton.disabled = false;
-          
+          applyResultContent.innerHTML = ''; // Clear previous loading message
+
           if (response.status === 'success') {
-            let message = response.message;
+            // Main success notification for file changes
+            const successNotification = document.createElement('div');
+            successNotification.className = 'notification is-success';
+            successNotification.innerHTML = `<p><strong>${escapeHtml(response.message)}</strong></p>`;
+            applyResultContent.appendChild(successNotification);
+
+            // Auto-deploy result section
             if (response.deploymentStatus) { 
-              message += `<br><br><strong>Auto-deploy Result:</strong><br>`;
+              const deployNotification = document.createElement('div');
+              let deployMessage = '<strong>Auto-deploy Result:</strong><br>';
+
               if (response.deploymentStatus === 'success') {
-                message += `Status: Success<br>Message: ${response.deploymentMessage}`;
-                if (response.deploymentId) message += `<br>Deployment ID: ${response.deploymentId}`;
+                deployNotification.className = 'notification is-info is-light mt-3'; // info for successful deploy
+                deployMessage += `Status: Success<br>Message: ${escapeHtml(response.deploymentMessage)}`;
+                if (response.deploymentId) deployMessage += `<br>Deployment ID: ${escapeHtml(response.deploymentId)}`;
                 if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
-                  message += `<br>Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
+                  deployMessage += `<br>Web App URL: <a href="${escapeHtml(response.webappUrl)}" target="_blank">${escapeHtml(response.webappUrl)}</a>`;
                 } else if (response.webappUrl === 'URL not found in response') {
-                  message += `<br>Web App URL: ${response.webappUrl}`;
+                  deployMessage += `<br>Web App URL: ${escapeHtml(response.webappUrl)}`;
                 }
+              } else if (response.deploymentStatus === 'error') {
+                deployNotification.className = 'notification is-danger is-light mt-3'; // danger for deploy error
+                deployMessage += `Status: Error<br>Message: ${escapeHtml(response.deploymentMessage)}`;
+              } else { // not_attempted
+                deployNotification.className = 'notification is-warning is-light mt-3'; // warning for not attempted
+                deployMessage += `Status: Not Executed<br>Message: ${escapeHtml(response.deploymentMessage)}`; 
               }
-            } else if (response.deploymentStatus === 'error') {
-              message += `Status: Error<br>Message: ${response.deploymentMessage}`; 
-            } else { 
-              message += `Status: Not Executed<br>Message: ${response.deploymentMessage}`; 
+              deployNotification.innerHTML = `<p>${deployMessage}</p>`;
+              applyResultContent.appendChild(deployNotification);
             }
-            applyResultText.innerHTML = message; 
+
             currentProposal = null; 
             document.getElementById('applyChangesButton').style.display = 'none';
             regenerateProposalButton.style.display = 'none'; 
@@ -1061,15 +1105,18 @@
             document.getElementById('html-validation-warnings').style.display = 'none'; 
             document.getElementById('html-validation-warnings').innerHTML = ''; 
             fixApplyErrorsButton.style.display = 'none';
-          } else { 
-            let errorMessage = response.message;
-            if (response.fullErrorText) {
-                errorMessage += '\nAPI Response: ' + response.fullErrorText;
+          } else { // response.status === 'error' for apply changes itself
+            const errorNotification = document.createElement('div');
+            errorNotification.className = 'notification is-danger';
+            let errorMessage = `<strong>Failed to Apply Changes:</strong> ${escapeHtml(response.message)}`;
+            
+            if (response.apiErrorDetails) {
+                errorMessage += `<h4>API Error Details:</h4><pre>${escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`;
+            } else if (response.fullErrorText) {
+                errorMessage += `<h4>Raw API Response:</h4><pre>${escapeHtml(response.fullErrorText)}</pre>`;
             }
-            else if (response.apiErrorDetails) {
-                errorMessage += '\nAPI Details: ' + JSON.stringify(response.apiErrorDetails, null, 2);
-            }
-            applyResultText.textContent = errorMessage;
+            errorNotification.innerHTML = `<p>${errorMessage}</p>`;
+            applyResultContent.appendChild(errorNotification);
             fixApplyErrorsButton.style.display = 'block';
           }
         })
@@ -1077,7 +1124,12 @@
           applySpinner.style.display = 'none';
           applyButton.disabled = false;
           regenerateProposalButton.disabled = false;
-          applyResultText.textContent = 'Error applying changes (Uncaught): ' + error.message;
+          applyResultContent.innerHTML = `
+              <div class="notification is-danger">
+                  <p><strong>Error applying changes (Uncaught):</strong></p>
+                  <p>${escapeHtml(error.message)}</p>
+              </div>
+          `;
           fixApplyErrorsButton.style.display = 'block';
         })
         .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeployChecked, currentProposal.purpose);
@@ -1086,7 +1138,12 @@
     document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
       if (!scriptId) {
-        document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
+        const applyResultContent = document.getElementById('apply-result-content');
+        applyResultContent.innerHTML = `
+            <div class="notification is-danger">
+                <p><strong>Error:</strong> Script ID is required to fix errors.</p>
+            </div>
+        `;
         document.getElementById('apply-result-container').style.display = 'block';
         return;
       }
@@ -1101,6 +1158,7 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
+      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
 
       const requestId = Date.now();
       activeRequestId = requestId;
@@ -1114,6 +1172,7 @@
       proposalContainer.style.display = 'none';
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
+      applyResultContent.innerHTML = ''; // Clear previous result
       document.getElementById('proposed-files-display').innerHTML = '';
       htmlWarningsDiv.style.display = 'none'; 
       htmlWarningsDiv.innerHTML = ''; 
@@ -1164,11 +1223,23 @@
             regenerateProposalButton.style.display = 'inline-block'; 
             fixButton.style.display = 'none'; 
           } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-danger">
+                    <p><strong>Error:</strong> Failed to get error fix proposal.</p>
+                    <p>${escapeHtml(response.message)}</p>
+                </div>
+            `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block';
           } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-warning">
+                    <p><strong>Unexpected response status:</strong></p>
+                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
+                </div>
+            `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block';
           }
@@ -1185,7 +1256,13 @@
           promptInput.readOnly = false; 
           cancelFixErrorsButton.style.display = 'none';
 
-          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
+          const applyResultContent = document.getElementById('apply-result-content');
+          applyResultContent.innerHTML = `
+              <div class="notification is-danger">
+                  <p><strong>Error calling AI for fix:</strong></p>
+                  <p>${escapeHtml(error.message)}</p>
+              </div>
+          `;
           document.getElementById('apply-result-container').style.display = 'block';
           document.getElementById('proposal-container').style.display = 'block';
         })
@@ -1197,7 +1274,12 @@
 
       const scriptId = getEffectiveScriptId();
       if (!scriptId) {
-        document.getElementById('apply-result').textContent = 'Error: Script ID is required to fix errors.';
+        const applyResultContent = document.getElementById('apply-result-content');
+        applyResultContent.innerHTML = `
+            <div class="notification is-danger">
+                <p><strong>Error:</strong> Script ID is required to fix errors.</p>
+            </div>
+        `;
         document.getElementById('apply-result-container').style.display = 'block';
         return;
       }
@@ -1213,6 +1295,7 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
+      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
 
       const requestId = Date.now();
       activeRequestId = requestId;
@@ -1229,7 +1312,7 @@
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('apply-result').textContent = '';
+      applyResultContent.innerHTML = ''; // Clear previous result
       htmlWarningsDiv.style.display = 'none';
       htmlWarningsDiv.innerHTML = '';
 
@@ -1279,11 +1362,23 @@
             regenerateProposalButton.style.display = 'inline-block'; 
             fixApplyErrorsButton.style.display = 'none'; 
           } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-danger">
+                    <p><strong>Error:</strong> Failed to get error fix proposal.</p>
+                    <p>${escapeHtml(response.message)}</p>
+                </div>
+            `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block';
           } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-warning">
+                    <p><strong>Unexpected response status:</strong></p>
+                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
+                </div>
+            `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block';
           }
@@ -1300,7 +1395,13 @@
           promptInput.readOnly = false; 
           cancelFixErrorsButton.style.display = 'none';
 
-          document.getElementById('apply-result').textContent = 'Error calling AI for fix: ' + error.message;
+          const applyResultContent = document.getElementById('apply-result-content');
+          applyResultContent.innerHTML = `
+              <div class="notification is-danger">
+                  <p><strong>Error calling AI for fix:</strong></p>
+                  <p>${escapeHtml(error.message)}</p>
+              </div>
+          `;
           document.getElementById('apply-result-container').style.display = 'block';
           document.getElementById('proposal-container').style.display = 'block';
         })
@@ -1321,6 +1422,7 @@
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
+      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
 
       proposalLoadingSpinner.style.display = 'none';
       fixErrorsButton.disabled = false;
@@ -1337,6 +1439,7 @@
       proposalContainer.style.display = 'block'; 
       applyButton.style.display = 'none';
       applyResultContainer.style.display = 'none';
+      applyResultContent.innerHTML = ''; // Clear the new element
       fixApplyErrorsButton.style.display = 'none';
     });
 
@@ -1359,6 +1462,7 @@
       const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings'); 
       const promptInput = document.getElementById('prompt');
+      const applyResultContent = document.getElementById('apply-result-content'); // Get the new element
 
       proposalLoadingSpinner.style.display = 'block';
       regenerateButton.disabled = true; 
@@ -1372,7 +1476,7 @@
       fixApplyErrorsButton.style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('apply-result').textContent = '';
+      applyResultContent.innerHTML = ''; // Clear previous result
       htmlWarningsDiv.style.display = 'none'; 
       htmlWarningsDiv.innerHTML = ''; 
 
@@ -1428,12 +1532,24 @@
             applyChangesButton.style.display = 'block';
             regenerateButton.style.display = 'inline-block'; 
           } else if (response.status === 'error') {
-            document.getElementById('apply-result').textContent = 'Error: ' + response.message;
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-danger">
+                    <p><strong>Error:</strong> Failed to regenerate proposal.</p>
+                    <p>${escapeHtml(response.message)}</p>
+                </div>
+            `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block'; 
             regenerateButton.style.display = 'inline-block'; 
           } else {
-            document.getElementById('apply-result').textContent = 'Unexpected response status: ' + JSON.stringify(response);
+            const applyResultContent = document.getElementById('apply-result-content');
+            applyResultContent.innerHTML = `
+                <div class="notification is-warning">
+                    <p><strong>Unexpected response status:</strong></p>
+                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
+                </div>
+            `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block'; 
             regenerateButton.style.display = 'inline-block'; 
@@ -1451,7 +1567,13 @@
           promptInput.readOnly = false; 
           cancelAiOperationButton.style.display = 'none';
 
-          document.getElementById('apply-result').textContent = 'Error regenerating proposal: ' + error.message;
+          const applyResultContent = document.getElementById('apply-result-content');
+          applyResultContent.innerHTML = `
+              <div class="notification is-danger">
+                  <p><strong>Error regenerating proposal:</strong></p>
+                  <p>${escapeHtml(error.message)}</p>
+              </div>
+          `;
           applyResultContainer.style.display = 'block';
           proposalContainer.style.display = 'block'; 
           regenerateButton.style.display = 'inline-block'; 
@@ -1591,6 +1713,9 @@
 
       saveScriptIdToLocalStorage(targetScriptId);
 
+      // Moved effectiveVersion definition to outside the success handler
+      const effectiveVersion = libraryVersion.trim() === '' ? 'HEAD' : libraryVersion.trim();
+
       google.script.run
         .withSuccessHandler(function(response) {
           spinner.style.display = 'none';
@@ -1663,7 +1788,8 @@
               versionResultText.textContent = response.message;
               revertVersionButton.disabled = true; 
             }
-          } else {
+          }
+          else {
             versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
             versionResultText.textContent = `Error: ${response.message}`;
             revertVersionButton.disabled = true; 
