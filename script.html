@@ -1402,7 +1402,7 @@
 
       const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
 
-      const requestId = Date.n();
+      const requestId = Date.now();
       activeRequestId = requestId;
 
       console.log('Regenerating AI proposed changes...');
