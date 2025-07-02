@@ -361,6 +361,19 @@
 
       // Initial display of editor URL
       updateEditorUrlDisplay();
+
+      // Add Ctrl+Enter to submit functionality for the prompt textarea
+      const promptTextarea = document.getElementById('prompt');
+      if (promptTextarea) {
+        promptTextarea.addEventListener('keydown', function(event) {
+          // Check for Ctrl+Enter (Windows/Linux) or Cmd+Enter (macOS)
+          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault(); // Prevent new line in textarea
+            // Simulate submission of the form via the 'Generate Policy' button
+            document.getElementById('agent-form').requestSubmit(document.getElementById('generatePolicyButton'));
+          }
+        });
+      }
     });
 
     // NEW: Add event listeners for script ID changes
@@ -1620,7 +1633,9 @@
             // Optionally, refresh versions or clear selection after successful revert
             versionSelect.innerHTML = '<option value="">-- Select a version --</option>';
             revertButton.disabled = true;
-          } else {
+          }
+
+          else {
             versionResultText.textContent = `Error: ${response.message}`;
           }
         })
