@@ -10,14 +10,6 @@
 <body>
   <section class="section">
     <div class="container">
-      <!-- NEW: Dark Mode Toggle -->
-      <div class="dark-mode-toggle">
-        <label for="darkModeSwitch">Dark Mode</label>
-        <label class="switch">
-          <input type="checkbox" id="darkModeSwitch">
-          <span class="slider round"></span>
-        </label>
-      </div>
       <h1 class="title is-2">Methane AI Agent</h1>
 
       <form id="agent-form" class="box">
@@ -253,57 +245,91 @@
     let activeRequestId = null; // Global flag for the currently active request ID
     let isPolicyEditing = false; // NEW: State variable for policy editing mode
 
-    // NEW: Dark Mode Logic
-    document.addEventListener('DOMContentLoaded', function() {
-        const darkModeSwitch = document.getElementById('darkModeSwitch');
-        const body = document.body;
-
-        // Function to apply theme
-        function applyTheme(theme) {
-            if (theme === 'dark') {
-                body.classList.add('dark-mode');
-                darkModeSwitch.checked = true;
-            } else {
-                body.classList.remove('dark-mode');
-                darkModeSwitch.checked = false;
-            }
+    // Helper to get the effective script ID
+    function getEffectiveScriptId() {
+        const manualId = document.getElementById('scriptIdManualInput').value.trim();
+        if (manualId) {
+            return manualId;
         }
+        return document.getElementById('scriptIdSelect').value.trim();
+    }
 
-        // Load theme from localStorage or system preference
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) {
-            applyTheme(savedTheme);
-        } else {
-            // Check system preference
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                applyTheme('dark');
-            } else {
-                applyTheme('light');
-            }
+    // --- Helper function to save scriptId to localStorage ---
+    function saveScriptIdToLocalStorage(id) {
+        if (id) {
+            localStorage.setItem('targetScriptId', id);
         }
+    }
 
-        // Listen for switch changes
-        darkModeSwitch.addEventListener('change', function() {
-            if (this.checked) {
-                applyTheme('dark');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                applyTheme('light');
-                localStorage.setItem('theme', 'light');
-            }
-        });
+    // Helper function to save gcpProjectId to localStorage
+    function saveGcpProjectIdToLocalStorage(id) {
+        if (id) {
+            localStorage.setItem('gcpProjectId', id);
+        }
+    }
 
-        // Optional: Listen for system theme changes and update UI if no explicit preference is set
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-            if (!localStorage.getItem('theme')) { // Only react if user hasn't set an explicit preference
-                if (event.matches) {
-                    applyTheme('dark');
+    // Function to load projects and populate the dropdown
+    function loadProjectsIntoDropdown(selectedId = null) {
+        const scriptIdSelect = document.getElementById('scriptIdSelect');
+
+        // Clear existing options except the placeholder
+        scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
+
+        google.script.run
+            .withSuccessHandler(function(response) {
+                if (response.status === 'success') {
+                    response.projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.title;
+                        scriptIdSelect.appendChild(option);
+                    });
+                    if (selectedId) {
+                        scriptIdSelect.value = selectedId; // Set selected if saved ID was passed
+                    }
                 } else {
-                    applyTheme('light');
+                    alert('Failed to load Apps Script projects: ' + response.message);
                 }
-            }
-        });
+            })
+            .withFailureHandler(function(error) {
+                alert('Error loading Apps Script projects: ' + error.message);
+            })
+            .listAppsScriptProjects();
+    }
 
+    // Function to display the Apps Script Editor URL based on current Script ID
+    function updateEditorUrlDisplay() {
+        const scriptId = getEffectiveScriptId();
+        const editorUrlDisplayDiv = document.getElementById('editor-url-display');
+        
+        editorUrlDisplayDiv.innerHTML = ''; // Clear previous content
+
+        if (!scriptId) {
+            editorUrlDisplayDiv.textContent = 'Apps Script Editor URL: (Script ID needed)';
+            return;
+        }
+
+        editorUrlDisplayDiv.innerHTML = 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...';
+
+        // Save scriptId to localStorage every time it's used/updated
+        saveScriptIdToLocalStorage(scriptId);
+
+        google.script.run
+            .withSuccessHandler(function(response) {
+                if (response.startsWith("Error:")) {
+                    editorUrlDisplayDiv.textContent = `Apps Script Editor URL: ${response}`;
+                } else {
+                    editorUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
+                }
+            })
+            .withFailureHandler(function(error) {
+                editorUrlDisplayDiv.textContent = `Apps Script Editor URL: Error - ${error.message}`;
+            })
+            .getScriptEditorUrl(scriptId);
+    }
+
+    // --- Load scriptId from localStorage on page load ---
+    document.addEventListener('DOMContentLoaded', function() {
       const scriptIdManualInput = document.getElementById('scriptIdManualInput');
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
 
