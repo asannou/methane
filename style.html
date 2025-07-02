@@ -1,19 +1,161 @@
 <style>
-  /* Keep custom spinner styles as Bulma doesn't provide them */
-  .spinner {
-    border: 4px solid #f3f3f3; /* Light grey */
-    border-top: 4px solid #3498db; /* Blue */
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    animation: spin 1s linear infinite;
-    margin: 10px auto;
-    display: block;
+  /* Google Apps Script inspired colors */
+  :root {
+    --gas-blue-dark: #1A73E8; /* Primary, Hero, Buttons */
+    --gas-blue-light: #4285F4; /* Info, Link, Spinners */
+    --gas-green: #34A853;     /* Success */
+    --gas-yellow: #FBBC04;    /* Warning */
+    --gas-red: #D93025;       /* Danger */
+    --gas-grey-light: #F8F9FA;
+    --gas-grey-medium: #DADCE0;
+    --gas-grey-dark: #616161;
   }
 
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  /* Bulma color overrides */
+  .hero.is-primary {
+    background-color: var(--gas-blue-dark) !important;
+    color: #fff !important;
+  }
+
+  .button.is-primary {
+    background-color: var(--gas-blue-dark) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+  }
+  .button.is-primary:hover {
+    background-color: #1669E0 !important; /* Slightly darker blue on hover */
+  }
+  .button.is-primary.is-light {
+    background-color: rgba(26, 115, 232, 0.1) !important; /* Light blue background */
+    color: var(--gas-blue-dark) !important;
+    border-color: rgba(26, 115, 232, 0.2) !important;
+  }
+  .button.is-primary.is-light:hover {
+    background-color: rgba(26, 115, 232, 0.2) !important;
+  }
+
+  .button.is-info {
+    background-color: var(--gas-blue-light) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+  }
+  .button.is-info:hover {
+    background-color: #357AE8 !important; /* Slightly darker blue on hover */
+  }
+  .button.is-info.is-light {
+    background-color: rgba(66, 133, 244, 0.1) !important;
+    color: var(--gas-blue-light) !important;
+    border-color: rgba(66, 133, 244, 0.2) !important;
+  }
+  .button.is-info.is-light:hover {
+    background-color: rgba(66, 133, 244, 0.2) !important;
+  }
+
+  .button.is-success {
+    background-color: var(--gas-green) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+  }
+  .button.is-success:hover {
+    background-color: #2F934A !important;
+  }
+  .button.is-success.is-light {
+    background-color: rgba(52, 168, 83, 0.1) !important;
+    color: var(--gas-green) !important;
+    border-color: rgba(52, 168, 83, 0.2) !important;
+  }
+  .button.is-success.is-light:hover {
+    background-color: rgba(52, 168, 83, 0.2) !important;
+  }
+
+  .button.is-warning {
+    background-color: var(--gas-yellow) !important;
+    border-color: transparent !important;
+    color: #333 !important;
+  }
+  .button.is-warning:hover {
+    background-color: #E8A800 !important;
+  }
+  .button.is-warning.is-light {
+    background-color: rgba(251, 188, 4, 0.1) !important;
+    color: #CC9900 !important;
+    border-color: rgba(251, 188, 4, 0.2) !important;
+  }
+  .button.is-warning.is-light:hover {
+    background-color: rgba(251, 188, 4, 0.2) !important;
+  }
+
+  .button.is-danger {
+    background-color: var(--gas-red) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+  }
+  .button.is-danger:hover {
+    background-color: #C5221F !important;
+  }
+  .button.is-danger.is-light {
+    background-color: rgba(217, 48, 37, 0.1) !important;
+    color: var(--gas-red) !important;
+    border-color: rgba(217, 48, 37, 0.2) !important;
+  }
+  .button.is-danger.is-light:hover {
+    background-color: rgba(217, 48, 37, 0.2) !important;
+  }
+
+  .button.is-link {
+    background-color: var(--gas-blue-light) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+  }
+  .button.is-link:hover {
+    background-color: #357AE8 !important;
+  }
+  .button.is-link.is-light {
+    background-color: rgba(66, 133, 244, 0.1) !important;
+    color: var(--gas-blue-light) !important;
+    border-color: rgba(66, 133, 244, 0.2) !important;
+  }
+  .button.is-link.is-light:hover {
+    background-color: rgba(66, 133, 244, 0.2) !important;
+  }
+
+  /* Notification overrides */
+  .notification.is-info.is-light {
+    background-color: rgba(66, 133, 244, 0.1) !important;
+    color: var(--gas-blue-dark) !important;
+  }
+  .notification.is-danger.is-light {
+    background-color: rgba(217, 48, 37, 0.1) !important;
+    color: var(--gas-red) !important;
+  }
+  .notification.is-success.is-light {
+    background-color: rgba(52, 168, 83, 0.1) !important;
+    color: var(--gas-green) !important;
+  }
+  .notification.is-warning.is-light {
+    background-color: rgba(251, 188, 4, 0.1) !important;
+    color: #CC9900 !important;
+  }
+  .notification.is-success {
+    background-color: var(--gas-green) !important;
+    color: #fff !important;
+  }
+  .notification.is-danger {
+    background-color: var(--gas-red) !important;
+    color: #fff !important;
+  }
+  .notification.is-warning {
+    background-color: var(--gas-yellow) !important;
+    color: #333 !important;
+  }
+  .notification.is-info {
+    background-color: var(--gas-blue-light) !important;
+    color: #fff !important;
+  }
+
+  /* Spinner color adjustment */
+  .spinner {
+    border-top: 4px solid var(--gas-blue-light) !important; /* Blue from GAS theme */
   }
 
   /* The small spinner in editor-url-display needs specific override */
@@ -30,9 +172,9 @@
     display: flex;
     flex-wrap: wrap;
     margin-bottom: 20px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--gas-grey-medium) !important;
     padding: 10px;
-    background-color: #f9f9f9;
+    background-color: #ffffff !important;
   }
 
   /* Default to full width on small screens, with vertical spacing */
@@ -67,20 +209,20 @@
     height: 250px;
     overflow-y: scroll;
     overflow-x: auto;
-    border: 1px solid #ccc;
+    border: 1px solid var(--gas-grey-light) !important;
     display: flex;
     width: 100%;
   }
 
   /* Styles for line numbers and code content columns - Custom, keep these */
   .line-numbers-col {
-    background-color: #eee;
-    color: #888;
+    background-color: var(--gas-grey-light) !important;
+    color: var(--gas-grey-dark) !important;
     text-align: right;
     user-select: none;
     flex-shrink: 0;
     width: max-content;
-    border-right: 1px solid #ddd;
+    border-right: 1px solid var(--gas-grey-medium) !important;
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
@@ -102,9 +244,9 @@
 
   /* Specific diff line highlighting - Custom, keep these */
   .code-content-col > .diff-line-equal { background-color: #f4f4f4; }
-  .code-content-col > .diff-line-added { background-color: #e6ffe6; }
-  .code-content-col > .diff-line-removed { background-color: #ffe6e6; }
-  .code-content-col > .diff-line-modified { background-color: #fffacd; }
+  .code-content-col > .diff-line-added { background-color: #E6FFEA; } /* Lighter Google green */
+  .code-content-col > .diff-line-removed { background-color: #FEE7E6; } /* Lighter Google red */
+  .code-content-col > .diff-line-modified { background-color: #FFFDE6; } /* Lighter Google yellow */
   .code-content-col > .diff-line-empty-fill { background-color: transparent; }
 
   /* Style for omitted lines in diff view */
@@ -132,7 +274,7 @@
   #ai-policy {
     background-color: #ffffff;
     padding: 15px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--gas-grey-medium) !important;
     border-radius: 4px;
     margin-bottom: 20px;
     line-height: 1.6;
@@ -141,7 +283,7 @@
   }
 
   #ai-policy pre {
-    background-color: #eef;
+    background-color: #F8F9FA !important;
     padding: 10px;
     border-radius: 4px;
     white-space: pre-wrap;
@@ -172,7 +314,7 @@
   display: flex;
   align-items: center;
   background-color: #fff;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--gas-grey-medium) !important;
   border-radius: 8px;
   padding: 10px 15px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -206,25 +348,35 @@
 
 /* Specific styles for different file types */
 .file-item.is-server-js .file-type-badge {
-  background-color: #4CAF50;
+  background-color: var(--gas-green) !important;
+  color: #fff !important;
 }
 
 .file-item.is-json .file-type-badge {
-  background-color: #FFC107;
-  color: #333;
+  background-color: var(--gas-yellow) !important;
+  color: #333 !important;
 }
 
 .file-item.is-html .file-type-badge {
-  background-color: #2196F3;
+  background-color: var(--gas-blue-light) !important;
 }
 
 .file-item.is-unknown .file-type-badge {
-  background-color: #9E9E9E;
+  background-color: var(--gas-grey-dark) !important;
 }
 
 /* Styles for Bulma Tabs integration */
 .tabs {
   margin-bottom: 2rem;
+}
+
+.tabs ul li.is-active a {
+  border-bottom-color: var(--gas-blue-dark) !important;
+  color: var(--gas-blue-dark) !important;
+}
+.tabs a:hover {
+  border-bottom-color: var(--gas-blue-light) !important;
+  color: var(--gas-blue-light) !important;
 }
 
 .tab-content {
@@ -233,6 +385,8 @@
 .tab-content .box {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
+  border-top: 2px solid var(--gas-blue-light); /* Subtle blue accent on boxes */
+  padding-top: calc(1.25rem - 2px); /* Adjust padding due to border-top */
 }
 .tab-content h2.title,
 .tab-content h3.title {
@@ -243,5 +397,18 @@
   margin: 3rem 0;
   background-color: #f0f0f0;
   height: 1px;
+}
+
+/* Input/Textarea/Select focus state to match GAS colors */
+.field .input,
+.field .textarea,
+.field .select select {
+  border-color: var(--gas-grey-medium);
+}
+.field .input:focus,
+.field .textarea:focus,
+.field .select select:focus {
+  border-color: var(--gas-blue-light);
+  box-shadow: 0 0 0 0.125em rgba(66, 133, 244, 0.25);
 }
 </style>
