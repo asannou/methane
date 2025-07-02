@@ -134,9 +134,9 @@
           const targetId = this.dataset.tabContentId;
           tabContents.forEach(content => {
             if (content.id === targetId) {
-              content.style.display = 'block';
+              content.classList.add('is-active-content');
             } else {
-              content.style.display = 'none';
+              content.classList.remove('is-active-content');
             }
           });
         });
@@ -982,6 +982,7 @@
       const proposalContainer = document.getElementById('proposal-container');
       const applyButton = document.getElementById('applyChangesButton');
       const applyResultContainer = document.getElementById('apply-result-container');
+      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const generatePolicyButton = document.getElementById('generatePolicyButton');
       const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
       const regenerateProposalButton = document.getElementById('regenerateProposalButton');
