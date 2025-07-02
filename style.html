@@ -158,4 +158,66 @@
     white-space: pre-wrap; /* Ensure text wraps within the container */
     word-wrap: break-word; /* For long words */
   }
+
+/* NEW: Styles for Target Script Files display */
+.files-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Responsive grid */
+  gap: 15px; /* Spacing between grid items */
+  padding: 10px 0; /* Padding around the grid */
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 10px 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.2s ease-in-out;
+}
+
+.file-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.file-type-badge {
+  font-weight: bold;
+  font-size: 0.75em;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-right: 12px;
+  text-align: center;
+  min-width: 45px; /* Ensure consistent badge width */
+  text-transform: uppercase;
+  color: #fff; /* Default text color for badges */
+}
+
+.file-name {
+  flex-grow: 1;
+  font-family: monospace; /* Monospace for file names */
+  font-size: 0.9em;
+  color: #333;
+  word-break: break-all; /* Break long file names */
+}
+
+/* Specific styles for different file types */
+.file-item.is-server-js .file-type-badge {
+  background-color: #4CAF50; /* Green */
+}
+
+.file-item.is-json .file-type-badge {
+  background-color: #FFC107; /* Amber */
+  color: #333; /* Darker text for amber */
+}
+
+.file-item.is-html .file-type-badge {
+  background-color: #2196F3; /* Blue */
+}
+
+.file-item.is-unknown .file-type-badge {
+  background-color: #9E9E9E; /* Grey */
+}
 </style>

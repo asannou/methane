@@ -248,7 +248,7 @@
       <div id="filesListContainer" class="box mt-4" style="display:none;">
         <div id="filesListLoadingSpinner" class="spinner" style="display:none;"></div>
         <h3 class="title is-5">Files in Script:</h3>
-        <ul id="filesListDisplay" class="content"></ul>
+        <div id="filesListDisplay" class="files-grid"></div>
       </div>
 
     </div>
@@ -1953,9 +1953,38 @@
                     if (response.files && response.files.length > 0) {
                         filesListDisplay.innerHTML = ''; // Ensure it's clear before adding items
                         response.files.forEach(file => {
-                            const li = document.createElement('li');
-                            li.textContent = `${file.name}.${getFileExtension(file.type)} (Type: ${file.type})`;
-                            filesListDisplay.appendChild(li);
+                            const fileItem = document.createElement('div');
+                            fileItem.className = 'file-item';
+
+                            let typeClass = '';
+                            let typeText = '';
+
+                            switch (file.type) {
+                                case 'SERVER_JS':
+                                    typeClass = 'is-server-js';
+                                    typeText = 'JS';
+                                    break;
+                                case 'JSON':
+                                    typeClass = 'is-json';
+                                    typeText = 'JSON';
+                                    break;
+                                case 'HTML':
+                                    typeClass = 'is-html';
+                                    typeText = 'HTML';
+                                    break;
+                                default:
+                                    typeClass = 'is-unknown';
+                                    typeText = 'UNKNOWN';
+                            }
+                            
+                            fileItem.classList.add(typeClass);
+
+                            fileItem.innerHTML = `
+                                <div class="file-type-badge">${typeText}</div>
+                                <div class="file-name">${escapeHtml(file.name)}.${getFileExtension(file.type)}</div>
+                            `;
+
+                            filesListDisplay.appendChild(fileItem);
                         });
                     } else {
                         filesListDisplay.innerHTML = '<p>No files found in this script.</p>';
