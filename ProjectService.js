@@ -583,7 +583,9 @@ function revertToVersion(scriptId, versionNumber) {
 
   try {
     const accessToken = ScriptApp.getOAuthToken();
-    const targetVersionContentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions/${versionNumber}`;
+    // 特定のバージョンのコンテンツを取得するためのエンドポイントを/versions/{versionNumber}から
+    // /content?versionNumber={versionNumber}に変更
+    const getContentForVersionUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content?versionNumber=${versionNumber}`;
     const currentContentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
     // 1. 指定されたバージョンのコンテンツを取得する
@@ -593,7 +595,7 @@ function revertToVersion(scriptId, versionNumber) {
       headers: { 'Authorization': `Bearer ${accessToken}` },
       muteHttpExceptions: true
     };
-    const getVersionContentResponse = UrlFetchApp.fetch(targetVersionContentUrl, getVersionContentOptions);
+    const getVersionContentResponse = UrlFetchApp.fetch(getContentForVersionUrl, getVersionContentOptions);
     const getVersionContentCode = getVersionContentResponse.getResponseCode();
     const getVersionContentBody = getVersionContentResponse.getContentText();
 
@@ -607,8 +609,8 @@ function revertToVersion(scriptId, versionNumber) {
       console.error(`バージョン ${versionNumber} のコンテンツにファイルデータが見つからないか、空でした。受信した応答ボディ: ${getVersionContentBody}`);
       return {
         status: 'error',
-        message: `Version ${versionNumber} content is empty or malformed (no files data). This version cannot be reverted to. Please check the Apps Script project's version history in the editor for details.`, // Improved user message
-        apiResponse: getVersionContentBody // For debugging on the client-side if needed
+        message: `Version ${versionNumber} content is empty or malformed (no files data). This version cannot be reverted to. Please check the Apps Script project's version history in the editor for details.`,
+        apiResponse: getVersionContentBody
       };
     }
 
@@ -638,4 +640,3 @@ function revertToVersion(scriptId, versionNumber) {
     return { status: 'error', message: `Version reversion error: ${e.message}` };
   }
 }
-
