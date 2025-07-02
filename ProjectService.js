@@ -640,3 +640,44 @@ function revertToVersion(scriptId, versionNumber) {
     return { status: 'error', message: `Version reversion error: ${e.message}` };
   }
 }
+
+/**
+ * 指定されたApps Scriptプロジェクトのファイル一覧（ファイル名とタイプ）を取得します。
+ * @param {string} scriptId - ファイル一覧を取得するApps ScriptのID
+ * @returns {object} - 処理結果 (成功/失敗) とファイル一覧 (成功時) を示すオブジェクト
+ */
+function listTargetScriptFiles(scriptId) {
+  if (!scriptId || scriptId.trim() === '') {
+    return { status: 'error', message: 'Script ID is not specified.' };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+
+    console.log(`スクリプトID ${scriptId} のファイル内容を取得中...`);
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    const responseCode = getResponse.getResponseCode();
+    const responseBody = getResponse.getContentText();
+
+    if (responseCode !== 200) {
+        console.error(`Apps Script APIエラー (ファイル内容取得) - ステータス: ${responseCode}, ボディ: ${responseBody}`);
+        return { status: 'error', message: `Failed to retrieve script content: ${responseBody}`, apiErrorDetails: JSON.parse(responseBody || '{}') };
+    }
+    
+    const projectContent = JSON.parse(responseBody);
+    
+    // 必要な情報（nameとtype）のみを抽出して返す
+    const filesList = (projectContent.files || []).map(file => ({
+      name: file.name,
+      type: file.type
+    }));
+
+    return { status: 'success', files: filesList, message: `Successfully retrieved ${filesList.length} files.` };
+
+  } catch (error) {
+    console.error("ファイル一覧取得中にエラーが発生しました:", error);
+    return { status: 'error', message: `File list retrieval error: ${error.message}` };
+  }
+}

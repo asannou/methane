@@ -236,6 +236,21 @@
         <pre id="version-result" class="content"></pre>
       </div>
 
+      <!-- NEW: Target Script Files Section -->
+      <hr class="my-5">
+      <h2 class="title is-4">Target Script Files</h2>
+      <p class="content">View the list of files within the selected Target Script ID.</p>
+      <div class="field">
+        <div class="control">
+          <button type="button" id="getFilesListButton" class="button is-link">Get Files List</button>
+        </div>
+      </div>
+      <div id="filesListContainer" class="box mt-4" style="display:none;">
+        <div id="filesListLoadingSpinner" class="spinner" style="display:none;"></div>
+        <h3 class="title is-5">Files in Script:</h3>
+        <ul id="filesListDisplay" class="content"></ul>
+      </div>
+
     </div>
   </section>
 
@@ -346,6 +361,7 @@
       document.getElementById('regeneratePolicyButton').style.display = 'none';
       
       document.getElementById('version-result-container').style.display = 'none';
+      document.getElementById('filesListContainer').style.display = 'none'; // Initialize new container to hidden
 
       updateEditorUrlDisplay();
 
@@ -1904,6 +1920,59 @@
           versionResultText.textContent = `Error reverting to version: ${error.message}`;
         })
         .revertToVersion(scriptId, parseInt(selectedVersion));
+    });
+
+    // New Event Listener for Get Files List Button
+    document.getElementById('getFilesListButton').addEventListener('click', function() {
+        const scriptId = getEffectiveScriptId();
+        const filesListContainer = document.getElementById('filesListContainer');
+        const filesListLoadingSpinner = document.getElementById('filesListLoadingSpinner');
+        const filesListDisplay = document.getElementById('filesListDisplay');
+        const getFilesListButton = this;
+
+        filesListContainer.style.display = 'block';
+        filesListDisplay.innerHTML = ''; // Clear previous list
+        filesListLoadingSpinner.style.display = 'block';
+        getFilesListButton.disabled = true;
+
+        if (!scriptId) {
+            filesListDisplay.innerHTML = '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>';
+            filesListLoadingSpinner.style.display = 'none';
+            getFilesListButton.disabled = false;
+            return;
+        }
+
+        saveScriptIdToLocalStorage(scriptId);
+
+        google.script.run
+            .withSuccessHandler(function(response) {
+                filesListLoadingSpinner.style.display = 'none';
+                getFilesListButton.disabled = false;
+
+                if (response.status === 'success') {
+                    if (response.files && response.files.length > 0) {
+                        filesListDisplay.innerHTML = ''; // Ensure it's clear before adding items
+                        response.files.forEach(file => {
+                            const li = document.createElement('li');
+                            li.textContent = `${file.name}.${getFileExtension(file.type)} (Type: ${file.type})`;
+                            filesListDisplay.appendChild(li);
+                        });
+                    } else {
+                        filesListDisplay.innerHTML = '<p>No files found in this script.</p>';
+                    }
+                } else {
+                    filesListDisplay.innerHTML = `<p class="has-text-danger">Error retrieving files: ${escapeHtml(response.message)}</p>`;
+                    if (response.apiErrorDetails) {
+                        filesListDisplay.innerHTML += `<pre class="has-text-danger-dark is-size-7 mt-2">${escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`;
+                    }
+                }
+            })
+            .withFailureHandler(function(error) {
+                filesListLoadingSpinner.style.display = 'none';
+                getFilesListButton.disabled = false;
+                filesListDisplay.innerHTML = `<p class="has-text-danger">Error calling server function: ${escapeHtml(error.message)}</p>`;
+            })
+            .listTargetScriptFiles(scriptId);
     });
   </script>
 </body>
