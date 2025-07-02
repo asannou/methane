@@ -53,6 +53,7 @@
     .file-comparison > div {
       flex: 1 1 calc(50% - 5px);
       margin-bottom: 0;
+      min-width: 0; /* Added to resolve flex-basis functionality issues */
     }
     .file-comparison > div:first-child {
       margin-right: 5px;
