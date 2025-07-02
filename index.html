@@ -1105,6 +1105,7 @@
             document.getElementById('html-validation-warnings').style.display = 'none'; 
             document.getElementById('html-validation-warnings').innerHTML = ''; 
             fixApplyErrorsButton.style.display = 'none';
+            document.getElementById('autoDeployAfterApply').parentElement.parentElement.style.display = 'none';
           } else { // response.status === 'error' for apply changes itself
             const errorNotification = document.createElement('div');
             errorNotification.className = 'notification is-danger';
