@@ -280,7 +280,7 @@ function deployScript(scriptId, description = '') {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
-    // --- 新しいロジック: デプロイメントが上限に達している場合にのみ古いウェブアプリデプロイメントをアーカイブ（削除）する --- 
+    // --- 新しいロジック: デプロイメントが上限に達している場合にのみ古いウェブアプリデプロイメントをアーカイブ（削除）する ---
     console.log("古いウェブアプリデプロイメントをアーカイブするか確認中...");
     const DEPLOYMENT_LIMIT = 50; // Google Apps Scriptのデプロイメント上限
 
@@ -537,11 +537,7 @@ function listScriptVersions(scriptId) {
     const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
 
     console.log(`スクリプトID ${scriptId} のバージョンをリスト中...`);
-    const options = {
-      method: 'get',
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      muteHttpExceptions: true
-    };
+    const options = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const response = UrlFetchApp.fetch(versionsApiUrl, options);
     const responseCode = response.getResponseCode();
     const responseBody = response.getContentText();
@@ -606,8 +602,14 @@ function revertToVersion(scriptId, versionNumber) {
       return { status: 'error', message: `Failed to retrieve content for version ${versionNumber} (HTTP ${getVersionContentCode}): ${getVersionContentBody}` };
     }
     const versionContent = JSON.parse(getVersionContentBody);
-    if (!versionContent.files) {
-      throw new Error(`No file data found in content for version ${versionNumber}.`);
+    // Modified: Check if 'files' property is missing or empty, and return a more specific error.
+    if (!versionContent.files || !Array.isArray(versionContent.files) || versionContent.files.length === 0) {
+      console.error(`バージョン ${versionNumber} のコンテンツにファイルデータが見つからないか、空でした。受信した応答ボディ: ${getVersionContentBody}`);
+      return {
+        status: 'error',
+        message: `Version ${versionNumber} content is empty or malformed (no files data). This version cannot be reverted to. Please check the Apps Script project's version history in the editor for details.`, // Improved user message
+        apiResponse: getVersionContentBody // For debugging on the client-side if needed
+      };
     }
 
     // 2. 取得したファイルコンテンツで現在のHEADを更新する (PUT)
@@ -636,3 +638,4 @@ function revertToVersion(scriptId, versionNumber) {
     return { status: 'error', message: `Version reversion error: ${e.message}` };
   }
 }
+
