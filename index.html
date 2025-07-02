@@ -87,7 +87,7 @@
         </div>
         <div class="field mt-3">
           <label class="checkbox">
-            <input type="checkbox" id="autoDeployAfterApply">
+            <input type="checkbox" id="autoDeployAfterApply" checked>
             Auto-deploy after applying
           </label>
         </div>
@@ -1137,7 +1137,7 @@
             currentProposal = response;
             document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
             
-            htmlWarningsDiv.innerHTML = ''; 
+            htmlWarningsDiv.innerHTML = '';
             let hasHtmlErrors = false;
 
             response.proposedFiles.forEach(file => {
