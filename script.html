@@ -4,6 +4,40 @@
     let activeRequestId = null;
     let isPolicyEditing = false;
 
+    // Map to store original button HTML content
+    const originalButtonContents = new Map();
+
+    /**
+     * Shows a loading spinner directly within the button.
+     * Stores the button's original content and disables it.
+     * @param {HTMLElement} buttonElement - The button element to modify.
+     * @param {string} [loadingText="Loading..."] - Optional text to display next to the spinner.
+     */
+    function showSpinnerInButton(buttonElement, loadingText = "Loading...") {
+        if (!buttonElement) return;
+        originalButtonContents.set(buttonElement.id, buttonElement.innerHTML);
+        buttonElement.innerHTML = `<span class="spinner button-spinner"></span> ${loadingText}`;
+        buttonElement.disabled = true;
+        buttonElement.classList.add('is-loading-button'); // Add a class for potential button-specific loading styles
+    }
+
+    /**
+     * Hides the loading spinner and restores the button's original content and state.
+     * @param {HTMLElement} buttonElement - The button element to restore.
+     */
+    function hideSpinnerInButton(buttonElement) {
+        if (!buttonElement || !originalButtonContents.has(buttonElement.id)) return;
+        buttonElement.innerHTML = originalButtonContents.get(buttonElement.id);
+        buttonElement.disabled = false;
+        buttonElement.classList.remove('is-loading-button');
+        originalButtonContents.delete(buttonElement.id); // Clean up map
+    }
+
+    // Helper to get a button element by ID and handle cases where it might not exist (e.g. for initially hidden buttons)
+    function getButton(id) {
+        return document.getElementById(id);
+    }
+
     function getEffectiveScriptId() {
         const manualId = document.getElementById('scriptIdManualInput').value.trim();
         if (manualId) {
@@ -62,6 +96,7 @@
             return;
         }
 
+        // This spinner is not in a button, so its existing style remains
         editorUrlDisplayDiv.innerHTML = 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...';
 
         saveScriptIdToLocalStorage(scriptId);
@@ -98,15 +133,15 @@
 
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
-      document.getElementById('applyChangesNoDeployButton').style.display = 'none';
-      document.getElementById('applyAndDeployButton').style.display = 'none';
-      document.getElementById('regenerateProposalButton').style.display = 'none';
+      getButton('applyChangesNoDeployButton').style.display = 'none';
+      getButton('applyAndDeployButton').style.display = 'none';
+      getButton('regenerateProposalButton').style.display = 'none';
       document.getElementById('apply-result-container').style.display = 'none';
-      document.getElementById('fixApplyErrorsButton').style.display = 'none';
+      getButton('fixApplyErrorsButton').style.display = 'none';
 
       // Ensure correct initial state for policy buttons
-      document.getElementById('generatePolicyButton').style.display = 'inline-block';
-      document.getElementById('regeneratePolicyButton').style.display = 'none';
+      getButton('generatePolicyButton').style.display = 'inline-block';
+      getButton('regeneratePolicyButton').style.display = 'none';
       
       document.getElementById('version-result-container').style.display = 'none';
       document.getElementById('filesListContainer').style.display = 'none';
@@ -403,11 +438,15 @@
       e.preventDefault();
       const submitterId = e.submitter.id;
 
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
+      const cancelAiOperationButton = getButton('cancelAiOperationButton');
       const promptInput = document.getElementById('prompt');
+      const acceptPolicyButton = getButton('acceptPolicyButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
+      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
+
 
       const scriptId = getEffectiveScriptId();
       const promptText = promptInput.value;
@@ -423,19 +462,25 @@
 
       saveScriptIdToLocalStorage(scriptId);
 
-      // Hide both policy buttons, show spinner and cancel
-      policyLoadingSpinner.style.display = 'block';
-      generatePolicyButton.style.display = 'none';
-      regeneratePolicyButton.style.display = 'none';
+      // Show spinner in the clicked button, hide others, disable all relevant buttons
+      if (submitterId === 'generatePolicyButton') {
+        showSpinnerInButton(generatePolicyButton, 'Generating Policy...');
+        regeneratePolicyButton.style.display = 'none'; // Will be shown later if successful
+      } else { // Should not happen for this form
+        console.error("Unknown submitter for agent-form:", submitterId);
+        return;
+      }
+
       promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
-      document.getElementById('regenerateProposalButton').style.display = 'none';
-      document.getElementById('applyChangesNoDeployButton').style.display = 'none';
-      document.getElementById('applyAndDeployButton').style.display = 'none';
+      acceptPolicyButton.style.display = 'none';
+      regenerateProposalButton.style.display = 'none';
+      applyChangesNoDeployButton.style.display = 'none';
+      applyAndDeployButton.style.display = 'none';
       document.getElementById('policy-container').style.display = 'none';
       document.getElementById('proposal-container').style.display = 'none';
       document.getElementById('apply-result-container').style.display = 'none';
-      document.getElementById('fixApplyErrorsButton').style.display = 'none';
+      getButton('fixApplyErrorsButton').style.display = 'none';
       document.getElementById('proposed-files-display').innerHTML = '';
       document.getElementById('ai-policy').innerHTML = '';
       document.getElementById('html-validation-warnings').style.display = 'none';
@@ -451,50 +496,48 @@
       const requestId = Date.now();
       activeRequestId = requestId;
 
-      if (submitterId === 'generatePolicyButton') {
-        console.log('Generating policy...');
-        google.script.run
-          .withSuccessHandler(function(response) {
-            if (activeRequestId !== requestId) {
-              console.log('Ignoring stale success response for generateProposalPolicy.');
-              return;
-            }
-            activeRequestId = null;
-            policyLoadingSpinner.style.display = 'none';
-            cancelAiOperationButton.style.display = 'none';
+      console.log('Generating policy...');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale success response for generateProposalPolicy.');
+            return;
+          }
+          activeRequestId = null;
+          hideSpinnerInButton(generatePolicyButton); // Hide spinner on the clicked button
+          cancelAiOperationButton.style.display = 'none';
 
-            if (response.status === 'policy') {
-              currentPolicyData = response;
-              document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
-              document.getElementById('policy-container').style.display = 'block';
-              document.getElementById('acceptPolicyButton').style.display = 'inline-block';
-              regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
-              generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-              promptInput.readOnly = false;
-            } else if (response.status === 'error') {
-              document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
-              document.getElementById('policy-container').style.display = 'block';
-              promptInput.readOnly = false;
-              generatePolicyButton.style.display = 'inline-block'; // Show Generate Policy on error
-              regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy
-            }
-          })
-          .withFailureHandler(function(error) {
-            if (activeRequestId !== requestId) {
-              console.log('Ignoring stale failure response for generateProposalPolicy.');
-              return;
-            }
-            activeRequestId = null;
-            policyLoadingSpinner.style.display = 'none';
-            promptInput.readOnly = false;
-            cancelAiOperationButton.style.display = 'none';
-            document.getElementById('ai-policy').textContent = 'Error generating policy: ' + error.message;
+          if (response.status === 'policy') {
+            currentPolicyData = response;
+            document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
             document.getElementById('policy-container').style.display = 'block';
+            acceptPolicyButton.style.display = 'inline-block';
+            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
+            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
+            promptInput.readOnly = false;
+          } else if (response.status === 'error') {
+            document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
+            document.getElementById('policy-container').style.display = 'block';
+            promptInput.readOnly = false;
             generatePolicyButton.style.display = 'inline-block'; // Show Generate Policy on error
             regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy
-          })
-          .generateProposalPolicy(formData);
-      }
+          }
+        })
+        .withFailureHandler(function(error) {
+          if (activeRequestId !== requestId) {
+            console.log('Ignoring stale failure response for generateProposalPolicy.');
+            return;
+          }
+          activeRequestId = null;
+          hideSpinnerInButton(generatePolicyButton); // Hide spinner on the clicked button
+          promptInput.readOnly = false;
+          cancelAiOperationButton.style.display = 'none';
+          document.getElementById('ai-policy').textContent = 'Error generating policy: ' + error.message;
+          document.getElementById('policy-container').style.display = 'block';
+          generatePolicyButton.style.display = 'inline-block'; // Show Generate Policy on error
+          regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy
+        })
+        .generateProposalPolicy(formData);
     });
 
     document.getElementById('togglePolicyEditButton').addEventListener('click', function() {
@@ -532,21 +575,18 @@
       }
 
       const acceptPolicyButton = this;
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const cancelAiOperationButton = getButton('cancelAiOperationButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
 
-      proposalLoadingSpinner.style.display = 'block';
-      acceptPolicyButton.disabled = true;
-      acceptPolicyButton.style.display = 'none';
+      showSpinnerInButton(acceptPolicyButton, 'Proposing Changes...');
       regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy button during proposal generation
       generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button remains hidden
       regenerateProposalButton.style.display = 'none';
-      document.getElementById('applyChangesNoDeployButton').style.display = 'none';
-      document.getElementById('applyAndDeployButton').style.display = 'none';
+      getButton('applyChangesNoDeployButton').style.display = 'none';
+      getButton('applyAndDeployButton').style.display = 'none';
       cancelAiOperationButton.style.display = 'inline-block';
       promptInput.readOnly = true;
       
@@ -568,8 +608,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          acceptPolicyButton.disabled = false;
+          hideSpinnerInButton(acceptPolicyButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
@@ -601,8 +640,8 @@
 
             displayFileComparison(response.originalFiles, response.proposedFiles);
             document.getElementById('proposal-container').style.display = 'block';
-            document.getElementById('applyChangesNoDeployButton').style.display = 'block';
-            document.getElementById('applyAndDeployButton').style.display = 'block';
+            getButton('applyChangesNoDeployButton').style.display = 'block';
+            getButton('applyAndDeployButton').style.display = 'block';
             regenerateProposalButton.style.display = 'inline-block';
             regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button again
             generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
@@ -638,8 +677,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          acceptPolicyButton.disabled = false;
+          hideSpinnerInButton(acceptPolicyButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
@@ -661,27 +699,33 @@
     document.getElementById('cancelAiOperationButton').addEventListener('click', function() {
       activeRequestId = null;
 
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
-      const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const cancelAiOperationButton = getButton('cancelAiOperationButton');
+      const acceptPolicyButton = getButton('acceptPolicyButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
+      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
+      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
+
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
-      const acceptPolicyButton = document.getElementById('acceptPolicyButton');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
-      const applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
       const applyResultContent = document.getElementById('apply-result-content');
 
-      policyLoadingSpinner.style.display = 'none';
-      proposalLoadingSpinner.style.display = 'none';
+      // Hide spinners and re-enable buttons that might have been loading
+      hideSpinnerInButton(generatePolicyButton);
+      hideSpinnerInButton(acceptPolicyButton);
+      hideSpinnerInButton(regeneratePolicyButton);
+      hideSpinnerInButton(regenerateProposalButton);
+      hideSpinnerInButton(applyChangesNoDeployButton);
+      hideSpinnerInButton(applyAndDeployButton);
+      hideSpinnerInButton(fixApplyErrorsButton);
+      
       promptInput.readOnly = false;
       cancelAiOperationButton.style.display = 'none';
 
@@ -729,30 +773,28 @@
 
       saveScriptIdToLocalStorage(scriptId);
 
-      const policyLoadingSpinner = document.getElementById('policy-loading-spinner');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const acceptPolicyButton = document.getElementById('acceptPolicyButton');
-      const regeneratePolicyButton = this;
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const acceptPolicyButton = getButton('acceptPolicyButton');
+      const regeneratePolicyButton = this; // This is the button that was clicked
+      const cancelAiOperationButton = getButton('cancelAiOperationButton');
       const policyContainer = document.getElementById('policy-container');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const promptInput = document.getElementById('prompt');
       const policyEditorTextarea = document.getElementById('policyEditor');
       const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
       const applyResultContent = document.getElementById('apply-result-content');
 
-      // Hide both policy buttons, show spinner and cancel
-      policyLoadingSpinner.style.display = 'block';
+      // Show spinner in the clicked button
+      showSpinnerInButton(regeneratePolicyButton, 'Regenerating Policy...');
       generatePolicyButton.style.display = 'none'; // Keep Generate Policy button hidden
-      regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy button during loading
-      regeneratePolicyButton.disabled = true; // Disable regenerate button
-      acceptPolicyButton.disabled = true; // Disable accept button
+      acceptPolicyButton.style.display = 'none'; // Hide accept button
+      
       promptInput.readOnly = true;
       cancelAiOperationButton.style.display = 'inline-block';
 
@@ -789,9 +831,7 @@
             return;
           }
           activeRequestId = null;
-          policyLoadingSpinner.style.display = 'none';
-          acceptPolicyButton.disabled = false;
-          regeneratePolicyButton.disabled = false;
+          hideSpinnerInButton(regeneratePolicyButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
@@ -815,9 +855,7 @@
             return;
           }
           activeRequestId = null;
-          policyLoadingSpinner.style.display = 'none';
-          acceptPolicyButton.disabled = false;
-          regeneratePolicyButton.disabled = false;
+          hideSpinnerInButton(regeneratePolicyButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelAiOperationButton.style.display = 'none';
 
@@ -830,14 +868,14 @@
     });
 
     document.getElementById('applyChangesNoDeployButton').addEventListener('click', function() {
-      handleApplyChanges(false); // No deploy
+      handleApplyChanges(false, this); // No deploy, pass clicked button
     });
 
     document.getElementById('applyAndDeployButton').addEventListener('click', function() {
-      handleApplyChanges(true); // Deploy
+      handleApplyChanges(true, this); // Deploy, pass clicked button
     });
 
-    function handleApplyChanges(autoDeploy) {
+    function handleApplyChanges(autoDeploy, clickedButton) {
       if (!currentProposal) {
         const applyResultContent = document.getElementById('apply-result-content');
         applyResultContent.innerHTML = `
@@ -851,18 +889,25 @@
 
       saveScriptIdToLocalStorage(currentProposal.scriptId);
 
-      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
-      const applySpinner = document.getElementById('apply-loading-spinner');
+      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
       const applyResultContent = document.getElementById('apply-result-content');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
 
-      applyNoDeployButton.disabled = true;
-      applyAndDeployButton.disabled = true;
-      fixApplyErrorsButton.style.display = 'none';
+      // Show spinner in the clicked button
+      showSpinnerInButton(clickedButton, autoDeploy ? 'Applying & Deploying...' : 'Applying Changes...');
+      
+      // Disable other related buttons that are not loading a spinner within them
+      if (clickedButton.id === 'applyChangesNoDeployButton') {
+          applyAndDeployButton.disabled = true;
+      } else {
+          applyNoDeployButton.disabled = true;
+      }
       regenerateProposalButton.disabled = true;
-      applySpinner.style.display = 'block';
+      fixApplyErrorsButton.disabled = true; // Disable fix apply errors button too if it's visible
+
+      fixApplyErrorsButton.style.display = 'none';
       applyResultContent.innerHTML = `
         <div class="notification is-info is-light">
           <p>Applying changes...</p>
@@ -873,10 +918,11 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          applySpinner.style.display = 'none';
-          applyNoDeployButton.disabled = false;
+          hideSpinnerInButton(clickedButton); // Hide spinner on the clicked button
+          applyNoDeployButton.disabled = false; // Re-enable all apply buttons
           applyAndDeployButton.disabled = false;
           regenerateProposalButton.disabled = false;
+          fixApplyErrorsButton.disabled = false;
           applyResultContent.innerHTML = '';
 
           if (response.status === 'success') {
@@ -969,10 +1015,11 @@
           }
         })
         .withFailureHandler(function(error) {
-          applySpinner.style.display = 'none';
+          hideSpinnerInButton(clickedButton); // Hide spinner on the clicked button
           applyNoDeployButton.disabled = false;
           applyAndDeployButton.disabled = false;
           regenerateProposalButton.disabled = false;
+          fixApplyErrorsButton.disabled = false;
           applyResultContent.innerHTML = `
               <div class="notification is-danger">
                   <p><strong>Error applying changes (Uncaught):</strong></p>
@@ -998,30 +1045,27 @@
       }
 
       const fixButton = this;
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
+      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const cancelFixErrorsButton = getButton('cancelFixErrorsButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const applyResultContent = document.getElementById('apply-result-content');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
 
       const requestId = Date.now();
       activeRequestId = requestId;
 
-      fixButton.disabled = true;
+      showSpinnerInButton(fixButton, 'Fixing Errors...');
       generatePolicyButton.style.display = 'none'; // Ensure generate button is hidden
       regeneratePolicyButton.style.display = 'none'; // Hide regenerate button during loading
       promptInput.readOnly = true;
       cancelFixErrorsButton.style.display = 'inline-block';
       regenerateProposalButton.style.display = 'none';
-      proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyNoDeployButton.style.display = 'none';
       applyAndDeployButton.style.display = 'none';
@@ -1040,8 +1084,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          fixButton.disabled = false;
+          hideSpinnerInButton(fixButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
@@ -1110,8 +1153,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          fixButton.disabled = false;
+          hideSpinnerInButton(fixButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
@@ -1145,31 +1187,29 @@
         return;
       }
 
-      const fixErrorsButton = document.getElementById('fixErrorsButton');
-      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
+      const fixErrorsButton = getButton('fixErrorsButton'); // This is the button that was clicked
+      const cancelFixErrorsButton = getButton('cancelFixErrorsButton');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
+      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const applyResultContent = document.getElementById('apply-result-content');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
 
       const requestId = Date.now();
       activeRequestId = requestId;
 
-      fixErrorsButton.disabled = true;
+      showSpinnerInButton(fixErrorsButton, 'Fixing Errors...');
       generatePolicyButton.style.display = 'none'; // Ensure generate button is hidden
       regeneratePolicyButton.style.display = 'none'; // Hide regenerate button during loading
       promptInput.readOnly = true;
       cancelFixErrorsButton.style.display = 'inline-block';
       regenerateProposalButton.style.display = 'none';
-      proposalLoadingSpinner.style.display = 'block';
       proposalContainer.style.display = 'none';
       applyNoDeployButton.style.display = 'none';
       applyAndDeployButton.style.display = 'none';
@@ -1190,8 +1230,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          fixErrorsButton.disabled = false;
+          hideSpinnerInButton(fixErrorsButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
@@ -1261,8 +1300,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          fixErrorsButton.disabled = false;
+          hideSpinnerInButton(fixErrorsButton); // Hide spinner on the clicked button
           promptInput.readOnly = false;
           cancelFixErrorsButton.style.display = 'none';
 
@@ -1284,23 +1322,21 @@
     document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
       activeRequestId = null;
 
-      const fixErrorsButton = document.getElementById('fixErrorsButton');
-      const cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
+      const fixErrorsButton = getButton('fixErrorsButton');
+      const cancelFixErrorsButton = getButton('cancelFixErrorsButton');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
+      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const regenerateProposalButton = document.getElementById('regenerateProposalButton');
+      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const regenerateProposalButton = getButton('regenerateProposalButton');
       const promptInput = document.getElementById('prompt');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const applyResultContent = document.getElementById('apply-result-content');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
 
-      proposalLoadingSpinner.style.display = 'none';
-      fixErrorsButton.disabled = false;
+      hideSpinnerInButton(fixErrorsButton); // Hide spinner on this button
       promptInput.readOnly = false;
       cancelFixErrorsButton.style.display = 'none';
       regenerateProposalButton.style.display = 'none';
@@ -1332,22 +1368,20 @@
       const promptText = currentPolicyData.userPrompt;
       const policyText = currentPolicyData.policy;
 
-      const regenerateButton = this;
-      const proposalLoadingSpinner = document.getElementById('proposal-loading-spinner');
-      const cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+      const regenerateButton = this; // This is the button that was clicked
+      const cancelAiOperationButton = getButton('cancelAiOperationButton');
       const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
-      const applyAndDeployButton = document.getElementById('applyAndDeployButton');
+      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
+      const applyAndDeployButton = getButton('applyAndDeployButton');
       const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
       const htmlWarningsDiv = document.getElementById('html-validation-warnings');
       const promptInput = document.getElementById('prompt');
       const applyResultContent = document.getElementById('apply-result-content');
-      const generatePolicyButton = document.getElementById('generatePolicyButton');
-      const regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+      const generatePolicyButton = getButton('generatePolicyButton');
+      const regeneratePolicyButton = getButton('regeneratePolicyButton');
 
-      proposalLoadingSpinner.style.display = 'block';
-      regenerateButton.disabled = true;
+      showSpinnerInButton(regenerateButton, 'Regenerating Proposal...');
       applyChangesNoDeployButton.disabled = true;
       applyAndDeployButton.disabled = true;
       promptInput.readOnly = true;
@@ -1368,7 +1402,7 @@
 
       const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
 
-      const requestId = Date.now();
+      const requestId = Date.n();
       activeRequestId = requestId;
 
       console.log('Regenerating AI proposed changes...');
@@ -1379,8 +1413,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          regenerateButton.disabled = false;
+          hideSpinnerInButton(regenerateButton); // Hide spinner on the clicked button
           applyChangesNoDeployButton.disabled = false;
           applyAndDeployButton.disabled = false;
           promptInput.readOnly = false;
@@ -1453,8 +1486,7 @@
             return;
           }
           activeRequestId = null;
-          proposalLoadingSpinner.style.display = 'none';
-          regenerateButton.disabled = false;
+          hideSpinnerInButton(regenerateButton); // Hide spinner on the clicked button
           applyChangesNoDeployButton.disabled = false;
           applyAndDeployButton.disabled = false;
           promptInput.readOnly = false;
@@ -1481,24 +1513,29 @@
       const gcpProjectId = gcpProjectIdInput.value.trim();
       const saveResultContainer = document.getElementById('gcp-save-result-container');
       const saveResultText = document.getElementById('gcp-save-result');
+      const saveButton = this;
 
       saveResultContainer.style.display = 'block';
       saveResultText.textContent = 'Saving...';
+      showSpinnerInButton(saveButton, 'Saving...');
 
       if (!gcpProjectId) {
         saveResultText.textContent = 'Error: GCP Project ID cannot be empty.';
+        hideSpinnerInButton(saveButton);
         return;
       }
 
       google.script.run
         .withSuccessHandler(function(response) {
           saveResultText.textContent = response.message;
+          hideSpinnerInButton(saveButton);
           if (response.status === 'success') {
             saveGcpProjectIdToLocalStorage(gcpProjectId);
           }
         })
         .withFailureHandler(function(error) {
           saveResultText.textContent = 'Error saving GCP Project ID: ' + error.message;
+          hideSpinnerInButton(saveButton);
         })
         .setGcpProjectId(gcpProjectId);
     });
@@ -1507,10 +1544,12 @@
       e.preventDefault();
       const form = this;
       const submitButton = form.querySelector('#getLogsButton');
-      const spinner = document.getElementById('log-loading-spinner');
+      const resultContainer = document.getElementById('log-result-container');
+      const resultText = document.getElementById('log-result');
 
-      submitButton.disabled = true;
-      spinner.style.display = 'block';
+      showSpinnerInButton(submitButton, 'Getting Logs...');
+      resultContainer.style.display = 'none';
+      resultText.textContent = '';
 
       const scriptId = getEffectiveScriptId();
 
@@ -1518,16 +1557,14 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          document.getElementById('log-result').textContent = response;
-          document.getElementById('log-result-container').style.display = 'block';
-          submitButton.disabled = false;
-          spinner.style.display = 'none';
+          hideSpinnerInButton(submitButton);
+          resultText.textContent = response;
+          resultContainer.style.display = 'block';
         })
         .withFailureHandler(function(error) {
-          document.getElementById('log-result').textContent = 'Error: ' + error.message;
-          document.getElementById('log-result-container').style.display = 'block';
-          submitButton.disabled = false;
-          spinner.style.display = 'none';
+          hideSpinnerInButton(submitButton);
+          resultText.textContent = 'Error: ' + error.message;
+          resultContainer.style.display = 'block';
         })
         .getScriptLogs(scriptId);
     });
@@ -1536,12 +1573,10 @@
       e.preventDefault();
       const form = this;
       const submitButton = form.querySelector('#deployButton');
-      const spinner = document.getElementById('deploy-loading-spinner');
       const resultContainer = document.getElementById('deploy-result-container');
       const resultText = document.getElementById('deploy-result');
 
-      submitButton.disabled = true;
-      spinner.style.display = 'block';
+      showSpinnerInButton(submitButton, 'Deploying...');
       resultContainer.style.display = 'none';
       resultText.textContent = '';
 
@@ -1552,8 +1587,7 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
+          hideSpinnerInButton(submitButton);
           resultContainer.style.display = 'block';
           if (response.status === 'success') {
             let webappUrlHtml = `Web App URL: ${response.webappUrl}`;
@@ -1566,8 +1600,7 @@
           }
         })
         .withFailureHandler(function(error) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
+          hideSpinnerInButton(submitButton);
           resultContainer.style.display = 'block';
           resultText.textContent = `Error deploying script: ${error.message}`;
         })
@@ -1578,12 +1611,10 @@
       e.preventDefault();
       const form = this;
       const submitButton = form.querySelector('#addLibraryButton');
-      const spinner = document.getElementById('add-library-loading-spinner');
       const resultContainer = document.getElementById('add-library-result-container');
       const resultText = document.getElementById('add-library-result');
 
-      submitButton.disabled = true;
-      spinner.style.display = 'block';
+      showSpinnerInButton(submitButton, 'Adding Library...');
       resultContainer.style.display = 'none';
       resultText.textContent = '';
 
@@ -1594,15 +1625,13 @@
       if (!targetScriptId) {
         resultText.textContent = 'Error: Please select or enter a Target Script ID.';
         resultContainer.style.display = 'block';
-        submitButton.disabled = false;
-        spinner.style.display = 'none';
+        hideSpinnerInButton(submitButton);
         return;
       }
       if (!libraryScriptId) {
         resultText.textContent = 'Error: Library Script ID cannot be empty.';
         resultContainer.style.display = 'block';
-        submitButton.disabled = false;
-        spinner.style.display = 'none';
+        hideSpinnerInButton(submitButton);
         return;
       }
 
@@ -1612,8 +1641,7 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
+          hideSpinnerInButton(submitButton);
           resultContainer.style.display = 'block';
           if (response.status === 'success') {
             resultText.textContent = response.message;
@@ -1624,8 +1652,7 @@
           }
         })
         .withFailureHandler(function(error) {
-          spinner.style.display = 'none';
-          submitButton.disabled = false;
+          hideSpinnerInButton(submitButton);
           resultContainer.style.display = 'block';
           resultText.textContent = `Error adding library: ${error.message}`;
         })
@@ -1635,17 +1662,15 @@
     document.getElementById('getVersionsButton').addEventListener('click', function() {
       const scriptId = getEffectiveScriptId();
       const versionsSelect = document.getElementById('versionSelect');
-      const getVersionsButton = this;
-      const revertVersionButton = document.getElementById('revertVersionButton');
-      const versionLoadingSpinner = document.getElementById('version-loading-spinner');
+      const getVersionsButton = this; // This is the button that was clicked
+      const revertVersionButton = getButton('revertVersionButton');
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
       versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>';
       versionsSelect.disabled = true;
-      getVersionsButton.disabled = true;
+      showSpinnerInButton(getVersionsButton, 'Getting Versions...');
       revertVersionButton.disabled = true;
-      versionLoadingSpinner.style.display = 'block';
       versionResultContainer.style.display = 'none';
 
       if (!scriptId) {
@@ -1653,8 +1678,7 @@
         versionResultText.textContent = 'Error: Please select or enter a Script ID to get versions.';
         versionResultContainer.style.display = 'block';
         versionsSelect.disabled = false;
-        getVersionsButton.disabled = false;
-        versionLoadingSpinner.style.display = 'none';
+        hideSpinnerInButton(getVersionsButton);
         return;
       }
 
@@ -1662,8 +1686,7 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          versionLoadingSpinner.style.display = 'none';
-          getVersionsButton.disabled = false;
+          hideSpinnerInButton(getVersionsButton);
           versionsSelect.disabled = false;
           revertVersionButton.disabled = false;
 
@@ -1691,8 +1714,7 @@
           versionResultContainer.style.display = 'block';
         })
         .withFailureHandler(function(error) {
-          versionLoadingSpinner.style.display = 'none';
-          getVersionsButton.disabled = false;
+          hideSpinnerInButton(getVersionsButton);
           versionsSelect.disabled = false;
           revertVersionButton.disabled = true;
           versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
@@ -1706,9 +1728,8 @@
       const scriptId = getEffectiveScriptId();
       const versionSelect = document.getElementById('versionSelect');
       const selectedVersion = versionSelect.value;
-      const revertButton = this;
-      const getVersionsButton = document.getElementById('getVersionsButton');
-      const versionLoadingSpinner = document.getElementById('version-loading-spinner');
+      const revertButton = this; // This is the button that was clicked
+      const getVersionsButton = getButton('getVersionsButton');
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
@@ -1727,10 +1748,9 @@
         return;
       }
 
-      revertButton.disabled = true;
+      showSpinnerInButton(revertButton, 'Reverting...');
       getVersionsButton.disabled = true;
       versionSelect.disabled = true;
-      versionLoadingSpinner.style.display = 'block';
       versionResultContainer.style.display = 'block';
       versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
 
@@ -1738,8 +1758,7 @@
 
       google.script.run
         .withSuccessHandler(function(response) {
-          versionLoadingSpinner.style.display = 'none';
-          revertButton.disabled = false;
+          hideSpinnerInButton(revertButton);
           getVersionsButton.disabled = false;
           versionSelect.disabled = false;
 
@@ -1754,8 +1773,7 @@
           }
         })
         .withFailureHandler(function(error) {
-          versionLoadingSpinner.style.display = 'none';
-          revertButton.disabled = false;
+          hideSpinnerInButton(revertButton);
           getVersionsButton.disabled = false;
           versionSelect.disabled = false;
           versionResultText.textContent = `Error reverting to version: ${error.message}`;
@@ -1766,19 +1784,16 @@
     document.getElementById('getFilesListButton').addEventListener('click', function() {
         const scriptId = getEffectiveScriptId();
         const filesListContainer = document.getElementById('filesListContainer');
-        const filesListLoadingSpinner = document.getElementById('filesListLoadingSpinner');
         const filesListDisplay = document.getElementById('filesListDisplay');
-        const getFilesListButton = this;
+        const getFilesListButton = this; // This is the button that was clicked
 
         filesListContainer.style.display = 'block';
         filesListDisplay.innerHTML = '';
-        filesListLoadingSpinner.style.display = 'block';
-        getFilesListButton.disabled = true;
+        showSpinnerInButton(getFilesListButton, 'Getting Files...');
 
         if (!scriptId) {
             filesListDisplay.innerHTML = '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>';
-            filesListLoadingSpinner.style.display = 'none';
-            getFilesListButton.disabled = false;
+            hideSpinnerInButton(getFilesListButton);
             return;
         }
 
@@ -1786,8 +1801,7 @@
 
         google.script.run
             .withSuccessHandler(function(response) {
-                filesListLoadingSpinner.style.display = 'none';
-                getFilesListButton.disabled = false;
+                hideSpinnerInButton(getFilesListButton);
 
                 if (response.status === 'success') {
                     if (response.files && response.files.length > 0) {
@@ -1837,8 +1851,7 @@
                 }
             })
             .withFailureHandler(function(error) {
-                filesListLoadingSpinner.style.display = 'none';
-                getFilesListButton.disabled = false;
+                hideSpinnerInButton(getFilesListButton);
                 filesListDisplay.innerHTML = `<p class="has-text-danger">Error calling server function: ${escapeHtml(error.message)}</p>`;
             })
             .listTargetScriptFiles(scriptId);

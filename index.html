@@ -68,8 +68,6 @@
           </div>
         </form>
 
-        <div id="policy-loading-spinner" class="spinner" style="display:none;"></div>
-
         <div id="policy-container" class="box mt-4" style="display:none;">
           <h2 class="title is-4">AI Generated Policy:</h2>
           <div class="field is-grouped is-flex is-justify-content-space-between is-align-items-center mb-3">
@@ -77,7 +75,7 @@
             </div>
             <div class="control">
               <button type="button" id="togglePolicyEditButton" class="button is-small is-light">Edit Policy</button>
-            </div>
+            }
           </div>
           <div id="ai-policy" class="content"></div>
           <textarea id="policyEditor" class="textarea is-small" style="display:none; height: 200px;"></textarea>
@@ -89,8 +87,6 @@
             </div>
           </div>
         </div>
-
-        <div id="proposal-loading-spinner" class="spinner" style="display:none;"></div>
 
         <div id="proposal-container" class="box mt-4" style="display:none;">
           <h2 class="title is-4">AI Proposed Changes:</h2>
@@ -110,7 +106,6 @@
               <button type="button" id="regenerateProposalButton" class="button is-info is-light" style="display:none;">Regenerate Proposal</button>
             </div>
           </div>
-          <div id="apply-loading-spinner" class="spinner" style="display:none;"></div>
           <div id="apply-result-container" class="box mt-4" style="display:none;">
             <h3 class="title is-5">Apply Result:</h3>
             <div id="apply-result-content"></div>
@@ -128,7 +123,6 @@
           </div>
         </form>
         <div id="log-result-container" class="box mt-4" style="display:none;">
-          <div id="log-loading-spinner" class="spinner" style="display:none;"></div>
           <h3 class="title is-5">Logs:</h3>
           <pre id="log-result" class="content"></pre>
         </div>
@@ -152,7 +146,7 @@
             <label class="label" for="deploymentDescription">Deployment Description (Optional):</label>
             <div class="control">
               <input type="text" id="deploymentDescription" name="deploymentDescription" class="input">
-            </div>
+            }
           </div>
           <p class="content is-small">This will deploy the current HEAD version as a new Web App deployment, using the Web App settings defined in <code>appsscript.json</code>. Older web app deployments might be automatically archived if limits are reached.</p>
           <div class="control">
@@ -160,7 +154,6 @@
           </div>
         </form>
         <div id="deploy-result-container" class="box mt-4" style="display:none;">
-          <div id="deploy-loading-spinner" class="spinner" style="display:none;"></div>
           <h3 class="title is-5">Deployment Result:</h3>
           <pre id="deploy-result" class="content"></pre>
         </div>
@@ -184,7 +177,6 @@
           </div>
         </form>
         <div id="add-library-result-container" class="box mt-4" style="display:none;">
-          <div id="add-library-loading-spinner" class="spinner" style="display:none;"></div>
           <h3 class="title is-5">Add Library Result:</h3>
           <pre id="add-library-result" class="content"></pre>
         </div>
@@ -207,7 +199,6 @@
               <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
             </div>
           </div>
-          <div id="version-loading-spinner" class="spinner" style="display:none;"></div>
           <div id="version-result-container" class="box mt-4" style="display:none;">
             <h3 class="title is-5">Version Operation Result:</h3>
             <pre id="version-result" class="content"></pre>
@@ -223,7 +214,6 @@
             </div>
           </div>
           <div id="filesListContainer" class="box mt-4" style="display:none;">
-            <div id="filesListLoadingSpinner" class="spinner" style="display:none;"></div>
             <h3 class="title is-5">Files in Script:</h3>
             <div id="filesListDisplay" class="files-grid"></div>
           </div>

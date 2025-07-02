@@ -165,6 +165,15 @@
     vertical-align: middle;
   }
 
+  /* Specific styles for spinner inside buttons */
+  .button .spinner {
+    width: 1em; /* Make it relative to font size */
+    height: 1em;
+    margin-right: 8px; /* Add some space between spinner and text */
+    vertical-align: middle;
+    border-width: 2px !important; /* Thinner border for smaller spinner */
+  }
+
   /* The small spinner in editor-url-display needs specific override */
   #editor-url-display .spinner {
     width: 14px;
@@ -172,6 +181,7 @@
     margin: 0 5px;
     display: inline-block;
     vertical-align: middle;
+    border-width: 2px !important; /* Keep its original border width for consistency */
   }
 
   /* Layout for diff-like display - Custom, keep these */
