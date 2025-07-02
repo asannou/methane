@@ -282,7 +282,7 @@ function deployScript(scriptId, description = '') {
 
     // --- 新しいロジック: デプロイメントが上限に達している場合にのみ古いウェブアプリデプロイメントをアーカイブ（削除）する ---
     console.log("古いウェブアプリデプロイメントをアーカイブするか確認中...");
-    const DEPLOYMENT_LIMIT = 50; // Google Apps Scriptのデプロイメント上限
+    const DEPLOYMENT_LIMIT = 20; // Google Apps Scriptのデプロイメント上限
 
     const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
     const listOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
