@@ -280,8 +280,8 @@ function deployScript(scriptId, description = '') {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
-    // --- 新しいロジック: デプロイメントが上限に達している場合にのみ古いウェブアプリデプロイメントをアーカイブ（削除）する ---
-    console.log("古いウェブアプリデプロイメントをアーカイブするか確認中...");
+    // --- 新しいロジック: デプロイメントが上限に達している場合にのみ古いウェブアプリデプロイメントをアーカイブ（削除）する --- 
+    console.log("古いデプロイメントをアーカイブするか確認中...");
     const DEPLOYMENT_LIMIT = 20; // Google Apps Scriptのデプロイメント上限
 
     const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
@@ -295,36 +295,43 @@ function deployScript(scriptId, description = '') {
       const allDeployments = JSON.parse(listResponseBody).deployments || [];
       console.log(`取得した全てのデプロイメント数: ${allDeployments.length}`);
 
-      // ウェブアプリデプロイメントのみをフィルタリングし、作成時間でソート
-      const webAppDeployments = allDeployments
-        .filter(dep => dep.entryPoints && dep.entryPoints.some(ep => ep.webApp))
-        .sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime()); // 最も古いものが先頭に来るようにソート
+      // 新しく作成されたデプロイメントを除外
+      let deletableDeployments = allDeployments.filter(dep => dep.deploymentId !== newDeploymentId);
+      // Sort them by creation time (oldest first)
+      deletableDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
 
-      console.log(`ウェブアプリデプロイメント数: ${webAppDeployments.length}`);
+      // Calculate how many deployments need to be removed to be below the limit
+      // Target DEPLOYMENT_LIMIT - 1 to make room for the newly created one, assuming it consumes one slot.
+      const deploymentsToRemoveCount = deletableDeployments.length - (DEPLOYMENT_LIMIT - 1);
 
-      // 上限に達している、または超えている場合にのみアーカイブ
-      if (webAppDeployments.length >= DEPLOYMENT_LIMIT) {
-        console.log(`デプロイメント数が上限 (${DEPLOYMENT_LIMIT}) に達しているため、最も古いウェブアプリデプロイメントをアーカイブします。`);
+      if (deploymentsToRemoveCount > 0) {
+        console.log(`デプロイメント数が上限 (${DEPLOYMENT_LIMIT}) を超えています (${deletableDeployments.length}個)。最も古い ${deploymentsToRemoveCount} 個のデプロイメントをアーカイブします。`);
         
-        // 新しく作成されたデプロイメントを除外
-        const deletableDeployments = webAppDeployments.filter(dep => dep.deploymentId !== newDeploymentId);
+        let removedCount = 0;
+        // Attempt to delete 'deploymentsToRemoveCount' oldest deployments, but not more than available
+        for (let i = 0; i < deploymentsToRemoveCount && i < deletableDeployments.length; i++) {
+          const oldDeploymentToDelete = deletableDeployments[i];
 
-        if (deletableDeployments.length > 0) {
-          // 最も古いデプロイメント (新しいものを除く) を一つ削除
-          const oldDeploymentToDelete = deletableDeployments[0]; // ソート済みなので0番目が最も古い
-
-          console.log(`古いウェブアプリデプロイメントを削除中: ID = ${oldDeploymentToDelete.deploymentId}, 作成日時 = ${oldDeploymentToDelete.createTime}`);
+          console.log(`古いデプロイメントを削除中: ID = ${oldDeploymentToDelete.deploymentId}, 作成日時 = ${oldDeploymentToDelete.createTime}`);
           const deleteDeploymentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments/${oldDeploymentToDelete.deploymentId}`;
           const deleteOptions = { method: 'delete', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
           const deleteResponse = UrlFetchApp.fetch(deleteDeploymentUrl, deleteOptions);
 
           if (deleteResponse.getResponseCode() !== 200) {
             console.warn(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} の削除に失敗: ${deleteResponse.getContentText()}`);
+            // Log full error for read-only issue specifically
+            if (deleteResponse.getContentText().includes("Read-only deployments may not be deleted.")) {
+                console.warn(`注: デプロイメント ${oldDeploymentToDelete.deploymentId} は読み取り専用のため削除できませんでした。`);
+            }
           } else {
             console.log(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} を正常に削除しました。`);
+            removedCount++;
           }
+        }
+        if (removedCount > 0) {
+          console.log(`${removedCount} 個の古いデプロイメントを削除しました。`);
         } else {
-          console.log("アーカイブ対象の古いウェブアプリデプロイメントが見つかりませんでした (新しいデプロイメントのみ、または数が少ない)。");
+          console.log("削除可能な古いデプロイメントが見つからなかったか、全て削除に失敗しました。利用可能なデプロイメントはすべて読み取り専用である可能性があります。");
         }
       } else {
         console.log(`デプロイメント数が上限 (${DEPLOYMENT_LIMIT}) 未満のため、古いデプロイメントのアーカイブはスキップします。`);
