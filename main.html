@@ -1,0 +1,115 @@
+<script>
+    // 5. Initialization on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cache DOM elements for frequent access
+        AppState.domElements.scriptIdManualInput = document.getElementById('scriptIdManualInput');
+        AppState.domElements.gcpProjectId = document.getElementById('gcpProjectId');
+        AppState.domElements.openWebAppButton = document.getElementById('openWebAppButton');
+        AppState.domElements.openWebAppMessage = document.getElementById('openWebAppMessage');
+        AppState.domElements.policyContainer = document.getElementById('policy-container');
+        AppState.domElements.proposalContainer = document.getElementById('proposal-container');
+        AppState.domElements.applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+        AppState.domElements.applyAndDeployButton = document.getElementById('applyAndDeployButton');
+        AppState.domElements.regenerateProposalButton = document.getElementById('regenerateProposalButton');
+        AppState.domElements.applyResultContainer = document.getElementById('apply-result-container');
+        AppState.domElements.fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+        AppState.domElements.generatePolicyButton = document.getElementById('generatePolicyButton');
+        AppState.domElements.regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+        AppState.domElements.prompt = document.getElementById('prompt');
+        AppState.domElements.aiPolicy = document.getElementById('ai-policy');
+        AppState.domElements.policyEditor = document.getElementById('policyEditor');
+        AppState.domElements.togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
+        AppState.domElements.acceptPolicyButton = document.getElementById('acceptPolicyButton');
+        AppState.domElements.cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+        AppState.domElements.proposalPurpose = document.getElementById('proposal-purpose');
+        AppState.domElements.htmlValidationWarnings = document.getElementById('html-validation-warnings');
+        AppState.domElements.proposedFilesDisplay = document.getElementById('proposed-files-display');
+        AppState.domElements.applyResultContent = document.getElementById('apply-result-content');
+        AppState.domElements.versionResultContainer = document.getElementById('version-result-container');
+        AppState.domElements.filesListContainer = document.getElementById('filesListContainer');
+        AppState.domElements.versionSelect = document.getElementById('versionSelect');
+        AppState.domElements.getFilesListButton = document.getElementById('getFilesListButton');
+        AppState.domElements.logResultContainer = document.getElementById('log-result-container');
+        AppState.domElements.logResult = document.getElementById('log-result');
+        AppState.domElements.deployResultContainer = document.getElementById('deploy-result-container');
+        AppState.domElements.deployResult = document.getElementById('deploy-result');
+        AppState.domElements.addLibraryResultContainer = document.getElementById('add-library-result-container');
+        AppState.domElements.addLibraryResult = document.getElementById('add-library-result');
+        AppState.domElements.gcpSaveResultContainer = document.getElementById('gcp-save-result-container');
+        AppState.domElements.gcpSaveResult = document.getElementById('gcp-save-result');
+        AppState.domElements.fixErrorsButton = document.getElementById('fixErrorsButton');
+        AppState.domElements.cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+        AppState.domElements.revertVersionButton = document.getElementById('revertVersionButton');
+        AppState.domElements.getVersionsButton = document.getElementById('getVersionsButton');
+        AppState.domElements.libraryScriptId = document.getElementById('libraryScriptId');
+        AppState.domElements.libraryVersion = document.getElementById('libraryVersion');
+        AppState.domElements.deploymentDescription = document.getElementById('deploymentDescription');
+
+        // Load initial state from localStorage
+        const savedScriptId = localStorage.getItem('targetScriptId');
+        if (savedScriptId) {
+            UI.get('scriptIdManualInput').value = savedScriptId;
+        }
+        const savedGcpProjectId = localStorage.getItem('gcpProjectId');
+        if (savedGcpProjectId) {
+            UI.get('gcpProjectId').value = savedGcpProjectId;
+        }
+
+        // Initialize UI components
+        Utils.loadProjectsIntoDropdown(savedScriptId);
+        UI.hide('policyContainer');
+        UI.hide('proposalContainer');
+        UI.hide('applyChangesNoDeployButton');
+        UI.hide('applyAndDeployButton');
+        UI.hide('regenerateProposalButton');
+        UI.hide('applyResultContainer');
+        UI.hide('fixApplyErrorsButton');
+        UI.show('generatePolicyButton');
+        UI.hide('regeneratePolicyButton');
+        UI.hide('versionResultContainer');
+        UI.hide('filesListContainer');
+        UI.disable('openWebAppButton');
+        UI.setText('openWebAppMessage', '');
+        UI.hide('logResultContainer');
+        UI.hide('deployResultContainer');
+        UI.hide('addLibraryResultContainer');
+        UI.hide('gcpSaveResultContainer');
+
+        Utils.updateEditorUrlDisplay();
+        Handlers.initTabNavigation();
+
+        // Register event listeners
+        UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
+        UI.get('scriptIdManualInput').addEventListener('input', Utils.updateEditorUrlDisplay);
+        UI.get('prompt').addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                UI.get('agent-form').requestSubmit(UI.get('generatePolicyButton'));
+            }
+        });
+
+        UI.get('agent-form').addEventListener('submit', Handlers.handleAgentFormSubmit);
+        UI.get('togglePolicyEditButton').addEventListener('click', Handlers.handleTogglePolicyEdit);
+        UI.get('acceptPolicyButton').addEventListener('click', Handlers.handleAcceptPolicy);
+        UI.get('cancelAiOperationButton').addEventListener('click', Handlers.handleCancelAiOperation);
+        UI.get('regeneratePolicyButton').addEventListener('click', Handlers.handleRegeneratePolicy);
+        UI.get('applyChangesNoDeployButton').addEventListener('click', (e) => Handlers.handleApplyChanges(false, e.currentTarget));
+        UI.get('applyAndDeployButton').addEventListener('click', (e) => Handlers.handleApplyChanges(true, e.currentTarget));
+        UI.get('fixApplyErrorsButton').addEventListener('click', Handlers.handleFixApplyErrors);
+        UI.get('fix-errors-form').addEventListener('submit', Handlers.handleFixErrorsFormSubmit);
+        UI.get('cancelFixErrorsButton').addEventListener('click', Handlers.handleCancelAiOperation);
+        UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
+
+        UI.get('saveGcpProjectIdButton').addEventListener('click', Handlers.handleSaveGcpProjectId);
+        UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);
+        UI.get('deploy-form').addEventListener('submit', Handlers.handleDeployFormSubmit);
+        UI.get('add-library-form').addEventListener('submit', Handlers.handleAddLibraryFormSubmit);
+
+        UI.get('getVersionsButton').addEventListener('click', Handlers.handleGetVersions);
+        UI.get('versionSelect').addEventListener('change', Handlers.handleVersionSelectChange);
+        UI.get('openWebAppButton').addEventListener('click', Handlers.handleOpenWebApp);
+        UI.get('revertVersionButton').addEventListener('click', Handlers.handleRevertVersion);
+
+        UI.get('getFilesListButton').addEventListener('click', Handlers.handleGetFilesList);
+    });
+</script>

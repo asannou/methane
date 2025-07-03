@@ -1,0 +1,116 @@
+<script>
+    // 2. UI Helper Functions
+    const UI = {
+        /**
+         * Get and cache a DOM element by ID.
+         * @param {string} id - The ID of the element.
+         * @returns {HTMLElement} The DOM element.
+         */
+        get: (id) => {
+            if (!AppState.domElements[id]) {
+                AppState.domElements[id] = document.getElementById(id);
+            }
+            return AppState.domElements[id];
+        },
+
+        /**
+         * Show a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        show: (elementId) => { UI.get(elementId).style.display = 'block'; },
+
+        /**
+         * Hide a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        hide: (elementId) => { UI.get(elementId).style.display = 'none'; },
+
+        /**
+         * Enable a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        enable: (elementId) => { UI.get(elementId).disabled = false; },
+
+        /**
+         * Disable a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        disable: (elementId) => { UI.get(elementId).disabled = true; },
+
+        /**
+         * Shows a loading spinner directly within the button.
+         * Stores the button's original content and disables it.
+         * @param {HTMLElement} buttonElement - The button element to modify.
+         * @param {string} [loadingText="Loading..."] - Optional text to display next to the spinner.
+         */
+        showSpinnerInButton: (buttonElement, loadingText = "Loading...") => {
+            if (!buttonElement) return;
+            AppState.originalButtonContents.set(buttonElement.id, buttonElement.innerHTML);
+            buttonElement.innerHTML = `<span class="spinner button-spinner"></span> ${loadingText}`;
+            buttonElement.disabled = true;
+            buttonElement.classList.add('is-loading-button');
+        },
+
+        /**
+         * Hides the loading spinner and restores the button's original content and state.
+         * @param {HTMLElement} buttonElement - The button element to restore.
+         */
+        hideSpinnerInButton: (buttonElement) => {
+            if (!buttonElement || !AppState.originalButtonContents.has(buttonElement.id)) return;
+            buttonElement.innerHTML = AppState.originalButtonContents.get(buttonElement.id);
+            buttonElement.disabled = false;
+            buttonElement.classList.remove('is-loading-button');
+            AppState.originalButtonContents.delete(buttonElement.id);
+        },
+
+        /**
+         * Set innerHTML of a DOM element.
+         * @param {string} elementId - The ID of the element.
+         * @param {string} content - The HTML content.
+         */
+        setHtml: (elementId, content) => { UI.get(elementId).innerHTML = content; },
+
+        /**
+         * Set textContent of a DOM element.
+         * @param {string} elementId - The ID of the element.
+         * @param {string} content - The text content.
+         */
+        setText: (elementId, content) => { UI.get(elementId).textContent = content; },
+
+        /**
+         * Clear the value of a textarea or input.
+         * @param {string} elementId - The ID of the textarea/input.
+         */
+        clearValue: (elementId) => { UI.get(elementId).value = ''; },
+
+        /**
+         * Append a notification message to a container.
+         * @param {string} containerId - The ID of the container to append to.
+         * @param {string} type - The type of notification (e.g., 'is-danger', 'is-success', 'is-info', 'is-warning').
+         * @param {string} message - The message to display.
+         * @param {object} [details=null] - Optional detailed error object.
+         */
+        appendNotification: (containerId, type, message, details = null) => {
+            const container = UI.get(containerId);
+            const notificationDiv = document.createElement('div');
+            notificationDiv.className = `notification ${type}`;
+            let contentHtml = `<p><strong>${Utils.escapeHtml(message)}</strong></p>`;
+
+            if (details) {
+                contentHtml += `<h4 class="mt-2">Details:</h4><pre class="has-text-danger-dark is-size-7 mt-1">${Utils.escapeHtml(JSON.stringify(details, null, 2))}</pre>`;
+            }
+            notificationDiv.innerHTML = contentHtml;
+            container.appendChild(notificationDiv);
+            UI.show(containerId);
+        },
+
+        /**
+         * Clear all notifications from a container.
+         * @param {string} containerId - The ID of the container to clear.
+         */
+        clearNotifications: (containerId) => {
+            UI.get(containerId).innerHTML = '';
+            UI.hide(containerId);
+        }
+    };
+</script>

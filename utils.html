@@ -1,0 +1,371 @@
+<script>
+    // 3. Utility Functions
+    const Utils = {
+        /**
+         * Get the effective Script ID (manual input takes precedence).
+         * @returns {string} The effective Script ID.
+         */
+        getEffectiveScriptId: () => {
+            const manualId = UI.get('scriptIdManualInput').value.trim();
+            if (manualId) {
+                return manualId;
+            }
+            return UI.get('scriptIdSelect').value.trim();
+        },
+
+        /**
+         * Save the target Script ID to Local Storage.
+         * @param {string} id - The Script ID to save.
+         */
+        saveScriptIdToLocalStorage: (id) => {
+            if (id) {
+                localStorage.setItem('targetScriptId', id);
+            }
+        },
+
+        /**
+         * Save the GCP Project ID to Local Storage.
+         * @param {string} id - The GCP Project ID to save.
+         */
+        saveGcpProjectIdToLocalStorage: (id) => {
+            if (id) {
+                localStorage.setItem('gcpProjectId', id);
+            }
+        },
+
+        /**
+         * Load Apps Script projects into the dropdown.
+         * @param {string} [selectedId=null] - The ID of the project to pre-select.
+         */
+        loadProjectsIntoDropdown: (selectedId = null) => {
+            const scriptIdSelect = UI.get('scriptIdSelect');
+            scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.status === 'success') {
+                        response.projects.forEach(project => {
+                            const option = document.createElement('option');
+                            option.value = project.id;
+                            option.textContent = project.title;
+                            scriptIdSelect.appendChild(option);
+                        });
+                        if (selectedId) {
+                            scriptIdSelect.value = selectedId;
+                        }
+                    } else {
+                        alert('Failed to load Apps Script projects: ' + response.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    alert('Error loading Apps Script projects: ' + error.message);
+                })
+                .listAppsScriptProjects();
+        },
+
+        /**
+         * Update the display for the Apps Script Editor URL.
+         */
+        updateEditorUrlDisplay: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const editorUrlDisplayDiv = UI.get('editor-url-display');
+            
+            UI.setHtml('editor-url-display', '');
+
+            if (!scriptId) {
+                UI.setText('editor-url-display', 'Apps Script Editor URL: (Script ID needed)');
+                return;
+            }
+
+            UI.setHtml('editor-url-display', 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.startsWith("Error:")) {
+                        UI.setText('editor-url-display', `Apps Script Editor URL: ${response}`);
+                    } else {
+                        UI.setHtml('editor-url-display', `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setText('editor-url-display', `Apps Script Editor URL: Error - ${error.message}`);
+                })
+                .getScriptEditorUrl(scriptId);
+        },
+
+        /**
+         * Validate HTML syntax.
+         * @param {string} htmlString - The HTML string to validate.
+         * @param {string} fileName - The name of the file being validated.
+         * @returns {{isValid: boolean, message?: string}} Validation result.
+         */
+        validateHtml: (htmlString, fileName) => {
+            console.log(`HTML validation started for file: ${fileName}`);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlString, 'text/html');
+            const parseError = doc.querySelector('parsererror');
+
+            if (parseError) {
+                const errorMessage = parseError.textContent;
+                console.error(`HTML validation failed in ${fileName}:`, errorMessage);
+                return { isValid: false, message: `Syntax error found in HTML file "${fileName}": ${errorMessage}` };
+            }
+            console.log(`HTML validation successful for file: ${fileName}`);
+            return { isValid: true };
+        },
+
+        /**
+         * Generate formatted diff panels HTML.
+         * @param {string} originalSource - The original source code.
+         * @param {string} proposedSource - The proposed source code.
+         * @returns {{originalLineNumbersHtml: string, originalCodeContentHtml: string, proposedLineNumbersHtml: string, proposedCodeContentHtml: string}} HTML parts for diff display.
+         */
+        generateFormattedDiffPanels: (originalSource, proposedSource) => {
+            const originalLines = originalSource ? originalSource.split('\n') : [];
+            const proposedLines = proposedSource ? proposedSource.split('\n') : [];
+
+            const diffResult = [];
+            let i = 0;
+            let j = 0;
+            const lookAheadWindow = 5;
+
+            while (i < originalLines.length || j < proposedLines.length) {
+                const currentOriginalLine = originalLines[i];
+                const currentProposedLine = proposedLines[j];
+
+                if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
+                    diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
+                    i++;
+                    j++;
+                } else {
+                    let originalFoundInProposedAhead = -1;
+                    for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
+                        if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
+                            originalFoundInProposedAhead = k;
+                            break;
+                        }
+                    }
+
+                    let proposedFoundInOriginalAhead = -1;
+                    for (let k = i + 1; k < Math.min(i + 1 + lookAheadWindow, originalLines.length); k++) {
+                        if (j < proposedLines.length && proposedLines[j] === originalLines[k]) {
+                            proposedFoundInOriginalAhead = k;
+                            break;
+                        }
+                    }
+
+                    if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
+                        diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
+                        i++;
+                        j++;
+                    } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
+                        diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                        j++;
+                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
+                        diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                        i++;
+                    } else if (i < originalLines.length) {
+                        diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                        i++;
+                    } else if (j < proposedLines.length) {
+                        diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                        j++;
+                    }
+                }
+            }
+
+            const OMIT_THRESHOLD = 8;
+            const CONTEXT_LINES = 3;
+
+            let originalLineNumbersHtml = '';
+            let originalCodeContentHtml = '';
+            let proposedLineNumbersHtml = '';
+            let proposedCodeContentHtml = '';
+
+            let currentOriginalLineNum = 1;
+            let currentProposedLineNum = 1;
+
+            let k = 0;
+            while (k < diffResult.length) {
+                const entry = diffResult[k];
+
+                if (entry.type === 'equal') {
+                    let equalBlockStartIndex = k;
+                    let equalCount = 0;
+
+                    while (k < diffResult.length && diffResult[k].type === 'equal') {
+                        equalCount++;
+                        k++;
+                    }
+
+                    if (equalCount > OMIT_THRESHOLD) {
+                        for (let l = 0; l < CONTEXT_LINES; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + l];
+                            originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                            originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
+                            proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                            proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.proposed)}</div>`;
+                            currentOriginalLineNum++;
+                            currentProposedLineNum++;
+                        }
+
+                        const omittedLinesCount = equalCount - (2 * CONTEXT_LINES);
+                        const originalOmittedStart = currentOriginalLineNum;
+                        const proposedOmittedStart = currentProposedLineNum;
+
+                        currentOriginalLineNum += omittedLinesCount;
+                        currentProposedLineNum += omittedLinesCount;
+
+                        originalLineNumbersHtml += `<div class="diff-line-omitted">${originalOmittedStart}-${currentOriginalLineNum - 1}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
+                        proposedLineNumbersHtml += `<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLineNum - 1}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
+
+                        for (let l = 0; l < CONTEXT_LINES; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
+                            originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                            originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
+                            proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                            proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.proposed)}</div>`;
+                            currentOriginalLineNum++;
+                            currentProposedLineNum++;
+                        }
+
+                    } else {
+                        for (let l = 0; l < equalCount; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + l];
+                            originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                            originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
+                            proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                            proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.proposed)}</div>`;
+                            currentOriginalLineNum++;
+                            currentProposedLineNum++;
+                        }
+                    }
+                } else {
+                    if (entry.type === 'added') {
+                        originalLineNumbersHtml += `<div>&nbsp;</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-added">${Utils.escapeHtml(entry.proposed)}</div>`;
+                        currentProposedLineNum++;
+                    } else if (entry.type === 'removed') {
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-removed">${Utils.escapeHtml(entry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>&nbsp;</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
+                        currentOriginalLineNum++;
+                    } else if (entry.type === 'modified') {
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-modified">${Utils.escapeHtml(entry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-modified">${Utils.escapeHtml(entry.proposed)}</div>`;
+                        currentOriginalLineNum++;
+                        currentProposedLineNum++;
+                    }
+                    k++;
+                }
+            }
+
+            return {
+                originalLineNumbersHtml, originalCodeContentHtml,
+                proposedLineNumbersHtml, proposedCodeContentHtml
+            };
+        },
+
+        /**
+         * Display file comparisons in the UI.
+         * @param {Array<object>} originalFiles - The original files array.
+         * @param {Array<object>} proposedFiles - The proposed files array.
+         */
+        displayFileComparison: (originalFiles, proposedFiles) => {
+            const displayArea = UI.get('proposedFilesDisplay');
+            UI.setHtml('proposedFilesDisplay', '');
+
+            if (!proposedFiles || proposedFiles.length === 0) {
+                UI.setHtml('proposedFilesDisplay', '<p>AI did not propose any changes to existing files, or no files were processed.</p>');
+                return;
+            }
+
+            proposedFiles.forEach(proposedFile => {
+                const name = proposedFile.name;
+                const fileType = proposedFile.type;
+
+                const originalFile = (originalFiles || []).find(f => f.name === name);
+                const originalSource = originalFile ? originalFile.source : '';
+                const proposedSource = proposedFile.source;
+
+                const diffHtmlData = Utils.generateFormattedDiffPanels(originalSource, proposedSource);
+
+                const fileComparisonDiv = document.createElement('div');
+                fileComparisonDiv.className = 'file-comparison';
+
+                const originalContentDiv = document.createElement('div');
+                originalContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
+                    <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
+                    <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
+                </pre>`;
+                
+                const proposedContentDiv = document.createElement('div');
+                proposedContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
+                    <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
+                    <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
+                </pre>`;
+                
+                fileComparisonDiv.appendChild(originalContentDiv);
+                fileComparisonDiv.appendChild(proposedContentDiv);
+                displayArea.appendChild(fileComparisonDiv);
+
+                const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
+                if (preElements.length === 2) {
+                    const pre1 = preElements[0];
+                    const pre2 = preElements[1];
+
+                    let isSyncing = false;
+
+                    pre1.addEventListener('scroll', function() {
+                        if (!isSyncing) {
+                            isSyncing = true;
+                            pre2.scrollTop = pre1.scrollTop;
+                            isSyncing = false;
+                        }
+                    });
+
+                    pre2.addEventListener('scroll', function() {
+                        if (!isSyncing) {
+                            isSyncing = true;
+                            pre1.scrollTop = pre2.scrollTop;
+                            isSyncing = false;
+                        }
+                    });
+                }
+            });
+        },
+
+        /**
+         * Get file extension based on file type.
+         * @param {string} type - The file type (SERVER_JS, JSON, HTML).
+         * @returns {string} The corresponding file extension.
+         */
+        getFileExtension: (type) => {
+            switch (type) {
+                case 'SERVER_JS': return 'gs';
+                case 'JSON': return 'json';
+                default: return 'html';
+            }
+        },
+
+        /**
+         * Escape HTML entities in a string.
+         * @param {string} text - The text to escape.
+         * @returns {string} The escaped HTML string.
+         */
+        escapeHtml: (text) => {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+    };
+</script>

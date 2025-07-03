@@ -1,0 +1,13 @@
+<script>
+    // 1. Global Application State Management
+    const AppState = {
+        currentPolicyData: null,
+        currentProposal: null,
+        activeRequestId: null,
+        isPolicyEditing: false,
+        // Cache for frequently accessed DOM elements
+        domElements: {},
+        // Map to store original button HTML content for spinner management
+        originalButtonContents: new Map()
+    };
+</script>
