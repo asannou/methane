@@ -1,1927 +1,1904 @@
 <script>
-    let currentPolicyData = null;
-    let currentProposal = null;
-    let activeRequestId = null;
-    let isPolicyEditing = false;
+    // 1. Global Application State Management
+    const AppState = {
+        currentPolicyData: null,
+        currentProposal: null,
+        activeRequestId: null,
+        isPolicyEditing: false,
+        // Cache for frequently accessed DOM elements
+        domElements: {},
+        // Map to store original button HTML content for spinner management
+        originalButtonContents: new Map()
+    };
 
-    // Map to store original button HTML content
-    const originalButtonContents = new Map();
+    // 2. UI Helper Functions
+    const UI = {
+        /**
+         * Get and cache a DOM element by ID.
+         * @param {string} id - The ID of the element.
+         * @returns {HTMLElement} The DOM element.
+         */
+        get: (id) => {
+            if (!AppState.domElements[id]) {
+                AppState.domElements[id] = document.getElementById(id);
+            }
+            return AppState.domElements[id];
+        },
 
-    /**
-     * Shows a loading spinner directly within the button.
-     * Stores the button's original content and disables it.
-     * @param {HTMLElement} buttonElement - The button element to modify.
-     * @param {string} [loadingText="Loading..."] - Optional text to display next to the spinner.
-     */
-    function showSpinnerInButton(buttonElement, loadingText = "Loading...") {
-        if (!buttonElement) return;
-        originalButtonContents.set(buttonElement.id, buttonElement.innerHTML);
-        buttonElement.innerHTML = `<span class="spinner button-spinner"></span> ${loadingText}`;
-        buttonElement.disabled = true;
-        buttonElement.classList.add('is-loading-button'); // Add a class for potential button-specific loading styles
-    }
+        /**
+         * Show a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        show: (elementId) => { UI.get(elementId).style.display = 'block'; },
 
-    /**
-     * Hides the loading spinner and restores the button's original content and state.
-     * @param {HTMLElement} buttonElement - The button element to restore.
-     */
-    function hideSpinnerInButton(buttonElement) {
-        if (!buttonElement || !originalButtonContents.has(buttonElement.id)) return;
-        buttonElement.innerHTML = originalButtonContents.get(buttonElement.id);
-        buttonElement.disabled = false;
-        buttonElement.classList.remove('is-loading-button');
-        originalButtonContents.delete(buttonElement.id); // Clean up map
-    }
+        /**
+         * Hide a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        hide: (elementId) => { UI.get(elementId).style.display = 'none'; },
 
-    // Helper to get a button element by ID and handle cases where it might not exist (e.g. for initially hidden buttons)
-    function getButton(id) {
-        return document.getElementById(id);
-    }
+        /**
+         * Enable a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        enable: (elementId) => { UI.get(elementId).disabled = false; },
 
-    function getEffectiveScriptId() {
-        const manualId = document.getElementById('scriptIdManualInput').value.trim();
-        if (manualId) {
-            return manualId;
+        /**
+         * Disable a DOM element.
+         * @param {string} elementId - The ID of the element.
+         */
+        disable: (elementId) => { UI.get(elementId).disabled = true; },
+
+        /**
+         * Shows a loading spinner directly within the button.
+         * Stores the button's original content and disables it.
+         * @param {HTMLElement} buttonElement - The button element to modify.
+         * @param {string} [loadingText="Loading..."] - Optional text to display next to the spinner.
+         */
+        showSpinnerInButton: (buttonElement, loadingText = "Loading...") => {
+            if (!buttonElement) return;
+            AppState.originalButtonContents.set(buttonElement.id, buttonElement.innerHTML);
+            buttonElement.innerHTML = `<span class="spinner button-spinner"></span> ${loadingText}`;
+            buttonElement.disabled = true;
+            buttonElement.classList.add('is-loading-button');
+        },
+
+        /**
+         * Hides the loading spinner and restores the button's original content and state.
+         * @param {HTMLElement} buttonElement - The button element to restore.
+         */
+        hideSpinnerInButton: (buttonElement) => {
+            if (!buttonElement || !AppState.originalButtonContents.has(buttonElement.id)) return;
+            buttonElement.innerHTML = AppState.originalButtonContents.get(buttonElement.id);
+            buttonElement.disabled = false;
+            buttonElement.classList.remove('is-loading-button');
+            AppState.originalButtonContents.delete(buttonElement.id);
+        },
+
+        /**
+         * Set innerHTML of a DOM element.
+         * @param {string} elementId - The ID of the element.
+         * @param {string} content - The HTML content.
+         */
+        setHtml: (elementId, content) => { UI.get(elementId).innerHTML = content; },
+
+        /**
+         * Set textContent of a DOM element.
+         * @param {string} elementId - The ID of the element.
+         * @param {string} content - The text content.
+         */
+        setText: (elementId, content) => { UI.get(elementId).textContent = content; },
+
+        /**
+         * Clear the value of a textarea or input.
+         * @param {string} elementId - The ID of the textarea/input.
+         */
+        clearValue: (elementId) => { UI.get(elementId).value = ''; },
+
+        /**
+         * Append a notification message to a container.
+         * @param {string} containerId - The ID of the container to append to.
+         * @param {string} type - The type of notification (e.g., 'is-danger', 'is-success', 'is-info', 'is-warning').
+         * @param {string} message - The message to display.
+         * @param {object} [details=null] - Optional detailed error object.
+         */
+        appendNotification: (containerId, type, message, details = null) => {
+            const container = UI.get(containerId);
+            const notificationDiv = document.createElement('div');
+            notificationDiv.className = `notification ${type}`;
+            let contentHtml = `<p><strong>${Utils.escapeHtml(message)}</strong></p>`;
+
+            if (details) {
+                contentHtml += `<h4 class="mt-2">Details:</h4><pre class="has-text-danger-dark is-size-7 mt-1">${Utils.escapeHtml(JSON.stringify(details, null, 2))}</pre>`;
+            }
+            notificationDiv.innerHTML = contentHtml;
+            container.appendChild(notificationDiv);
+            UI.show(containerId);
+        },
+
+        /**
+         * Clear all notifications from a container.
+         * @param {string} containerId - The ID of the container to clear.
+         */
+        clearNotifications: (containerId) => {
+            UI.get(containerId).innerHTML = '';
+            UI.hide(containerId);
         }
-        return document.getElementById('scriptIdSelect').value.trim();
-    }
+    };
 
-    function saveScriptIdToLocalStorage(id) {
-        if (id) {
-            localStorage.setItem('targetScriptId', id);
-        }
-    }
+    // 3. Utility Functions
+    const Utils = {
+        /**
+         * Get the effective Script ID (manual input takes precedence).
+         * @returns {string} The effective Script ID.
+         */
+        getEffectiveScriptId: () => {
+            const manualId = UI.get('scriptIdManualInput').value.trim();
+            if (manualId) {
+                return manualId;
+            }
+            return UI.get('scriptIdSelect').value.trim();
+        },
 
-    function saveGcpProjectIdToLocalStorage(id) {
-        if (id) {
-            localStorage.setItem('gcpProjectId', id);
-        }
-    }
+        /**
+         * Save the target Script ID to Local Storage.
+         * @param {string} id - The Script ID to save.
+         */
+        saveScriptIdToLocalStorage: (id) => {
+            if (id) {
+                localStorage.setItem('targetScriptId', id);
+            }
+        },
 
-    function loadProjectsIntoDropdown(selectedId = null) {
-        const scriptIdSelect = document.getElementById('scriptIdSelect');
+        /**
+         * Save the GCP Project ID to Local Storage.
+         * @param {string} id - The GCP Project ID to save.
+         */
+        saveGcpProjectIdToLocalStorage: (id) => {
+            if (id) {
+                localStorage.setItem('gcpProjectId', id);
+            }
+        },
 
-        scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
+        /**
+         * Load Apps Script projects into the dropdown.
+         * @param {string} [selectedId=null] - The ID of the project to pre-select.
+         */
+        loadProjectsIntoDropdown: (selectedId = null) => {
+            const scriptIdSelect = UI.get('scriptIdSelect');
+            scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
 
-        google.script.run
-            .withSuccessHandler(function(response) {
-                if (response.status === 'success') {
-                    response.projects.forEach(project => {
-                        const option = document.createElement('option');
-                        option.value = project.id;
-                        option.textContent = project.title;
-                        scriptIdSelect.appendChild(option);
-                    });
-                    if (selectedId) {
-                        scriptIdSelect.value = selectedId;
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.status === 'success') {
+                        response.projects.forEach(project => {
+                            const option = document.createElement('option');
+                            option.value = project.id;
+                            option.textContent = project.title;
+                            scriptIdSelect.appendChild(option);
+                        });
+                        if (selectedId) {
+                            scriptIdSelect.value = selectedId;
+                        }
+                    } else {
+                        alert('Failed to load Apps Script projects: ' + response.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    alert('Error loading Apps Script projects: ' + error.message);
+                })
+                .listAppsScriptProjects();
+        },
+
+        /**
+         * Update the display for the Apps Script Editor URL.
+         */
+        updateEditorUrlDisplay: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const editorUrlDisplayDiv = UI.get('editor-url-display');
+            
+            UI.setHtml('editor-url-display', '');
+
+            if (!scriptId) {
+                UI.setText('editor-url-display', 'Apps Script Editor URL: (Script ID needed)');
+                return;
+            }
+
+            UI.setHtml('editor-url-display', 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.startsWith("Error:")) {
+                        UI.setText('editor-url-display', `Apps Script Editor URL: ${response}`);
+                    } else {
+                        UI.setHtml('editor-url-display', `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setText('editor-url-display', `Apps Script Editor URL: Error - ${error.message}`);
+                })
+                .getScriptEditorUrl(scriptId);
+        },
+
+        /**
+         * Validate HTML syntax.
+         * @param {string} htmlString - The HTML string to validate.
+         * @param {string} fileName - The name of the file being validated.
+         * @returns {{isValid: boolean, message?: string}} Validation result.
+         */
+        validateHtml: (htmlString, fileName) => {
+            console.log(`HTML validation started for file: ${fileName}`);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlString, 'text/html');
+            const parseError = doc.querySelector('parsererror');
+
+            if (parseError) {
+                const errorMessage = parseError.textContent;
+                console.error(`HTML validation failed in ${fileName}:`, errorMessage);
+                return { isValid: false, message: `Syntax error found in HTML file "${fileName}": ${errorMessage}` };
+            }
+            console.log(`HTML validation successful for file: ${fileName}`);
+            return { isValid: true };
+        },
+
+        /**
+         * Generate formatted diff panels HTML.
+         * @param {string} originalSource - The original source code.
+         * @param {string} proposedSource - The proposed source code.
+         * @returns {{originalLineNumbersHtml: string, originalCodeContentHtml: string, proposedLineNumbersHtml: string, proposedCodeContentHtml: string}} HTML parts for diff display.
+         */
+        generateFormattedDiffPanels: (originalSource, proposedSource) => {
+            const originalLines = originalSource ? originalSource.split('\n') : [];
+            const proposedLines = proposedSource ? proposedSource.split('\n') : [];
+
+            const diffResult = [];
+            let i = 0;
+            let j = 0;
+            const lookAheadWindow = 5;
+
+            while (i < originalLines.length || j < proposedLines.length) {
+                const currentOriginalLine = originalLines[i];
+                const currentProposedLine = proposedLines[j];
+
+                if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
+                    diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
+                    i++;
+                    j++;
+                } else {
+                    let originalFoundInProposedAhead = -1;
+                    for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
+                        if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
+                            originalFoundInProposedAhead = k;
+                            break;
+                        }
+                    }
+
+                    let proposedFoundInOriginalAhead = -1;
+                    for (let k = i + 1; k < Math.min(i + 1 + lookAheadWindow, originalLines.length); k++) {
+                        if (j < proposedLines.length && proposedLines[j] === originalLines[k]) {
+                            proposedFoundInOriginalAhead = k;
+                            break;
+                        }
+                    }
+
+                    if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
+                        diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
+                        i++;
+                        j++;
+                    } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
+                        diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                        j++;
+                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
+                        diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                        i++;
+                    } else if (i < originalLines.length) {
+                        diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                        i++;
+                    } else if (j < proposedLines.length) {
+                        diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                        j++;
+                    }
+                }
+            }
+
+            const OMIT_THRESHOLD = 8;
+            const CONTEXT_LINES = 3;
+
+            let originalLineNumbersHtml = '';
+            let originalCodeContentHtml = '';
+            let proposedLineNumbersHtml = '';
+            let proposedCodeContentHtml = '';
+
+            let currentOriginalLineNum = 1;
+            let currentProposedLineNum = 1;
+
+            let k = 0;
+            while (k < diffResult.length) {
+                const entry = diffResult[k];
+
+                if (entry.type === 'equal') {
+                    let equalBlockStartIndex = k;
+                    let equalCount = 0;
+
+                    while (k < diffResult.length && diffResult[k].type === 'equal') {
+                        equalCount++;
+                        k++;
+                    }
+
+                    if (equalCount > OMIT_THRESHOLD) {
+                        for (let l = 0; l < CONTEXT_LINES; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + l];
+                            originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                            originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
+                            proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                            proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.proposed)}</div>`;
+                            currentOriginalLineNum++;
+                            currentProposedLineNum++;
+                        }
+
+                        const omittedLinesCount = equalCount - (2 * CONTEXT_LINES);
+                        const originalOmittedStart = currentOriginalLineNum;
+                        const proposedOmittedStart = currentProposedLineNum;
+
+                        currentOriginalLineNum += omittedLinesCount;
+                        currentProposedLineNum += omittedLinesCount;
+
+                        originalLineNumbersHtml += `<div class="diff-line-omitted">${originalOmittedStart}-${currentOriginalLineNum - 1}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
+                        proposedLineNumbersHtml += `<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLineNum - 1}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
+
+                        for (let l = 0; l < CONTEXT_LINES; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
+                            originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                            originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
+                            proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                            proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.proposed)}</div>`;
+                            currentOriginalLineNum++;
+                            currentProposedLineNum++;
+                        }
+
+                    } else {
+                        for (let l = 0; l < equalCount; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + l];
+                            originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                            originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
+                            proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                            proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.proposed)}</div>`;
+                            currentOriginalLineNum++;
+                            currentProposedLineNum++;
+                        }
                     }
                 } else {
-                    alert('Failed to load Apps Script projects: ' + response.message);
-                }
-            })
-            .withFailureHandler(function(error) {
-                alert('Error loading Apps Script projects: ' + error.message);
-            })
-            .listAppsScriptProjects();
-    }
-
-    function updateEditorUrlDisplay() {
-        const scriptId = getEffectiveScriptId();
-        const editorUrlDisplayDiv = document.getElementById('editor-url-display');
-        
-        editorUrlDisplayDiv.innerHTML = '';
-
-        if (!scriptId) {
-            editorUrlDisplayDiv.textContent = 'Apps Script Editor URL: (Script ID needed)';
-            return;
-        }
-
-        // This spinner is not in a button, so its existing style remains
-        editorUrlDisplayDiv.innerHTML = 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...';
-
-        saveScriptIdToLocalStorage(scriptId);
-
-        google.script.run
-            .withSuccessHandler(function(response) {
-                if (response.startsWith("Error:")) {
-                    editorUrlDisplayDiv.textContent = `Apps Script Editor URL: ${response}`;
-                } else {
-                    editorUrlDisplayDiv.innerHTML = `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`;
-                }
-            })
-            .withFailureHandler(function(error) {
-                editorUrlDisplayDiv.textContent = `Apps Script Editor URL: Error - ${error.message}`;
-            })
-            .getScriptEditorUrl(scriptId);
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      const scriptIdManualInput = document.getElementById('scriptIdManualInput');
-      const gcpProjectIdInput = document.getElementById('gcpProjectId');
-      const openWebAppButton = getButton('openWebAppButton');
-      const openWebAppMessage = document.getElementById('openWebAppMessage');
-
-      const savedScriptId = localStorage.getItem('targetScriptId');
-      if (savedScriptId) {
-        scriptIdManualInput.value = savedScriptId;
-      }
-
-      const savedGcpProjectId = localStorage.getItem('gcpProjectId');
-      if (savedGcpProjectId) {
-        gcpProjectIdInput.value = savedGcpProjectId;
-      }
-
-      loadProjectsIntoDropdown(savedScriptId);
-
-      document.getElementById('policy-container').style.display = 'none';
-      document.getElementById('proposal-container').style.display = 'none';
-      getButton('applyChangesNoDeployButton').style.display = 'none';
-      getButton('applyAndDeployButton').style.display = 'none';
-      getButton('regenerateProposalButton').style.display = 'none';
-      document.getElementById('apply-result-container').style.display = 'none';
-      getButton('fixApplyErrorsButton').style.display = 'none';
-
-      // Ensure correct initial state for policy buttons
-      getButton('generatePolicyButton').style.display = 'inline-block';
-      getButton('regeneratePolicyButton').style.display = 'none';
-      
-      document.getElementById('version-result-container').style.display = 'none';
-      document.getElementById('filesListContainer').style.display = 'none';
-      openWebAppButton.disabled = true; // Set initial state for the new button
-      openWebAppMessage.textContent = ''; // Clear initial message
-
-      updateEditorUrlDisplay();
-
-      const promptTextarea = document.getElementById('prompt');
-      if (promptTextarea) {
-        promptTextarea.addEventListener('keydown', function(event) {
-          if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-            event.preventDefault();
-            document.getElementById('agent-form').requestSubmit(document.getElementById('generatePolicyButton'));
-          }
-        });
-      }
-
-      // Tab logic
-      const tabs = document.querySelectorAll('.tabs li');
-      const tabContents = document.querySelectorAll('.tab-content');
-
-      tabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-          tabs.forEach(item => item.classList.remove('is-active'));
-          this.classList.add('is-active');
-
-          const targetId = this.dataset.tabContentId;
-          tabContents.forEach(content => {
-            if (content.id === targetId) {
-              content.classList.add('is-active-content');
-            } else {
-              content.classList.remove('is-active-content');
-            }
-          });
-        });
-      });
-
-      // Initially activate the first tab
-      if (tabs.length > 0) {
-        tabs[0].click();
-      }
-
-    });
-
-    document.getElementById('scriptIdSelect').addEventListener('change', updateEditorUrlDisplay);
-    document.getElementById('scriptIdManualInput').addEventListener('input', updateEditorUrlDisplay);
-
-    function validateHtml(htmlString, fileName) {
-        console.log(`HTML validation started for file: ${fileName}`);
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlString, 'text/html');
-        const parseError = doc.querySelector('parsererror');
-
-        if (parseError) {
-            const errorMessage = parseError.textContent;
-            console.error(`HTML validation failed in ${fileName}:`, errorMessage);
-            return { isValid: false, message: `Syntax error found in HTML file "${fileName}": ${errorMessage}` };
-        }
-        console.log(`HTML validation successful for file: ${fileName}`);
-        return { isValid: true };
-    }
-
-    function generateFormattedDiffPanels(originalSource, proposedSource) {
-        const originalLines = originalSource ? originalSource.split('\n') : [];
-        const proposedLines = proposedSource ? proposedSource.split('\n') : [];
-
-        const diffResult = [];
-        let i = 0;
-        let j = 0;
-        const lookAheadWindow = 5;
-
-        while (i < originalLines.length || j < proposedLines.length) {
-            const currentOriginalLine = originalLines[i];
-            const currentProposedLine = proposedLines[j];
-
-            if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
-                diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
-                i++;
-                j++;
-            } else {
-                let originalFoundInProposedAhead = -1;
-                for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
-                    if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
-                        originalFoundInProposedAhead = k;
-                        break;
+                    if (entry.type === 'added') {
+                        originalLineNumbersHtml += `<div>&nbsp;</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-added">${Utils.escapeHtml(entry.proposed)}</div>`;
+                        currentProposedLineNum++;
+                    } else if (entry.type === 'removed') {
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-removed">${Utils.escapeHtml(entry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>&nbsp;</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
+                        currentOriginalLineNum++;
+                    } else if (entry.type === 'modified') {
+                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
+                        originalCodeContentHtml += `<div class="diff-line-modified">${Utils.escapeHtml(entry.original)}</div>`;
+                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
+                        proposedCodeContentHtml += `<div class="diff-line-modified">${Utils.escapeHtml(entry.proposed)}</div>`;
+                        currentOriginalLineNum++;
+                        currentProposedLineNum++;
                     }
-                }
-
-                let proposedFoundInOriginalAhead = -1;
-                for (let k = i + 1; k < Math.min(i + 1 + lookAheadWindow, originalLines.length); k++) {
-                    if (j < proposedLines.length && proposedLines[j] === originalLines[k]) {
-                        proposedFoundInOriginalAhead = k;
-                        break;
-                    }
-                }
-
-                if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
-                    diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
-                    i++;
-                    j++;
-                } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
-                    diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
-                    j++;
-                } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
-                    diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
-                    i++;
-                } else if (i < originalLines.length) {
-                    diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
-                    i++;
-                } else if (j < proposedLines.length) {
-                    diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
-                    j++;
-                }
-            }
-        }
-
-        const OMIT_THRESHOLD = 8;
-        const CONTEXT_LINES = 3;
-
-        let originalLineNumbersHtml = '';
-        let originalCodeContentHtml = '';
-        let proposedLineNumbersHtml = '';
-        let proposedCodeContentHtml = '';
-
-        let currentOriginalLineNum = 1;
-        let currentProposedLineNum = 1;
-
-        let k = 0;
-        while (k < diffResult.length) {
-            const entry = diffResult[k];
-
-            if (entry.type === 'equal') {
-                let equalBlockStartIndex = k;
-                let equalCount = 0;
-
-                while (k < diffResult.length && diffResult[k].type === 'equal') {
-                    equalCount++;
                     k++;
                 }
-
-                if (equalCount > OMIT_THRESHOLD) {
-                    for (let l = 0; l < CONTEXT_LINES; l++) {
-                        const lineEntry = diffResult[equalBlockStartIndex + l];
-                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
-                        originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.original)}</div>`;
-                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
-                        proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.proposed)}</div>`;
-                        currentOriginalLineNum++;
-                        currentProposedLineNum++;
-                    }
-
-                    const omittedLinesCount = equalCount - (2 * CONTEXT_LINES);
-                    const originalOmittedStart = currentOriginalLineNum;
-                    const proposedOmittedStart = currentProposedLineNum;
-
-                    currentOriginalLineNum += omittedLinesCount;
-                    currentProposedLineNum += omittedLinesCount;
-
-                    originalLineNumbersHtml += `<div class="diff-line-omitted">${originalOmittedStart}-${currentOriginalLineNum - 1}</div>`;
-                    originalCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
-                    proposedLineNumbersHtml += `<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLineNum - 1}</div>`;
-                    proposedCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
-
-                    for (let l = 0; l < CONTEXT_LINES; l++) {
-                        const lineEntry = diffResult[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
-                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
-                        originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.original)}</div>`;
-                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
-                        proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.proposed)}</div>`;
-                        currentOriginalLineNum++;
-                        currentProposedLineNum++;
-                    }
-
-                } else {
-                    for (let l = 0; l < equalCount; l++) {
-                        const lineEntry = diffResult[equalBlockStartIndex + l];
-                        originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
-                        originalCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.original)}</div>`;
-                        proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
-                        proposedCodeContentHtml += `<div class="diff-line-equal">${escapeHtml(lineEntry.proposed)}</div>`;
-                        currentOriginalLineNum++;
-                        currentProposedLineNum++;
-                    }
-                }
-            } else {
-                if (entry.type === 'added') {
-                    originalLineNumbersHtml += `<div>&nbsp;</div>`;
-                    originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
-                    proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
-                    proposedCodeContentHtml += `<div class="diff-line-added">${escapeHtml(entry.proposed)}</div>`;
-                    currentProposedLineNum++;
-                } else if (entry.type === 'removed') {
-                    originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
-                    originalCodeContentHtml += `<div class="diff-line-removed">${escapeHtml(entry.original)}</div>`;
-                    proposedLineNumbersHtml += `<div>&nbsp;</div>`;
-                    proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
-                    currentOriginalLineNum++;
-                } else if (entry.type === 'modified') {
-                    originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
-                    originalCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.original)}</div>`;
-                    proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
-                    proposedCodeContentHtml += `<div class="diff-line-modified">${escapeHtml(entry.proposed)}</div>`;
-                    currentOriginalLineNum++;
-                    currentProposedLineNum++;
-                }
-                k++;
             }
-        }
 
-        return {
-            originalLineNumbersHtml, originalCodeContentHtml,
-            proposedLineNumbersHtml, proposedCodeContentHtml
-        };
-    }
+            return {
+                originalLineNumbersHtml, originalCodeContentHtml,
+                proposedLineNumbersHtml, proposedCodeContentHtml
+            };
+        },
 
-    function displayFileComparison(originalFiles, proposedFiles) {
-      const displayArea = document.getElementById('proposed-files-display');
-      displayArea.innerHTML = '';
+        /**
+         * Display file comparisons in the UI.
+         * @param {Array<object>} originalFiles - The original files array.
+         * @param {Array<object>} proposedFiles - The proposed files array.
+         */
+        displayFileComparison: (originalFiles, proposedFiles) => {
+            const displayArea = UI.get('proposedFilesDisplay');
+            UI.setHtml('proposedFilesDisplay', '');
 
-      if (!proposedFiles || proposedFiles.length === 0) {
-        displayArea.innerHTML = '<p>AI did not propose any changes to existing files, or no files were processed.</p>';
-        return;
-      }
+            if (!proposedFiles || proposedFiles.length === 0) {
+                UI.setHtml('proposedFilesDisplay', '<p>AI did not propose any changes to existing files, or no files were processed.</p>');
+                return;
+            }
 
-      proposedFiles.forEach(proposedFile => {
-          const name = proposedFile.name;
-          const fileType = proposedFile.type;
+            proposedFiles.forEach(proposedFile => {
+                const name = proposedFile.name;
+                const fileType = proposedFile.type;
 
-          const originalFile = (originalFiles || []).find(f => f.name === name);
-          const originalSource = originalFile ? originalFile.source : '';
-          const proposedSource = proposedFile.source;
+                const originalFile = (originalFiles || []).find(f => f.name === name);
+                const originalSource = originalFile ? originalFile.source : '';
+                const proposedSource = proposedFile.source;
 
-          const diffHtmlData = generateFormattedDiffPanels(originalSource, proposedSource);
+                const diffHtmlData = Utils.generateFormattedDiffPanels(originalSource, proposedSource);
 
-          const fileComparisonDiv = document.createElement('div');
-          fileComparisonDiv.className = 'file-comparison';
+                const fileComparisonDiv = document.createElement('div');
+                fileComparisonDiv.className = 'file-comparison';
 
-          const originalContentDiv = document.createElement('div');
-          originalContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
-              <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
-              <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
-          </pre>`;
-          
-          const proposedContentDiv = document.createElement('div');
-          proposedContentDiv.innerHTML = `<h4>${name}.${getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
-              <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
-              <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
-          </pre>`;
-          
-          fileComparisonDiv.appendChild(originalContentDiv);
-          fileComparisonDiv.appendChild(proposedContentDiv);
-          displayArea.appendChild(fileComparisonDiv);
+                const originalContentDiv = document.createElement('div');
+                originalContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
+                    <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
+                    <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
+                </pre>`;
+                
+                const proposedContentDiv = document.createElement('div');
+                proposedContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
+                    <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
+                    <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
+                </pre>`;
+                
+                fileComparisonDiv.appendChild(originalContentDiv);
+                fileComparisonDiv.appendChild(proposedContentDiv);
+                displayArea.appendChild(fileComparisonDiv);
 
-          const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
-          if (preElements.length === 2) {
-              const pre1 = preElements[0];
-              const pre2 = preElements[1];
+                const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
+                if (preElements.length === 2) {
+                    const pre1 = preElements[0];
+                    const pre2 = preElements[1];
 
-              let isSyncing = false;
+                    let isSyncing = false;
 
-              pre1.addEventListener('scroll', function() {
-                  if (!isSyncing) {
-                      isSyncing = true;
-                      pre2.scrollTop = pre1.scrollTop;
-                      isSyncing = false;
-                  }
-              });
+                    pre1.addEventListener('scroll', function() {
+                        if (!isSyncing) {
+                            isSyncing = true;
+                            pre2.scrollTop = pre1.scrollTop;
+                            isSyncing = false;
+                        }
+                    });
 
-              pre2.addEventListener('scroll', function() {
-                  if (!isSyncing) {
-                      isSyncing = true;
-                      pre1.scrollTop = pre2.scrollTop;
-                      isSyncing = false;
-                  }
-              });
-          }
-      });
-    }
-
-    function getFileExtension(type) {
-      switch (type) {
-        case 'SERVER_JS': return 'gs';
-        case 'JSON': return 'json';
-        default: return 'html';
-      }
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.appendChild(document.createTextNode(text));
-      return div.innerHTML;
-    }
-
-    document.getElementById('agent-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const submitterId = e.submitter.id;
-
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-      const cancelAiOperationButton = getButton('cancelAiOperationButton');
-      const promptInput = document.getElementById('prompt');
-      const acceptPolicyButton = getButton('acceptPolicyButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-
-
-      const scriptId = getEffectiveScriptId();
-      const promptText = promptInput.value;
-
-      if (!scriptId) {
-        alert('Please select or enter a Script ID.');
-        return;
-      }
-      if (!promptText.trim()) {
-        alert('Prompt cannot be empty.');
-        return;
-      }
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      // Show spinner in the clicked button, hide others, disable all relevant buttons
-      if (submitterId === 'generatePolicyButton') {
-        showSpinnerInButton(generatePolicyButton, 'Generating Policy...');
-        regeneratePolicyButton.style.display = 'none'; // Will be shown later if successful
-      } else { // Should not happen for this form
-        console.error("Unknown submitter for agent-form:", submitterId);
-        return;
-      }
-
-      promptInput.readOnly = true;
-      cancelAiOperationButton.style.display = 'inline-block';
-      acceptPolicyButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none';
-      applyChangesNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      document.getElementById('policy-container').style.display = 'none';
-      document.getElementById('proposal-container').style.display = 'none';
-      document.getElementById('apply-result-container').style.display = 'none';
-      getButton('fixApplyErrorsButton').style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('ai-policy').innerHTML = '';
-      document.getElementById('html-validation-warnings').style.display = 'none';
-      document.getElementById('html-validation-warnings').innerHTML = '';
-      document.getElementById('version-result-container').style.display = 'none';
-      document.getElementById('policyEditor').style.display = 'none';
-      document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
-      isPolicyEditing = false;
-      document.getElementById('apply-result-content').innerHTML = '';
-
-      const formData = { scriptId: scriptId, prompt: promptText };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Generating policy...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for generateProposalPolicy.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(generatePolicyButton); // Hide spinner on the clicked button
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'policy') {
-            currentPolicyData = response;
-            document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
-            document.getElementById('policy-container').style.display = 'block';
-            acceptPolicyButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-            promptInput.readOnly = false;
-          } else if (response.status === 'error') {
-            document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
-            document.getElementById('policy-container').style.display = 'block';
-            promptInput.readOnly = false;
-            generatePolicyButton.style.display = 'inline-block'; // Show Generate Policy on error
-            regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for generateProposalPolicy.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(generatePolicyButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-          document.getElementById('ai-policy').textContent = 'Error generating policy: ' + error.message;
-          document.getElementById('policy-container').style.display = 'block';
-          generatePolicyButton.style.display = 'inline-block'; // Show Generate Policy on error
-          regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy
-        })
-        .generateProposalPolicy(formData);
-    });
-
-    document.getElementById('togglePolicyEditButton').addEventListener('click', function() {
-      const aiPolicyDiv = document.getElementById('ai-policy');
-      const policyEditorTextarea = document.getElementById('policyEditor');
-      const toggleButton = this;
-      const promptInput = document.getElementById('prompt');
-
-      if (isPolicyEditing) {
-        currentPolicyData.policy = policyEditorTextarea.value;
-        aiPolicyDiv.innerHTML = marked.parse(currentPolicyData.policy);
-        aiPolicyDiv.style.display = 'block';
-        policyEditorTextarea.style.display = 'none';
-        toggleButton.textContent = 'Edit Policy';
-        promptInput.readOnly = false;
-      } else {
-        if (!currentPolicyData || !currentPolicyData.policy) {
-          alert('No policy to edit. Please generate a policy first.');
-          return;
-        }
-        policyEditorTextarea.value = currentPolicyData.policy;
-        aiPolicyDiv.style.display = 'none';
-        policyEditorTextarea.style.display = 'block';
-        toggleButton.textContent = 'Finish Editing';
-        promptInput.readOnly = false;
-        policyEditorTextarea.focus();
-      }
-      isPolicyEditing = !isPolicyEditing;
-    });
-
-    document.getElementById('acceptPolicyButton').addEventListener('click', function() {
-      if (!currentPolicyData) {
-        alert('No policy to accept. Please generate a policy first.');
-        return;
-      }
-
-      const acceptPolicyButton = this;
-      const cancelAiOperationButton = getButton('cancelAiOperationButton');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const promptInput = document.getElementById('prompt');
-      const generatePolicyButton = getButton('generatePolicyButton');
-
-      showSpinnerInButton(acceptPolicyButton, 'Proposing Changes...');
-      regeneratePolicyButton.style.display = 'none'; // Hide Regenerate Policy button during proposal generation
-      generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button remains hidden
-      regenerateProposalButton.style.display = 'none';
-      getButton('applyChangesNoDeployButton').style.display = 'none';
-      getButton('applyAndDeployButton').style.display = 'none';
-      cancelAiOperationButton.style.display = 'inline-block';
-      promptInput.readOnly = true;
-      
-      document.getElementById('policyEditor').style.display = 'none';
-      document.getElementById('togglePolicyEditButton').textContent = 'Edit Policy';
-      isPolicyEditing = false;
-      document.getElementById('apply-result-content').innerHTML = '';
-
-      const formData = { scriptId: currentPolicyData.scriptId, prompt: currentPolicyData.userPrompt, policy: currentPolicyData.policy };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Generating code proposal...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for processPrompt (after policy).');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(acceptPolicyButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
-            
-            const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-            htmlWarningsDiv.innerHTML = '';
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
-                    }
+                    pre2.addEventListener('scroll', function() {
+                        if (!isSyncing) {
+                            isSyncing = true;
+                            pre1.scrollTop = pre2.scrollTop;
+                            isSyncing = false;
+                        }
+                    });
                 }
             });
+        },
 
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
-            } else {
-                htmlWarningsDiv.style.display = 'none';
+        /**
+         * Get file extension based on file type.
+         * @param {string} type - The file type (SERVER_JS, JSON, HTML).
+         * @returns {string} The corresponding file extension.
+         */
+        getFileExtension: (type) => {
+            switch (type) {
+                case 'SERVER_JS': return 'gs';
+                case 'JSON': return 'json';
+                default: return 'html';
             }
+        },
 
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            document.getElementById('proposal-container').style.display = 'block';
-            getButton('applyChangesNoDeployButton').style.display = 'block';
-            getButton('applyAndDeployButton').style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button again
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else if (response.status === 'error') {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-danger">
-                    <p><strong>Error:</strong> Failed to generate proposal.</p>
-                    <p>${escapeHtml(response.message)}</p>
-                </div>
-            `;
-            document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on error
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-warning">
-                    <p><strong>Unexpected response status:</strong></p>
-                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
-                </div>
-            `;
-            document.getElementById('apply-result-container').style.display = 'block';
-            document.getElementById('proposal-container').style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on unexpected response
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for processPrompt (after policy).');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(acceptPolicyButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
+        /**
+         * Escape HTML entities in a string.
+         * @param {string} text - The text to escape.
+         * @returns {string} The escaped HTML string.
+         */
+        escapeHtml: (text) => {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+    };
 
-          const applyResultContent = document.getElementById('apply-result-content');
-          applyResultContent.innerHTML = `
-              <div class="notification is-danger">
-                  <p><strong>Error calling AI:</strong></p>
-                  <p>${escapeHtml(error.message)}</p>
-              </div>
-          `;
-          document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block';
-          regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on failure
-          generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-        })
-        .processPrompt(formData);
-    });
+    // 4. Core Logic / Event Handlers
+    const Handlers = {
+        /**
+         * Initialize tab navigation functionality.
+         */
+        initTabNavigation: () => {
+            const tabs = document.querySelectorAll('.tabs li');
+            const tabContents = document.querySelectorAll('.tab-content');
 
-    document.getElementById('cancelAiOperationButton').addEventListener('click', function() {
-      activeRequestId = null;
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    tabs.forEach(item => item.classList.remove('is-active'));
+                    this.classList.add('is-active');
 
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const cancelAiOperationButton = getButton('cancelAiOperationButton');
-      const acceptPolicyButton = getButton('acceptPolicyButton');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
-
-      const policyContainer = document.getElementById('policy-container');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const promptInput = document.getElementById('prompt');
-      const policyEditorTextarea = document.getElementById('policyEditor');
-      const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
-      const applyResultContent = document.getElementById('apply-result-content');
-
-      // Hide spinners and re-enable buttons that might have been loading
-      hideSpinnerInButton(generatePolicyButton);
-      hideSpinnerInButton(acceptPolicyButton);
-      hideSpinnerInButton(regeneratePolicyButton);
-      hideSpinnerInButton(regenerateProposalButton);
-      hideSpinnerInButton(applyChangesNoDeployButton);
-      hideSpinnerInButton(applyAndDeployButton);
-      hideSpinnerInButton(fixApplyErrorsButton);
-      
-      promptInput.readOnly = false;
-      cancelAiOperationButton.style.display = 'none';
-
-      currentPolicyData = null;
-      currentProposal = null;
-      document.getElementById('ai-policy').innerHTML = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      applyResultContent.innerHTML = '';
-      htmlWarningsDiv.style.display = 'none';
-      htmlWarningsDiv.innerHTML = '';
-
-      policyContainer.style.display = 'none';
-      proposalContainer.style.display = 'none';
-      acceptPolicyButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none';
-      applyChangesNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-
-      // Reset to initial state for policy buttons
-      generatePolicyButton.style.display = 'inline-block';
-      regeneratePolicyButton.style.display = 'none';
-
-      policyEditorTextarea.style.display = 'none';
-      togglePolicyEditButton.textContent = 'Edit Policy';
-      isPolicyEditing = false;
-
-      alert('AI operation canceled by user.');
-    });
-
-    document.getElementById('regeneratePolicyButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId();
-      const promptText = document.getElementById('prompt').value;
-
-      if (!scriptId) {
-        alert('Please select or enter a Script ID.');
-        return;
-      }
-      if (!promptText.trim()) {
-        alert('Prompt cannot be empty.');
-        return;
-      }
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const acceptPolicyButton = getButton('acceptPolicyButton');
-      const regeneratePolicyButton = this; // This is the button that was clicked
-      const cancelAiOperationButton = getButton('cancelAiOperationButton');
-      const policyContainer = document.getElementById('policy-container');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const promptInput = document.getElementById('prompt');
-      const policyEditorTextarea = document.getElementById('policyEditor');
-      const togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
-      const applyResultContent = document.getElementById('apply-result-content');
-
-      // Show spinner in the clicked button
-      showSpinnerInButton(regeneratePolicyButton, 'Regenerating Policy...');
-      generatePolicyButton.style.display = 'none'; // Keep Generate Policy button hidden
-      acceptPolicyButton.style.display = 'none'; // Hide accept button
-      
-      promptInput.readOnly = true;
-      cancelAiOperationButton.style.display = 'inline-block';
-
-      policyContainer.style.display = 'none';
-      proposalContainer.style.display = 'none';
-      applyChangesNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('ai-policy').innerHTML = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      htmlWarningsDiv.style.display = 'none';
-      htmlWarningsDiv.innerHTML = '';
-      policyEditorTextarea.style.display = 'none';
-      togglePolicyEditButton.textContent = 'Edit Policy';
-      isPolicyEditing = false;
-      applyResultContent.innerHTML = '';
-
-      currentPolicyData = null;
-      currentProposal = null;
-
-      const formData = { scriptId: scriptId, prompt: promptText };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Regenerating policy...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for regeneratePolicy.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(regeneratePolicyButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'policy') {
-            currentPolicyData = response;
-            document.getElementById('ai-policy').innerHTML = marked.parse(response.policy);
-            policyContainer.style.display = 'block';
-            acceptPolicyButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else if (response.status === 'error') {
-            document.getElementById('ai-policy').textContent = 'Error: ' + response.message;
-            policyContainer.style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on error
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for regeneratePolicy.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(regeneratePolicyButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          document.getElementById('ai-policy').textContent = 'Error regenerating policy: ' + error.message;
-          policyContainer.style.display = 'block';
-          regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on failure
-          generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-        })
-        .generateProposalPolicy(formData);
-    });
-
-    document.getElementById('applyChangesNoDeployButton').addEventListener('click', function() {
-      handleApplyChanges(false, this); // No deploy, pass clicked button
-    });
-
-    document.getElementById('applyAndDeployButton').addEventListener('click', function() {
-      handleApplyChanges(true, this); // Deploy, pass clicked button
-    });
-
-    function handleApplyChanges(autoDeploy, clickedButton) {
-      if (!currentProposal) {
-        const applyResultContent = document.getElementById('apply-result-content');
-        applyResultContent.innerHTML = `
-            <div class="notification is-danger">
-                <p><strong>Error:</strong> No proposal to apply.</p>
-            </div>
-        `;
-        document.getElementById('apply-result-container').style.display = 'block';
-        return;
-      }
-
-      saveScriptIdToLocalStorage(currentProposal.scriptId);
-
-      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const applyResultContent = document.getElementById('apply-result-content');
-      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-
-      // Show spinner in the clicked button
-      showSpinnerInButton(clickedButton, autoDeploy ? 'Applying & Deploying...' : 'Applying Changes...');
-      
-      // Disable other related buttons that are not loading a spinner within them
-      if (clickedButton.id === 'applyChangesNoDeployButton') {
-          applyAndDeployButton.disabled = true;
-      } else {
-          applyNoDeployButton.disabled = true;
-      }
-      regenerateProposalButton.disabled = true;
-      fixApplyErrorsButton.disabled = true; // Disable fix apply errors button too if it's visible
-
-      fixApplyErrorsButton.style.display = 'none';
-      applyResultContent.innerHTML = `
-        <div class="notification is-info is-light">
-          <p>Applying changes...</p>
-          ${autoDeploy ? '<p>Auto-deploying...</p>' : ''}
-        </div>
-      `;
-      document.getElementById('apply-result-container').style.display = 'block';
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          hideSpinnerInButton(clickedButton); // Hide spinner on the clicked button
-          applyNoDeployButton.disabled = false; // Re-enable all apply buttons
-          applyAndDeployButton.disabled = false;
-          regenerateProposalButton.disabled = false;
-          fixApplyErrorsButton.disabled = false;
-          applyResultContent.innerHTML = '';
-
-          if (response.status === 'success') {
-            const successNotification = document.createElement('div');
-            successNotification.className = 'notification is-success';
-            successNotification.innerHTML = `<p><strong>${escapeHtml(response.message)}</strong></p>`;
-            applyResultContent.appendChild(successNotification);
-
-            if (autoDeploy) { // Only show deployment status if auto-deploy was attempted
-              const deployMessageContainer = document.createElement('article');
-              deployMessageContainer.className = 'message mt-3';
-
-              let headerText = 'Auto-deploy Result';
-              let messageBodyContent = '';
-              let messageClass = '';
-
-              if (response.deploymentStatus === 'success') {
-                messageClass = 'is-success';
-                headerText += ' (Success)';
-                messageBodyContent += `
-                  <ul>
-                    <li><strong>Status:</strong> Success</li>
-                    <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
-                `;
-                if (response.deploymentId) {
-                  messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
-                }
-                if (response.webappUrl && response.webappUrl !== 'null') { // Ensure webappUrl is a valid string, not 'null'
-                  messageBodyContent += `<li><strong>Web App URL:</strong> <a href="${escapeHtml(response.webappUrl)}" target="_blank">${escapeHtml(response.webappUrl)}</a></li>`;
-                } else if (response.webappUrl === null) { // Explicitly check for null from backend
-                  messageBodyContent += `<li><strong>Web App URL:</strong> Not found in deployment response.</li>`;
-                }
-                messageBodyContent += `</ul>`;
-              } else if (response.deploymentStatus === 'error') {
-                messageClass = 'is-danger';
-                headerText += ' (Error)';
-                messageBodyContent += `
-                  <ul>
-                    <li><strong>Status:</strong> Error</li>
-                    <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
-                `;
-                if (response.deploymentId) {
-                  messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
-                }
-                messageBodyContent += `</ul>`;
-              } else { // This case should theoretically not be reached if autoDeploy is true
-                messageClass = 'is-warning';
-                headerText += ' (Unknown Status)';
-                messageBodyContent += `
-                  <ul>
-                    <li><strong>Status:</strong> Unknown</li>
-                    <li><strong>Message:</strong> ${escapeHtml(response.deploymentMessage)}</li>
-                  </ul>
-                `;
-              }
-              
-              deployMessageContainer.classList.add(messageClass);
-              deployMessageContainer.innerHTML = `
-                <div class="message-header">
-                  <p>${headerText}</p>
-                </div>
-                <div class="message-body">
-                  ${messageBodyContent}
-                </div>
-              `;
-              applyResultContent.appendChild(deployMessageContainer);
-            }
-
-            currentProposal = null;
-            applyNoDeployButton.style.display = 'none';
-            applyAndDeployButton.style.display = 'none';
-            regenerateProposalButton.style.display = 'none';
-            document.getElementById('proposed-files-display').innerHTML = '<p>Changes applied successfully. You can propose new changes or check logs.</p>';
-            document.getElementById('html-validation-warnings').style.display = 'none';
-            document.getElementById('html-validation-warnings').innerHTML = '';
-            fixApplyErrorsButton.style.display = 'none';
-          } else {
-            const errorNotification = document.createElement('div');
-            errorNotification.className = 'notification is-danger';
-            let errorMessage = `<strong>Failed to Apply Changes:</strong> ${escapeHtml(response.message)}`;
-            
-            if (response.apiErrorDetails) {
-                errorMessage += `<h4>API Error Details:</h4><pre>${escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`;
-            } else if (response.fullErrorText) {
-                errorMessage += `<h4>Raw API Response:</h4><pre>${escapeHtml(response.fullErrorText)}</pre>`;
-            }
-            errorNotification.innerHTML = `<p>${errorMessage}</p>`;
-            applyResultContent.appendChild(errorNotification);
-            fixApplyErrorsButton.style.display = 'block';
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideSpinnerInButton(clickedButton); // Hide spinner on the clicked button
-          applyNoDeployButton.disabled = false;
-          applyAndDeployButton.disabled = false;
-          regenerateProposalButton.disabled = false;
-          fixApplyErrorsButton.disabled = false;
-          applyResultContent.innerHTML = `
-              <div class="notification is-danger">
-                  <p><strong>Error applying changes (Uncaught):</strong></p>
-                  <p>${escapeHtml(error.message)}</p>
-              </div>
-          `;
-          fixApplyErrorsButton.style.display = 'block';
-        })
-        .applyProposedChanges(currentProposal.scriptId, currentProposal.proposedFiles, autoDeploy, currentProposal.purpose);
-    }
-
-    document.getElementById('fixApplyErrorsButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId();
-      if (!scriptId) {
-        const applyResultContent = document.getElementById('apply-result-content');
-        applyResultContent.innerHTML = `
-            <div class="notification is-danger">
-                <p><strong>Error:</strong> Script ID is required to fix errors.</p>
-            </div>
-        `;
-        document.getElementById('apply-result-container').style.display = 'block';
-        return;
-      }
-
-      const fixButton = this;
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const cancelFixErrorsButton = getButton('cancelFixErrorsButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const applyResultContent = document.getElementById('apply-result-content');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      showSpinnerInButton(fixButton, 'Fixing Errors...');
-      generatePolicyButton.style.display = 'none'; // Ensure generate button is hidden
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button during loading
-      promptInput.readOnly = true;
-      cancelFixErrorsButton.style.display = 'inline-block';
-      regenerateProposalButton.style.display = 'none';
-      proposalContainer.style.display = 'none';
-      applyNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      applyResultContent.innerHTML = '';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      htmlWarningsDiv.style.display = 'none';
-      htmlWarningsDiv.innerHTML = '';
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for fixErrorsFromLogs.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(fixButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelFixErrorsButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
-            
-            htmlWarningsDiv.innerHTML = '';
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
-                    }
-                }
+                    const targetId = this.dataset.tabContentId;
+                    tabContents.forEach(content => {
+                        if (content.id === targetId) {
+                            content.classList.add('is-active-content');
+                        } else {
+                            content.classList.remove('is-active-content');
+                        }
+                    });
+                });
             });
 
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
+            // Initially activate the first tab
+            if (tabs.length > 0) {
+                tabs[0].click();
+            }
+        },
+
+        /**
+         * Common function to reset AI operation related UI.
+         */
+        resetAiOperationUI: () => {
+            AppState.activeRequestId = null;
+            UI.hideSpinnerInButton(UI.get('generatePolicyButton'));
+            UI.hideSpinnerInButton(UI.get('acceptPolicyButton'));
+            UI.hideSpinnerInButton(UI.get('regeneratePolicyButton'));
+            UI.hideSpinnerInButton(UI.get('regenerateProposalButton'));
+            UI.hideSpinnerInButton(UI.get('applyChangesNoDeployButton'));
+            UI.hideSpinnerInButton(UI.get('applyAndDeployButton'));
+            UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
+            UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
+
+            UI.enable('prompt');
+            UI.hide('cancelAiOperationButton');
+            UI.hide('cancelFixErrorsButton');
+
+            AppState.currentPolicyData = null;
+            AppState.currentProposal = null;
+            UI.setHtml('aiPolicy', '');
+            UI.setText('proposalPurpose', '');
+            UI.setHtml('proposedFilesDisplay', '');
+            UI.setHtml('applyResultContent', '');
+            UI.hide('htmlValidationWarnings');
+            UI.setHtml('htmlValidationWarnings', '');
+
+            UI.hide('policyContainer');
+            UI.hide('proposalContainer');
+            UI.hide('acceptPolicyButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('applyResultContainer');
+            UI.hide('fixApplyErrorsButton');
+
+            UI.show('generatePolicyButton');
+            UI.hide('regeneratePolicyButton');
+
+            UI.hide('policyEditor');
+            UI.setText('togglePolicyEditButton', 'Edit Policy');
+            AppState.isPolicyEditing = false;
+        },
+
+        /**
+         * Handle submit for the agent form (Generate Policy).
+         * @param {Event} e - The submit event.
+         */
+        handleAgentFormSubmit: (e) => {
+            e.preventDefault();
+            const submitterId = e.submitter.id;
+
+            const scriptId = Utils.getEffectiveScriptId();
+            const promptText = UI.get('prompt').value;
+
+            if (!scriptId) {
+                alert('Please select or enter a Script ID.');
+                return;
+            }
+            if (!promptText.trim()) {
+                alert('Prompt cannot be empty.');
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            if (submitterId === 'generatePolicyButton') {
+                UI.showSpinnerInButton(UI.get('generatePolicyButton'), 'Generating Policy...');
+                UI.hide('regeneratePolicyButton');
             } else {
-                htmlWarningsDiv.style.display = 'none';
+                console.error("Unknown submitter for agent-form:", submitterId);
+                return;
             }
 
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyNoDeployButton.style.display = 'block';
-            applyAndDeployButton.style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block';
-            fixButton.style.display = 'none';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else if (response.status === 'error') {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-danger">
-                    <p><strong>Error:</strong> Failed to get error fix proposal.</p>
-                    <p>${escapeHtml(response.message)}</p>
-                </div>
-            `;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on error
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-warning">
-                    <p><strong>Unexpected response status:</strong></p>
-                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
-                }
-            `;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on unexpected response
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for fixErrorsFromLogs.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(fixButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelFixErrorsButton.style.display = 'none';
+            UI.disable('prompt');
+            UI.show('cancelAiOperationButton');
+            UI.hide('acceptPolicyButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('policyContainer');
+            UI.hide('proposalContainer');
+            UI.hide('applyResultContainer');
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('proposedFilesDisplay', '');
+            UI.setHtml('aiPolicy', '');
+            UI.hide('htmlValidationWarnings');
+            UI.setHtml('htmlValidationWarnings', '');
+            UI.hide('versionResultContainer');
+            UI.hide('policyEditor');
+            UI.setText('togglePolicyEditButton', 'Edit Policy');
+            AppState.isPolicyEditing = false;
+            UI.setHtml('applyResultContent', '');
 
-          const applyResultContent = document.getElementById('apply-result-content');
-          applyResultContent.innerHTML = `
-              <div class="notification is-danger">
-                  <p><strong>Error calling AI for fix:</strong></p>
-                  <p>${escapeHtml(error.message)}</p>
-              </div>
-          `;
-          document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block';
-          regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on failure
-          generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-        })
-        .fixErrorsFromLogs(scriptId);
-    });
+            const formData = { scriptId: scriptId, prompt: promptText };
 
-    document.getElementById('fix-errors-form').addEventListener('submit', function(e) {
-      e.preventDefault();
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
 
-      const scriptId = getEffectiveScriptId();
-      if (!scriptId) {
-        const applyResultContent = document.getElementById('apply-result-content');
-        applyResultContent.innerHTML = `
-            <div class="notification is-danger">
-                <p><strong>Error:</strong> Script ID is required to fix errors.</p>
-            </div>
-        `;
-        document.getElementById('apply-result-container').style.display = 'block';
-        return;
-      }
-
-      const fixErrorsButton = getButton('fixErrorsButton'); // This is the button that was clicked
-      const cancelFixErrorsButton = getButton('cancelFixErrorsButton');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const applyResultContent = document.getElementById('apply-result-content');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      showSpinnerInButton(fixErrorsButton, 'Fixing Errors...');
-      generatePolicyButton.style.display = 'none'; // Ensure generate button is hidden
-      regeneratePolicyButton.style.display = 'none'; // Hide regenerate button during loading
-      promptInput.readOnly = true;
-      cancelFixErrorsButton.style.display = 'inline-block';
-      regenerateProposalButton.style.display = 'none';
-      proposalContainer.style.display = 'none';
-      applyNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      applyResultContent.innerHTML = '';
-      htmlWarningsDiv.style.display = 'none';
-      htmlWarningsDiv.innerHTML = '';
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for fixErrorsFromLogs (via form submit).');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(fixErrorsButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelFixErrorsButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
-            
-            htmlWarningsDiv.innerHTML = '';
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
+            console.log('Generating policy...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for generateProposalPolicy.');
+                        return;
                     }
-                }
-            });
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('generatePolicyButton'));
+                    UI.hide('cancelAiOperationButton');
 
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
-            }
-            else {
-                htmlWarningsDiv.style.display = 'none';
-            }
-
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyNoDeployButton.style.display = 'block';
-            applyAndDeployButton.style.display = 'block';
-            regenerateProposalButton.style.display = 'inline-block';
-            fixApplyErrorsButton.style.display = 'none';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else if (response.status === 'error') {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-danger">
-                    <p><strong>Error:</strong> Failed to get error fix proposal.</p>
-                    <p>${escapeHtml(response.message)}</p>
-                </div>
-            `;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on error
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-warning">
-                    <p><strong>Unexpected response status:</strong></p>
-                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
-                </div>
-            `;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on unexpected response
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for fixErrorsFromLogs (via form submit).');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(fixErrorsButton); // Hide spinner on the clicked button
-          promptInput.readOnly = false;
-          cancelFixErrorsButton.style.display = 'none';
-
-          const applyResultContent = document.getElementById('apply-result-content');
-          applyResultContent.innerHTML = `
-              <div class="notification is-danger">
-                  <p><strong>Error calling AI for fix:</strong></p>
-                  <p>${escapeHtml(error.message)}</p>
-              </div>
-          `;
-          document.getElementById('apply-result-container').style.display = 'block';
-          document.getElementById('proposal-container').style.display = 'block';
-          regeneratePolicyButton.style.display = 'inline-block'; // Show Regenerate Policy button on failure
-          generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-        })
-        .fixErrorsFromLogs(scriptId);
-    });
-
-    document.getElementById('cancelFixErrorsButton').addEventListener('click', function() {
-      activeRequestId = null;
-
-      const fixErrorsButton = getButton('fixErrorsButton');
-      const cancelFixErrorsButton = getButton('cancelFixErrorsButton');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const regenerateProposalButton = getButton('regenerateProposalButton');
-      const promptInput = document.getElementById('prompt');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const applyResultContent = document.getElementById('apply-result-content');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-
-      hideSpinnerInButton(fixErrorsButton); // Hide spinner on this button
-      promptInput.readOnly = false;
-      cancelFixErrorsButton.style.display = 'none';
-      regenerateProposalButton.style.display = 'none';
-      
-      currentProposal = null;
-      document.getElementById('proposal-purpose').textContent = '';
-      document.getElementById('proposed-files-display').innerHTML = '<p>AI error fix canceled by user.</p>';
-      htmlWarningsDiv.style.display = 'none';
-      htmlWarningsDiv.innerHTML = '';
-      proposalContainer.style.display = 'block';
-      applyNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      applyResultContent.innerHTML = '';
-      fixApplyErrorsButton.style.display = 'none';
-
-      // Reset to initial state for policy buttons
-      generatePolicyButton.style.display = 'inline-block';
-      regeneratePolicyButton.style.display = 'none';
-    });
-
-    document.getElementById('regenerateProposalButton').addEventListener('click', function() {
-      if (!currentPolicyData || !currentPolicyData.scriptId || !currentPolicyData.userPrompt || !currentPolicyData.policy) {
-        alert('Cannot regenerate proposal. Policy data is missing.');
-        return;
-      }
-
-      const scriptId = currentPolicyData.scriptId;
-      const promptText = currentPolicyData.userPrompt;
-      const policyText = currentPolicyData.policy;
-
-      const regenerateButton = this; // This is the button that was clicked
-      const cancelAiOperationButton = getButton('cancelAiOperationButton');
-      const proposalContainer = document.getElementById('proposal-container');
-      const applyChangesNoDeployButton = getButton('applyChangesNoDeployButton');
-      const applyAndDeployButton = getButton('applyAndDeployButton');
-      const applyResultContainer = document.getElementById('apply-result-container');
-      const fixApplyErrorsButton = getButton('fixApplyErrorsButton');
-      const htmlWarningsDiv = document.getElementById('html-validation-warnings');
-      const promptInput = document.getElementById('prompt');
-      const applyResultContent = document.getElementById('apply-result-content');
-      const generatePolicyButton = getButton('generatePolicyButton');
-      const regeneratePolicyButton = getButton('regeneratePolicyButton');
-
-      showSpinnerInButton(regenerateButton, 'Regenerating Proposal...');
-      applyChangesNoDeployButton.disabled = true;
-      applyAndDeployButton.disabled = true;
-      promptInput.readOnly = true;
-      cancelAiOperationButton.style.display = 'inline-block';
-
-      proposalContainer.style.display = 'none';
-      applyChangesNoDeployButton.style.display = 'none';
-      applyAndDeployButton.style.display = 'none';
-      applyResultContainer.style.display = 'none';
-      fixApplyErrorsButton.style.display = 'none';
-      document.getElementById('proposed-files-display').innerHTML = '';
-      document.getElementById('proposal-purpose').textContent = '';
-      applyResultContent.innerHTML = '';
-      htmlWarningsDiv.style.display = 'none';
-      htmlWarningsDiv.innerHTML = '';
-
-      currentProposal = null;
-
-      const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
-
-      const requestId = Date.now();
-      activeRequestId = requestId;
-
-      console.log('Regenerating AI proposed changes...');
-      google.script.run
-        .withSuccessHandler(function(response) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale success response for regenerateProposal.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(regenerateButton); // Hide spinner on the clicked button
-          applyChangesNoDeployButton.disabled = false;
-          applyAndDeployButton.disabled = false;
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          if (response.status === 'proposal') {
-            currentProposal = response;
-            document.getElementById('proposal-purpose').textContent = response.purpose || 'No description provided.';
-            
-            htmlWarningsDiv.innerHTML = '';
-            let hasHtmlErrors = false;
-
-            response.proposedFiles.forEach(file => {
-                if (file.type === 'HTML') {
-                    const validationResult = validateHtml(file.source, file.name);
-                    if (!validationResult.isValid) {
-                        hasHtmlErrors = true;
-                        const warningP = document.createElement('p');
-                        warningP.textContent = validationResult.message;
-                        htmlWarningsDiv.appendChild(warningP);
+                    if (response.status === 'policy') {
+                        AppState.currentPolicyData = response;
+                        UI.setHtml('aiPolicy', marked.parse(response.policy));
+                        UI.show('policyContainer');
+                        UI.show('acceptPolicyButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                        UI.enable('prompt');
+                    } else if (response.status === 'error') {
+                        UI.setText('aiPolicy', 'Error: ' + response.message);
+                        UI.show('policyContainer');
+                        UI.enable('prompt');
+                        UI.show('generatePolicyButton');
+                        UI.hide('regeneratePolicyButton');
                     }
-                }
-            });
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for generateProposalPolicy.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('generatePolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
+                    UI.setText('aiPolicy', 'Error generating policy: ' + error.message);
+                    UI.show('policyContainer');
+                    UI.show('generatePolicyButton');
+                    UI.hide('regeneratePolicyButton');
+                })
+                .generateProposalPolicy(formData);
+        },
 
-            if (hasHtmlErrors) {
-                htmlWarningsDiv.style.display = 'block';
-            }
-            else {
-                htmlWarningsDiv.style.display = 'none';
-            }
+        /**
+         * Handle toggling the policy edit mode.
+         */
+        handleTogglePolicyEdit: () => {
+            const aiPolicyDiv = UI.get('aiPolicy');
+            const policyEditorTextarea = UI.get('policyEditor');
+            const toggleButton = UI.get('togglePolicyEditButton');
 
-            displayFileComparison(response.originalFiles, response.proposedFiles);
-            proposalContainer.style.display = 'block';
-            applyChangesNoDeployButton.style.display = 'block';
-            applyAndDeployButton.style.display = 'block';
-            regenerateButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Keep Regenerate Policy button visible
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else if (response.status === 'error') {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-danger">
-                    <p><strong>Error:</strong> Failed to regenerate proposal.</p>
-                    <p>${escapeHtml(response.message)}</p>
-                </div>
-            `;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-            regenerateButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Keep Regenerate Policy button visible on error
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          } else {
-            const applyResultContent = document.getElementById('apply-result-content');
-            applyResultContent.innerHTML = `
-                <div class="notification is-warning">
-                    <p><strong>Unexpected response status:</strong></p>
-                    <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
-                </div>
-            `;
-            applyResultContainer.style.display = 'block';
-            proposalContainer.style.display = 'block';
-            regenerateButton.style.display = 'inline-block';
-            regeneratePolicyButton.style.display = 'inline-block'; // Keep Regenerate Policy button visible on unexpected response
-            generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-          }
-        })
-        .withFailureHandler(function(error) {
-          if (activeRequestId !== requestId) {
-            console.log('Ignoring stale failure response for regenerateProposal.');
-            return;
-          }
-          activeRequestId = null;
-          hideSpinnerInButton(regenerateButton); // Hide spinner on the clicked button
-          applyChangesNoDeployButton.disabled = false;
-          applyAndDeployButton.disabled = false;
-          promptInput.readOnly = false;
-          cancelAiOperationButton.style.display = 'none';
-
-          const applyResultContent = document.getElementById('apply-result-content');
-          applyResultContent.innerHTML = `
-              <div class="notification is-danger">
-                  <p><strong>Error regenerating proposal:</strong></p>
-                  <p>${escapeHtml(error.message)}</p>
-              </div>
-          `;
-          applyResultContainer.style.display = 'block';
-          proposalContainer.style.display = 'block';
-          regenerateButton.style.display = 'inline-block';
-          regeneratePolicyButton.style.display = 'inline-block'; // Keep Regenerate Policy button visible on failure
-          generatePolicyButton.style.display = 'none'; // Ensure Generate Policy button is hidden
-        })
-        .processPrompt(formData);
-    });
-
-    document.getElementById('saveGcpProjectIdButton').addEventListener('click', function() {
-      const gcpProjectIdInput = document.getElementById('gcpProjectId');
-      const gcpProjectId = gcpProjectIdInput.value.trim();
-      const saveResultContainer = document.getElementById('gcp-save-result-container');
-      const saveResultText = document.getElementById('gcp-save-result');
-      const saveButton = this;
-
-      saveResultContainer.style.display = 'block';
-      saveResultText.textContent = 'Saving...';
-      showSpinnerInButton(saveButton, 'Saving...');
-
-      if (!gcpProjectId) {
-        saveResultText.textContent = 'Error: GCP Project ID cannot be empty.';
-        hideSpinnerInButton(saveButton);
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          saveResultText.textContent = response.message;
-          hideSpinnerInButton(saveButton);
-          if (response.status === 'success') {
-            saveGcpProjectIdToLocalStorage(gcpProjectId);
-          }
-        })
-        .withFailureHandler(function(error) {
-          saveResultText.textContent = 'Error saving GCP Project ID: ' + error.message;
-          hideSpinnerInButton(saveButton);
-        })
-        .setGcpProjectId(gcpProjectId);
-    });
-
-    document.getElementById('log-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const submitButton = form.querySelector('#getLogsButton');
-      const resultContainer = document.getElementById('log-result-container');
-      const resultText = document.getElementById('log-result');
-
-      showSpinnerInButton(submitButton, 'Getting Logs...');
-      resultContainer.style.display = 'none';
-      resultText.textContent = '';
-
-      const scriptId = getEffectiveScriptId();
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          hideSpinnerInButton(submitButton);
-          resultText.textContent = response;
-          resultContainer.style.display = 'block';
-        })
-        .withFailureHandler(function(error) {
-          hideSpinnerInButton(submitButton);
-          resultText.textContent = 'Error: ' + error.message;
-          resultContainer.style.display = 'block';
-        })
-        .getScriptLogs(scriptId);
-    });
-
-    document.getElementById('deploy-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const submitButton = form.querySelector('#deployButton');
-      const resultContainer = document.getElementById('deploy-result-container');
-      const resultText = document.getElementById('deploy-result');
-
-      showSpinnerInButton(submitButton, 'Deploying...');
-      resultContainer.style.display = 'none';
-      resultText.textContent = '';
-
-      const scriptId = getEffectiveScriptId();
-      const description = document.getElementById('deploymentDescription').value;
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          hideSpinnerInButton(submitButton);
-          resultContainer.style.display = 'block';
-          if (response.status === 'success') {
-            let webappUrlHtml = `Web App URL: ${response.webappUrl}`;
-            if (response.webappUrl && response.webappUrl !== 'null') { // Check for actual URL, not 'null' string
-              webappUrlHtml = `Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
-            } else if (response.webappUrl === null) { // Explicitly check for null from backend
-                webappUrlHtml = `Web App URL: Not found in deployment response.`;
-            }
-            resultText.innerHTML = `${response.message}<br>Deployment ID: ${response.deploymentId}<br>${webappUrlHtml}`;
-          } else {
-            resultText.textContent = `Error: ${response.message}`;
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideSpinnerInButton(submitButton);
-          resultContainer.style.display = 'block';
-          resultText.textContent = `Error deploying script: ${error.message}`;
-        })
-        .deployScript(scriptId, description);
-    });
-
-    document.getElementById('add-library-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const form = this;
-      const submitButton = form.querySelector('#addLibraryButton');
-      const resultContainer = document.getElementById('add-library-result-container');
-      const resultText = document.getElementById('add-library-result');
-
-      showSpinnerInButton(submitButton, 'Adding Library...');
-      resultContainer.style.display = 'none';
-      resultText.textContent = '';
-
-      const targetScriptId = getEffectiveScriptId();
-      const libraryScriptId = document.getElementById('libraryScriptId').value.trim();
-      const libraryVersion = document.getElementById('libraryVersion').value.trim();
-
-      if (!targetScriptId) {
-        resultText.textContent = 'Error: Please select or enter a Target Script ID.';
-        resultContainer.style.display = 'block';
-        hideSpinnerInButton(submitButton);
-        return;
-      }
-      if (!libraryScriptId) {
-        resultText.textContent = 'Error: Library Script ID cannot be empty.';
-        resultContainer.style.display = 'block';
-        hideSpinnerInButton(submitButton);
-        return;
-      }
-
-      saveScriptIdToLocalStorage(targetScriptId);
-
-      const effectiveVersion = libraryVersion.trim() === '' ? 'HEAD' : libraryVersion.trim();
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          hideSpinnerInButton(submitButton);
-          resultContainer.style.display = 'block';
-          if (response.status === 'success') {
-            resultText.textContent = response.message;
-            document.getElementById('libraryScriptId').value = '';
-            document.getElementById('libraryVersion').value = '';
-          } else {
-            resultText.textContent = `Error: ${response.message}`;
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideSpinnerInButton(submitButton);
-          resultContainer.style.display = 'block';
-          resultText.textContent = `Error adding library: ${error.message}`;
-        })
-        .addLibraryToProject(targetScriptId, libraryScriptId, effectiveVersion);
-    });
-
-    document.getElementById('getVersionsButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId();
-      const versionsSelect = document.getElementById('versionSelect');
-      const getVersionsButton = this; // This is the button that was clicked
-      const revertVersionButton = getButton('revertVersionButton');
-      const openWebAppButton = getButton('openWebAppButton'); // Get button reference
-      const openWebAppMessage = document.getElementById('openWebAppMessage');
-      const versionResultContainer = document.getElementById('version-result-container');
-      const versionResultText = document.getElementById('version-result');
-
-      versionsSelect.innerHTML = '<option value="">-- Loading versions --</option>';
-      versionsSelect.disabled = true;
-      showSpinnerInButton(getVersionsButton, 'Getting Versions...');
-      revertVersionButton.disabled = true;
-      openWebAppButton.disabled = true; // Ensure it's disabled when versions are loading/reloading
-      openWebAppMessage.textContent = ''; // Clear message while loading
-      versionResultContainer.style.display = 'none';
-
-      if (!scriptId) {
-        versionsSelect.innerHTML = '<option value="">-- Select a Script ID first --</option>';
-        versionResultText.textContent = 'Error: Please select or enter a Script ID to get versions.';
-        versionResultContainer.style.display = 'block';
-        versionsSelect.disabled = false;
-        hideSpinnerInButton(getVersionsButton);
-        return;
-      }
-
-      saveScriptIdToLocalStorage(scriptId);
-
-      google.script.run
-        .withSuccessHandler(function(response) {
-          hideSpinnerInButton(getVersionsButton);
-          versionsSelect.disabled = false;
-          // revertVersionButton.disabled and openWebAppButton.disabled will be handled by versionSelect change handler
-
-          if (response.status === 'success') {
-            versionsSelect.innerHTML = '<option value="">-- Select a version --</option>';
-            if (response.versions && response.versions.length > 0) {
-              response.versions.forEach(version => {
-                const option = document.createElement('option');
-                option.value = version.versionNumber;
-                option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
-                if (version.webappUrl !== null) { // Store 'null' as a string if it's null from backend
-                    option.dataset.webappUrl = version.webappUrl;
-                } else {
-                    option.dataset.webappUrl = 'null'; // Explicitly store 'null' string for proper checking
-                }
-                versionsSelect.appendChild(option);
-              });
-              versionResultText.textContent = `Versions found: ${response.versions.length} items`;
+            if (AppState.isPolicyEditing) {
+                AppState.currentPolicyData.policy = policyEditorTextarea.value;
+                UI.setHtml('aiPolicy', marked.parse(AppState.currentPolicyData.policy));
+                UI.show('aiPolicy');
+                UI.hide('policyEditor');
+                UI.setText('togglePolicyEditButton', 'Edit Policy');
+                UI.enable('prompt');
             } else {
-              versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
-              versionResultText.textContent = response.message;
+                if (!AppState.currentPolicyData || !AppState.currentPolicyData.policy) {
+                    alert('No policy to edit. Please generate a policy first.');
+                    return;
+                }
+                UI.get('policyEditor').value = AppState.currentPolicyData.policy;
+                UI.hide('aiPolicy');
+                UI.show('policyEditor');
+                UI.setText('togglePolicyEditButton', 'Finish Editing');
+                UI.enable('prompt');
+                UI.get('policyEditor').focus();
             }
-            // After populating options, trigger change event to correctly set button state and message
-            versionsSelect.dispatchEvent(new Event('change'));
-          }
-          else {
-            versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
-            versionResultText.textContent = `Error: ${response.message}`;
-            openWebAppButton.disabled = true; // Disable on error
-            revertVersionButton.disabled = true; // Disable on error
-            openWebAppMessage.textContent = ''; // Clear message on error
-          }
-          versionResultContainer.style.display = 'block';
-        })
-        .withFailureHandler(function(error) {
-          hideSpinnerInButton(getVersionsButton);
-          versionsSelect.disabled = false;
-          revertVersionButton.disabled = true;
-          openWebAppButton.disabled = true; // Disable on error
-          openWebAppMessage.textContent = ''; // Clear message on error
-          versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
-          versionResultText.textContent = `Error getting versions: ${error.message}`;
-          versionResultContainer.style.display = 'block';
-        })
-        .listScriptVersions(scriptId);
-    });
+            AppState.isPolicyEditing = !AppState.isPolicyEditing;
+        },
 
-    document.getElementById('versionSelect').addEventListener('change', function() {
-        const versionsSelect = this;
-        const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
-        const revertVersionButton = getButton('revertVersionButton');
-        const openWebAppButton = getButton('openWebAppButton');
-        const openWebAppMessage = document.getElementById('openWebAppMessage');
+        /**
+         * Handle accepting the generated policy and generating proposed changes.
+         */
+        handleAcceptPolicy: () => {
+            if (!AppState.currentPolicyData) {
+                alert('No policy to accept. Please generate a policy first.');
+                return;
+            }
 
-        // Enable/disable revert button based on selection
-        revertVersionButton.disabled = !selectedOption.value;
+            UI.showSpinnerInButton(UI.get('acceptPolicyButton'), 'Proposing Changes...');
+            UI.hide('regeneratePolicyButton');
+            UI.hide('generatePolicyButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.show('cancelAiOperationButton');
+            UI.disable('prompt');
+            
+            UI.hide('policyEditor');
+            UI.setText('togglePolicyEditButton', 'Edit Policy');
+            AppState.isPolicyEditing = false;
+            UI.setHtml('applyResultContent', '');
 
-        // Enable/disable open web app button based on webappUrl in dataset
-        const webappUrl = selectedOption.dataset.webappUrl;
+            const formData = { scriptId: AppState.currentPolicyData.scriptId, prompt: AppState.currentPolicyData.userPrompt, policy: AppState.currentPolicyData.policy };
 
-        if (selectedOption.value && webappUrl && webappUrl !== 'null') { 
-            openWebAppButton.disabled = false;
-            openWebAppMessage.textContent = ''; // Clear message
-        } else if (selectedOption.value && (webappUrl === 'null' || !webappUrl)) { 
-            openWebAppButton.disabled = true;
-            openWebAppMessage.textContent = 'No web app URL for this version.';
-        } else { // No version selected
-            openWebAppButton.disabled = true;
-            openWebAppMessage.textContent = ''; // Clear message
-        }
-    });
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
 
-    document.getElementById('openWebAppButton').addEventListener('click', function() {
-        const versionsSelect = document.getElementById('versionSelect');
-        const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
-        const webappUrl = selectedOption.dataset.webappUrl;
+            console.log('Generating code proposal...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for processPrompt (after policy).');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('acceptPolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
 
-        if (webappUrl && webappUrl !== 'null') { // Ensure it's a valid URL string
-            window.open(webappUrl, '_blank');
-        } else {
-            alert('No web app URL found for the selected version, or URL is invalid.'); // More specific message for consistency
-        }
-    });
+                    if (response.status === 'proposal') {
+                        AppState.currentProposal = response;
+                        UI.setText('proposalPurpose', response.purpose || 'No description provided.');
+                        
+                        UI.setHtml('htmlValidationWarnings', '');
+                        let hasHtmlErrors = false;
 
-    document.getElementById('revertVersionButton').addEventListener('click', function() {
-      const scriptId = getEffectiveScriptId();
-      const versionSelect = document.getElementById('versionSelect');
-      const selectedVersion = versionSelect.value;
-      const revertButton = this; // This is the button that was clicked
-      const getVersionsButton = getButton('getVersionsButton');
-      const openWebAppButton = getButton('openWebAppButton'); // Get button reference
-      const openWebAppMessage = document.getElementById('openWebAppMessage');
-      const versionResultContainer = document.getElementById('version-result-container');
-      const versionResultText = document.getElementById('version-result');
+                        response.proposedFiles.forEach(file => {
+                            if (file.type === 'HTML') {
+                                const validationResult = Utils.validateHtml(file.source, file.name);
+                                if (!validationResult.isValid) {
+                                    hasHtmlErrors = true;
+                                    const warningP = document.createElement('p');
+                                    warningP.textContent = validationResult.message;
+                                    UI.get('htmlValidationWarnings').appendChild(warningP);
+                                }
+                            }
+                        });
 
-      if (!scriptId) {
-        versionResultText.textContent = 'Error: Please select or enter a Script ID.';
-        versionResultContainer.style.display = 'block';
-        return;
-      }
-      if (!selectedVersion) {
-        versionResultText.textContent = 'Error: Please select a version to revert to.';
-        versionResultContainer.style.display = 'block';
-        return;
-      }
+                        if (hasHtmlErrors) {
+                            UI.show('htmlValidationWarnings');
+                        } else {
+                            UI.hide('htmlValidationWarnings');
+                        }
 
-      if (!confirm(`Reverting script ID ${scriptId} to version ${selectedVersion}. This cannot be undone. Do you wish to continue?`)) {
-        return;
-      }
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        UI.show('proposalContainer');
+                        UI.show('applyChangesNoDeployButton');
+                        UI.show('applyAndDeployButton');
+                        UI.show('regenerateProposalButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else if (response.status === 'error') {
+                        UI.appendNotification('applyResultContent', 'is-danger', 'Failed to generate proposal.', response.message);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else {
+                        UI.appendNotification('applyResultContent', 'is-warning', 'Unexpected response status:', response);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for processPrompt (after policy).');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('acceptPolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
 
-      showSpinnerInButton(revertButton, 'Reverting...');
-      getVersionsButton.disabled = true;
-      versionSelect.disabled = true;
-      openWebAppButton.disabled = true; // Disable during revert operation
-      openWebAppMessage.textContent = ''; // Clear message during revert
-      versionResultContainer.style.display = 'block';
-      versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
+                    UI.appendNotification('applyResultContent', 'is-danger', 'Error calling AI:', error.message);
+                    UI.show('applyResultContainer');
+                    UI.show('proposalContainer');
+                    UI.show('regeneratePolicyButton');
+                    UI.hide('generatePolicyButton');
+                })
+                .processPrompt(formData);
+        },
 
-      saveScriptIdToLocalStorage(scriptId);
+        /**
+         * Handle canceling any active AI operation.
+         */
+        handleCancelAiOperation: () => {
+            Handlers.resetAiOperationUI();
+            alert('AI operation canceled by user.');
+        },
 
-      google.script.run
-        .withSuccessHandler(function(response) {
-          hideSpinnerInButton(revertButton);
-          getVersionsButton.disabled = false;
-          versionSelect.disabled = false;
-          // openWebAppButton.disabled will be handled by versionSelect change after success
+        /**
+         * Handle regenerating the AI policy.
+         */
+        handleRegeneratePolicy: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const promptText = UI.get('prompt').value;
 
-          if (response.status === 'success') {
-            versionResultText.textContent = response.message;
-            versionSelect.innerHTML = '<option value="">-- Select a version --</option>';
-            revertButton.disabled = true;
-            openWebAppButton.disabled = true; // Ensure disabled after revert
-            openWebAppMessage.textContent = ''; // Ensure cleared after revert
-          }
+            if (!scriptId) {
+                alert('Please select or enter a Script ID.');
+                return;
+            }
+            if (!promptText.trim()) {
+                alert('Prompt cannot be empty.');
+                return;
+            }
 
-          else {
-            versionResultText.textContent = `Error: ${response.message}`;
-            openWebAppButton.disabled = true; // Disable on error
-            openWebAppMessage.textContent = ''; // Clear message on error
-          }
-        })
-        .withFailureHandler(function(error) {
-          hideSpinnerInButton(revertButton);
-          getVersionsButton.disabled = false;
-          versionSelect.disabled = false;
-          openWebAppButton.disabled = true; // Disable on failure
-          openWebAppMessage.textContent = ''; // Clear message on failure
-          versionResultText.textContent = `Error reverting to version: ${error.message}`;
-        })
-        .revertToVersion(scriptId, parseInt(selectedVersion));
-    });
+            Utils.saveScriptIdToLocalStorage(scriptId);
 
-    document.getElementById('getFilesListButton').addEventListener('click', function() {
-        const scriptId = getEffectiveScriptId();
-        const filesListContainer = document.getElementById('filesListContainer');
-        const filesListDisplay = document.getElementById('filesListDisplay');
-        const getFilesListButton = this; // This is the button that was clicked
+            UI.showSpinnerInButton(UI.get('regeneratePolicyButton'), 'Regenerating Policy...');
+            UI.hide('generatePolicyButton');
+            UI.hide('acceptPolicyButton');
+            
+            UI.disable('prompt');
+            UI.show('cancelAiOperationButton');
 
-        filesListContainer.style.display = 'block';
-        filesListDisplay.innerHTML = '';
-        showSpinnerInButton(getFilesListButton, 'Getting Files...');
+            UI.hide('policyContainer');
+            UI.hide('proposalContainer');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('applyResultContainer');
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('proposedFilesDisplay', '');
+            UI.setHtml('aiPolicy', '');
+            UI.setText('proposalPurpose', '');
+            UI.hide('htmlValidationWarnings');
+            UI.setHtml('htmlValidationWarnings', '');
+            UI.hide('policyEditor');
+            UI.setText('togglePolicyEditButton', 'Edit Policy');
+            AppState.isPolicyEditing = false;
+            UI.setHtml('applyResultContent', '');
 
-        if (!scriptId) {
-            filesListDisplay.innerHTML = '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>';
-            hideSpinnerInButton(getFilesListButton);
-            return;
-        }
+            AppState.currentPolicyData = null;
+            AppState.currentProposal = null;
 
-        saveScriptIdToLocalStorage(scriptId);
+            const formData = { scriptId: scriptId, prompt: promptText };
 
-        google.script.run
-            .withSuccessHandler(function(response) {
-                hideSpinnerInButton(getFilesListButton);
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
 
-                if (response.status === 'success') {
-                    if (response.files && response.files.length > 0) {
-                        filesListDisplay.innerHTML = '';
-                        response.files.forEach(file => {
-                            const fileItem = document.createElement('div');
-                            fileItem.className = 'file-item';
+            console.log('Regenerating policy...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for regeneratePolicy.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('regeneratePolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
 
-                            let typeClass = '';
-                            let typeText = '';
+                    if (response.status === 'policy') {
+                        AppState.currentPolicyData = response;
+                        UI.setHtml('aiPolicy', marked.parse(response.policy));
+                        UI.show('policyContainer');
+                        UI.show('acceptPolicyButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else if (response.status === 'error') {
+                        UI.setText('aiPolicy', 'Error: ' + response.message);
+                        UI.show('policyContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for regeneratePolicy.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('regeneratePolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
 
-                            switch (file.type) {
-                                case 'SERVER_JS':
-                                    typeClass = 'is-server-js';
-                                    typeText = 'JS';
-                                    break;
-                                case 'JSON':
-                                    typeClass = 'is-json';
-                                    typeText = 'JSON';
-                                    break;
-                                case 'HTML':
-                                    typeClass = 'is-html';
-                                    typeText = 'HTML';
-                                    break;
-                                default:
-                                    typeClass = 'is-unknown';
-                                    typeText = 'UNKNOWN';
+                    UI.setText('aiPolicy', 'Error regenerating policy: ' + error.message);
+                    UI.show('policyContainer');
+                    UI.show('regeneratePolicyButton');
+                    UI.hide('generatePolicyButton');
+                })
+                .generateProposalPolicy(formData);
+        },
+
+        /**
+         * Handle applying proposed changes to the script.
+         * @param {boolean} autoDeploy - Whether to automatically deploy after applying changes.
+         * @param {HTMLElement} clickedButton - The button element that was clicked.
+         */
+        handleApplyChanges: (autoDeploy, clickedButton) => {
+            if (!AppState.currentProposal) {
+                UI.appendNotification('applyResultContent', 'is-danger', 'No proposal to apply.');
+                UI.show('applyResultContainer');
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(AppState.currentProposal.scriptId);
+
+            UI.showSpinnerInButton(clickedButton, autoDeploy ? 'Applying & Deploying...' : 'Applying Changes...');
+            
+            // Disable other related buttons
+            if (clickedButton.id === 'applyChangesNoDeployButton') {
+                UI.disable('applyAndDeployButton');
+            } else {
+                UI.disable('applyChangesNoDeployButton');
+            }
+            UI.disable('regenerateProposalButton');
+            UI.disable('fixApplyErrorsButton');
+
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('applyResultContent', `
+                <div class="notification is-info is-light">
+                <p>Applying changes...</p>
+                ${autoDeploy ? '<p>Auto-deploying...</p>' : ''}
+                </div>
+            `);
+            UI.show('applyResultContainer');
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(clickedButton);
+                    UI.enable('applyChangesNoDeployButton');
+                    UI.enable('applyAndDeployButton');
+                    UI.enable('regenerateProposalButton');
+                    UI.enable('fixApplyErrorsButton');
+                    UI.setHtml('applyResultContent', '');
+
+                    if (response.status === 'success') {
+                        UI.appendNotification('applyResultContent', 'is-success', Utils.escapeHtml(response.message));
+
+                        if (autoDeploy) {
+                            const deployMessageContainer = document.createElement('article');
+                            deployMessageContainer.className = 'message mt-3';
+
+                            let headerText = 'Auto-deploy Result';
+                            let messageBodyContent = '';
+                            let messageClass = '';
+
+                            if (response.deploymentStatus === 'success') {
+                                messageClass = 'is-success';
+                                headerText += ' (Success)';
+                                messageBodyContent += `
+                                    <ul>
+                                    <li><strong>Status:</strong> Success</li>
+                                    <li><strong>Message:</strong> ${Utils.escapeHtml(response.deploymentMessage)}</li>
+                                `;
+                                if (response.deploymentId) {
+                                    messageBodyContent += `<li><strong>Deployment ID:</strong> ${Utils.escapeHtml(response.deploymentId)}</li>`;
+                                }
+                                if (response.webappUrl && response.webappUrl !== 'null') {
+                                    messageBodyContent += `<li><strong>Web App URL:</strong> <a href="${Utils.escapeHtml(response.webappUrl)}" target="_blank">${Utils.escapeHtml(response.webappUrl)}</a></li>`;
+                                } else if (response.webappUrl === null) {
+                                    messageBodyContent += `<li><strong>Web App URL:</strong> Not found in deployment response.</li>`;
+                                }
+                                messageBodyContent += `</ul>`;
+                            } else if (response.deploymentStatus === 'error') {
+                                messageClass = 'is-danger';
+                                headerText += ' (Error)';
+                                messageBodyContent += `
+                                    <ul>
+                                    <li><strong>Status:</strong> Error</li>
+                                    <li><strong>Message:</strong> ${Utils.escapeHtml(response.deploymentMessage)}</li>
+                                `;
+                                if (response.deploymentId) {
+                                    messageBodyContent += `<li><strong>Deployment ID:</strong> ${Utils.escapeHtml(response.deploymentId)}</li>`;
+                                }
+                                messageBodyContent += `</ul>`;
+                            } else {
+                                messageClass = 'is-warning';
+                                headerText += ' (Unknown Status)';
+                                messageBodyContent += `
+                                    <ul>
+                                    <li><strong>Status:</strong> Unknown</li>
+                                    <li><strong>Message:</strong> ${Utils.escapeHtml(response.deploymentMessage)}</li>
+                                    </ul>
+                                `;
                             }
                             
-                            fileItem.classList.add(typeClass);
-
-                            fileItem.innerHTML = `
-                                <div class="file-type-badge">${typeText}</div>
-                                <div class="file-name">${escapeHtml(file.name)}.${getFileExtension(file.type)}</div>
+                            deployMessageContainer.classList.add(messageClass);
+                            deployMessageContainer.innerHTML = `
+                                <div class="message-header">
+                                <p>${headerText}</p>
+                                </div>
+                                <div class="message-body">
+                                ${messageBodyContent}
+                                </div>
                             `;
+                            UI.get('applyResultContent').appendChild(deployMessageContainer);
+                        }
 
-                            filesListDisplay.appendChild(fileItem);
-                        });
+                        AppState.currentProposal = null;
+                        UI.hide('applyChangesNoDeployButton');
+                        UI.hide('applyAndDeployButton');
+                        UI.hide('regenerateProposalButton');
+                        UI.setHtml('proposedFilesDisplay', '<p>Changes applied successfully. You can propose new changes or check logs.</p>');
+                        UI.hide('htmlValidationWarnings');
+                        UI.setHtml('htmlValidationWarnings', '');
+                        UI.hide('fixApplyErrorsButton');
                     } else {
-                        filesListDisplay.innerHTML = '<p>No files found in this script.</p>';
+                        UI.appendNotification('applyResultContent', 'is-danger', `Failed to Apply Changes: ${Utils.escapeHtml(response.message)}`, response.apiErrorDetails || response.fullErrorText);
+                        UI.show('fixApplyErrorsButton');
                     }
-                } else {
-                    filesListDisplay.innerHTML = `<p class="has-text-danger">Error retrieving files: ${escapeHtml(response.message)}</p>`;
-                    if (response.apiErrorDetails) {
-                        filesListDisplay.innerHTML += `<pre class="has-text-danger-dark is-size-7 mt-2">${escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`;
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(clickedButton);
+                    UI.enable('applyChangesNoDeployButton');
+                    UI.enable('applyAndDeployButton');
+                    UI.enable('regenerateProposalButton');
+                    UI.enable('fixApplyErrorsButton');
+                    UI.appendNotification('applyResultContent', 'is-danger', 'Error applying changes (Uncaught):', error.message);
+                    UI.show('fixApplyErrorsButton');
+                })
+                .applyProposedChanges(AppState.currentProposal.scriptId, AppState.currentProposal.proposedFiles, autoDeploy, AppState.currentProposal.purpose);
+        },
+
+        /**
+         * Handle regenerating the AI proposal.
+         */
+        handleRegenerateProposal: () => {
+            if (!AppState.currentPolicyData || !AppState.currentPolicyData.scriptId || !AppState.currentPolicyData.userPrompt || !AppState.currentPolicyData.policy) {
+                alert('Cannot regenerate proposal. Policy data is missing.');
+                return;
+            }
+
+            const scriptId = AppState.currentPolicyData.scriptId;
+            const promptText = AppState.currentPolicyData.userPrompt;
+            const policyText = AppState.currentPolicyData.policy;
+
+            UI.showSpinnerInButton(UI.get('regenerateProposalButton'), 'Regenerating Proposal...');
+            UI.disable('applyChangesNoDeployButton');
+            UI.disable('applyAndDeployButton');
+            UI.disable('prompt');
+            UI.show('cancelAiOperationButton');
+
+            UI.hide('proposalContainer');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('applyResultContainer');
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('proposedFilesDisplay', '');
+            UI.setText('proposalPurpose', '');
+            UI.setHtml('applyResultContent', '');
+            UI.hide('htmlValidationWarnings');
+            UI.setHtml('htmlValidationWarnings', '');
+
+            AppState.currentProposal = null;
+
+            const formData = { scriptId: scriptId, prompt: promptText, policy: policyText };
+
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
+
+            console.log('Regenerating AI proposed changes...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for regenerateProposal.');
+                        return;
                     }
-                }
-            })
-            .withFailureHandler(function(error) {
-                hideSpinnerInButton(getFilesListButton);
-                filesListDisplay.innerHTML = `<p class="has-text-danger">Error calling server function: ${escapeHtml(error.message)}</p>`;
-            })
-            .listTargetScriptFiles(scriptId);
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('regenerateProposalButton'));
+                    UI.enable('applyChangesNoDeployButton');
+                    UI.enable('applyAndDeployButton');
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
+
+                    if (response.status === 'proposal') {
+                        AppState.currentProposal = response;
+                        UI.setText('proposalPurpose', response.purpose || 'No description provided.');
+                        
+                        UI.setHtml('htmlValidationWarnings', '');
+                        let hasHtmlErrors = false;
+
+                        response.proposedFiles.forEach(file => {
+                            if (file.type === 'HTML') {
+                                const validationResult = Utils.validateHtml(file.source, file.name);
+                                if (!validationResult.isValid) {
+                                    hasHtmlErrors = true;
+                                    const warningP = document.createElement('p');
+                                    warningP.textContent = validationResult.message;
+                                    UI.get('htmlValidationWarnings').appendChild(warningP);
+                                }
+                            }
+                        });
+
+                        if (hasHtmlErrors) {
+                            UI.show('htmlValidationWarnings');
+                        } else {
+                            UI.hide('htmlValidationWarnings');
+                        }
+
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        UI.show('proposalContainer');
+                        UI.show('applyChangesNoDeployButton');
+                        UI.show('applyAndDeployButton');
+                        UI.show('regenerateProposalButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else if (response.status === 'error') {
+                        UI.appendNotification('applyResultContent', 'is-danger', 'Failed to regenerate proposal.', response.message);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regenerateProposalButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else {
+                        UI.appendNotification('applyResultContent', 'is-warning', 'Unexpected response status:', response);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regenerateProposalButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for regenerateProposal.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('regenerateProposalButton'));
+                    UI.enable('applyChangesNoDeployButton');
+                    UI.enable('applyAndDeployButton');
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
+
+                    UI.appendNotification('applyResultContent', 'is-danger', 'Error regenerating proposal:', error.message);
+                    UI.show('applyResultContainer');
+                    UI.show('proposalContainer');
+                    UI.show('regenerateProposalButton');
+                    UI.show('regeneratePolicyButton');
+                    UI.hide('generatePolicyButton');
+                })
+                .processPrompt(formData);
+        },
+
+        /**
+         * Handle fixing apply errors using AI.
+         */
+        handleFixApplyErrors: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            if (!scriptId) {
+                UI.appendNotification('applyResultContent', 'is-danger', 'Script ID is required to fix errors.');
+                UI.show('applyResultContainer');
+                return;
+            }
+
+            UI.showSpinnerInButton(UI.get('fixApplyErrorsButton'), 'Fixing Errors...');
+            UI.hide('generatePolicyButton');
+            UI.hide('regeneratePolicyButton');
+            UI.disable('prompt');
+            UI.show('cancelFixErrorsButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('proposalContainer');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('applyResultContainer');
+            UI.setHtml('applyResultContent', '');
+            UI.setHtml('proposedFilesDisplay', '');
+            UI.hide('htmlValidationWarnings');
+            UI.setHtml('htmlValidationWarnings', '');
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for fixErrorsFromLogs.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelFixErrorsButton');
+
+                    if (response.status === 'proposal') {
+                        AppState.currentProposal = response;
+                        UI.setText('proposalPurpose', response.purpose || 'No description provided.');
+                        
+                        UI.setHtml('htmlValidationWarnings', '');
+                        let hasHtmlErrors = false;
+
+                        response.proposedFiles.forEach(file => {
+                            if (file.type === 'HTML') {
+                                const validationResult = Utils.validateHtml(file.source, file.name);
+                                if (!validationResult.isValid) {
+                                    hasHtmlErrors = true;
+                                    const warningP = document.createElement('p');
+                                    warningP.textContent = validationResult.message;
+                                    UI.get('htmlValidationWarnings').appendChild(warningP);
+                                }
+                            }
+                        });
+
+                        if (hasHtmlErrors) {
+                            UI.show('htmlValidationWarnings');
+                        }
+
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        UI.show('proposalContainer');
+                        UI.show('applyChangesNoDeployButton');
+                        UI.show('applyAndDeployButton');
+                        UI.show('regenerateProposalButton');
+                        UI.hide('fixApplyErrorsButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else if (response.status === 'error') {
+                        UI.appendNotification('applyResultContent', 'is-danger', 'Failed to get error fix proposal.', response.message);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else {
+                        UI.appendNotification('applyResultContent', 'is-warning', 'Unexpected response status:', response);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for fixErrorsFromLogs.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelFixErrorsButton');
+
+                    UI.appendNotification('applyResultContent', 'is-danger', 'Error calling AI for fix:', error.message);
+                    UI.show('applyResultContainer');
+                    UI.show('proposalContainer');
+                    UI.show('regeneratePolicyButton');
+                    UI.hide('generatePolicyButton');
+                })
+                .fixErrorsFromLogs(scriptId);
+        },
+
+        /**
+         * Handle submit for the fix errors form.
+         * @param {Event} e - The submit event.
+         */
+        handleFixErrorsFormSubmit: (e) => {
+            e.preventDefault();
+
+            const scriptId = Utils.getEffectiveScriptId();
+            if (!scriptId) {
+                UI.appendNotification('applyResultContent', 'is-danger', 'Script ID is required to fix errors.');
+                UI.show('applyResultContainer');
+                return;
+            }
+
+            UI.showSpinnerInButton(UI.get('fixErrorsButton'), 'Fixing Errors...');
+            UI.hide('generatePolicyButton');
+            UI.hide('regeneratePolicyButton');
+            UI.disable('prompt');
+            UI.show('cancelFixErrorsButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('proposalContainer');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('applyResultContainer');
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('proposedFilesDisplay', '');
+            UI.setText('proposalPurpose', '');
+            UI.setHtml('applyResultContent', '');
+            UI.hide('htmlValidationWarnings');
+            UI.setHtml('htmlValidationWarnings', '');
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for fixErrorsFromLogs (via form submit).');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelFixErrorsButton');
+
+                    if (response.status === 'proposal') {
+                        AppState.currentProposal = response;
+                        UI.setText('proposalPurpose', response.purpose || 'No description provided.');
+                        
+                        UI.setHtml('htmlValidationWarnings', '');
+                        let hasHtmlErrors = false;
+
+                        response.proposedFiles.forEach(file => {
+                            if (file.type === 'HTML') {
+                                const validationResult = Utils.validateHtml(file.source, file.name);
+                                if (!validationResult.isValid) {
+                                    hasHtmlErrors = true;
+                                    const warningP = document.createElement('p');
+                                    warningP.textContent = validationResult.message;
+                                    UI.get('htmlValidationWarnings').appendChild(warningP);
+                                }
+                            }
+                        });
+
+                        if (hasHtmlErrors) {
+                            UI.show('htmlValidationWarnings');
+                        }
+
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        UI.show('proposalContainer');
+                        UI.show('applyChangesNoDeployButton');
+                        UI.show('applyAndDeployButton');
+                        UI.show('regenerateProposalButton');
+                        UI.hide('fixApplyErrorsButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else if (response.status === 'error') {
+                        UI.appendNotification('applyResultContent', 'is-danger', 'Failed to get error fix proposal.', response.message);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else {
+                        UI.appendNotification('applyResultContent', 'is-warning', 'Unexpected response status:', response);
+                        UI.show('applyResultContainer');
+                        UI.show('proposalContainer');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for fixErrorsFromLogs (via form submit).');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelFixErrorsButton');
+
+                    UI.appendNotification('applyResultContent', 'is-danger', 'Error calling AI for fix:', error.message);
+                    UI.show('applyResultContainer');
+                    UI.show('proposalContainer');
+                    UI.show('regeneratePolicyButton');
+                    UI.hide('generatePolicyButton');
+                })
+                .fixErrorsFromLogs(scriptId);
+        },
+
+        /**
+         * Handle saving the GCP Project ID.
+         */
+        handleSaveGcpProjectId: () => {
+            const gcpProjectId = UI.get('gcpProjectId').value.trim();
+            const saveButton = UI.get('saveGcpProjectIdButton');
+
+            UI.show('gcpSaveResultContainer');
+            UI.setText('gcpSaveResult', 'Saving...');
+            UI.showSpinnerInButton(saveButton, 'Saving...');
+
+            if (!gcpProjectId) {
+                UI.setText('gcpSaveResult', 'Error: GCP Project ID cannot be empty.');
+                UI.hideSpinnerInButton(saveButton);
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.setText('gcpSaveResult', response.message);
+                    UI.hideSpinnerInButton(saveButton);
+                    if (response.status === 'success') {
+                        Utils.saveGcpProjectIdToLocalStorage(gcpProjectId);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setText('gcpSaveResult', 'Error saving GCP Project ID: ' + error.message);
+                    UI.hideSpinnerInButton(saveButton);
+                })
+                .setGcpProjectId(gcpProjectId);
+        },
+
+        /**
+         * Handle submit for the log retrieval form.
+         * @param {Event} e - The submit event.
+         */
+        handleLogFormSubmit: (e) => {
+            e.preventDefault();
+            const submitButton = UI.get('getLogsButton');
+
+            UI.showSpinnerInButton(submitButton, 'Getting Logs...');
+            UI.hide('logResultContainer');
+            UI.setText('logResult', '');
+
+            const scriptId = Utils.getEffectiveScriptId();
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(submitButton);
+                    UI.setText('logResult', response);
+                    UI.show('logResultContainer');
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(submitButton);
+                    UI.setText('logResult', 'Error: ' + error.message);
+                    UI.show('logResultContainer');
+                })
+                .getScriptLogs(scriptId);
+        },
+
+        /**
+         * Handle submit for the deploy form.
+         * @param {Event} e - The submit event.
+         */
+        handleDeployFormSubmit: (e) => {
+            e.preventDefault();
+            const submitButton = UI.get('deployButton');
+
+            UI.showSpinnerInButton(submitButton, 'Deploying...');
+            UI.hide('deployResultContainer');
+            UI.setText('deployResult', '');
+
+            const scriptId = Utils.getEffectiveScriptId();
+            const description = UI.get('deploymentDescription').value;
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(submitButton);
+                    UI.show('deployResultContainer');
+                    if (response.status === 'success') {
+                        let webappUrlHtml = `Web App URL: ${response.webappUrl}`;
+                        if (response.webappUrl && response.webappUrl !== 'null') {
+                            webappUrlHtml = `Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
+                        } else if (response.webappUrl === null) {
+                            webappUrlHtml = `Web App URL: Not found in deployment response.`;
+                        }
+                        UI.setHtml('deployResult', `${response.message}<br>Deployment ID: ${response.deploymentId}<br>${webappUrlHtml}`);
+                    } else {
+                        UI.setText('deployResult', `Error: ${response.message}`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(submitButton);
+                    UI.show('deployResultContainer');
+                    UI.setText('deployResult', `Error deploying script: ${error.message}`);
+                })
+                .deployScript(scriptId, description);
+        },
+
+        /**
+         * Handle submit for the add library form.
+         * @param {Event} e - The submit event.
+         */
+        handleAddLibraryFormSubmit: (e) => {
+            e.preventDefault();
+            const submitButton = UI.get('addLibraryButton');
+
+            UI.showSpinnerInButton(submitButton, 'Adding Library...');
+            UI.hide('addLibraryResultContainer');
+            UI.setText('addLibraryResult', '');
+
+            const targetScriptId = Utils.getEffectiveScriptId();
+            const libraryScriptId = UI.get('libraryScriptId').value.trim();
+            const libraryVersion = UI.get('libraryVersion').value.trim();
+
+            if (!targetScriptId) {
+                UI.setText('addLibraryResult', 'Error: Please select or enter a Target Script ID.');
+                UI.show('addLibraryResultContainer');
+                UI.hideSpinnerInButton(submitButton);
+                return;
+            }
+            if (!libraryScriptId) {
+                UI.setText('addLibraryResult', 'Error: Library Script ID cannot be empty.');
+                UI.show('addLibraryResultContainer');
+                UI.hideSpinnerInButton(submitButton);
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(targetScriptId);
+
+            const effectiveVersion = libraryVersion.trim() === '' ? 'HEAD' : libraryVersion.trim();
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(submitButton);
+                    UI.show('addLibraryResultContainer');
+                    if (response.status === 'success') {
+                        UI.setText('addLibraryResult', response.message);
+                        UI.clearValue('libraryScriptId');
+                        UI.clearValue('libraryVersion');
+                    } else {
+                        UI.setText('addLibraryResult', `Error: ${response.message}`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(submitButton);
+                    UI.show('addLibraryResultContainer');
+                    UI.setText('addLibraryResult', `Error adding library: ${error.message}`);
+                })
+                .addLibraryToProject(targetScriptId, libraryScriptId, effectiveVersion);
+        },
+
+        /**
+         * Handle getting script versions.
+         */
+        handleGetVersions: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const versionsSelect = UI.get('versionSelect');
+            const getVersionsButton = UI.get('getVersionsButton');
+            
+            UI.setHtml('versionSelect', '<option value="">-- Loading versions --</option>');
+            UI.disable('versionSelect');
+            UI.showSpinnerInButton(getVersionsButton, 'Getting Versions...');
+            UI.disable('revertVersionButton');
+            UI.disable('openWebAppButton');
+            UI.setText('openWebAppMessage', '');
+            UI.hide('versionResultContainer');
+
+            if (!scriptId) {
+                UI.setHtml('versionSelect', '<option value="">-- Select a Script ID first --</option>');
+                UI.setText('versionResult', 'Error: Please select or enter a Script ID to get versions.');
+                UI.show('versionResultContainer');
+                UI.enable('versionSelect');
+                UI.hideSpinnerInButton(getVersionsButton);
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(getVersionsButton);
+                    UI.enable('versionSelect');
+
+                    if (response.status === 'success') {
+                        UI.setHtml('versionSelect', '<option value="">-- Select a version --</option>');
+                        if (response.versions && response.versions.length > 0) {
+                            response.versions.forEach(version => {
+                                const option = document.createElement('option');
+                                option.value = version.versionNumber;
+                                option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
+                                if (version.webappUrl !== null) {
+                                    option.dataset.webappUrl = version.webappUrl;
+                                } else {
+                                    option.dataset.webappUrl = 'null';
+                                }
+                                versionsSelect.appendChild(option);
+                            });
+                            UI.setText('versionResult', `Versions found: ${response.versions.length} items`);
+                        } else {
+                            UI.setHtml('versionSelect', '<option value="">-- No versions found --</option>');
+                            UI.setText('versionResult', response.message);
+                        }
+                        versionsSelect.dispatchEvent(new Event('change'));
+                    }
+                    else {
+                        UI.setHtml('versionSelect', '<option value="">-- Error loading versions --</option>');
+                        UI.setText('versionResult', `Error: ${response.message}`);
+                        UI.disable('openWebAppButton');
+                        UI.disable('revertVersionButton');
+                        UI.setText('openWebAppMessage', '');
+                    }
+                    UI.show('versionResultContainer');
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(getVersionsButton);
+                    UI.enable('versionSelect');
+                    UI.disable('revertVersionButton');
+                    UI.disable('openWebAppButton');
+                    UI.setText('openWebAppMessage', '');
+                    UI.setHtml('versionSelect', '<option value="">-- Error loading versions --</option>');
+                    UI.setText('versionResult', `Error getting versions: ${error.message}`);
+                    UI.show('versionResultContainer');
+                })
+                .listScriptVersions(scriptId);
+        },
+
+        /**
+         * Handle change event for the version select dropdown.
+         */
+        handleVersionSelectChange: () => {
+            const versionsSelect = UI.get('versionSelect');
+            const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
+
+            // Enable/disable revert button based on selection
+            UI.get('revertVersionButton').disabled = !selectedOption.value;
+
+            // Enable/disable open web app button based on webappUrl in dataset
+            const webappUrl = selectedOption.dataset.webappUrl;
+
+            if (selectedOption.value && webappUrl && webappUrl !== 'null') {
+                UI.enable('openWebAppButton');
+                UI.setText('openWebAppMessage', '');
+            } else if (selectedOption.value && (webappUrl === 'null' || !webappUrl)) {
+                UI.disable('openWebAppButton');
+                UI.setText('openWebAppMessage', 'No web app URL for this version.');
+            } else {
+                UI.disable('openWebAppButton');
+                UI.setText('openWebAppMessage', '');
+            }
+        },
+
+        /**
+         * Handle opening the web app URL for the selected version.
+         */
+        handleOpenWebApp: () => {
+            const versionsSelect = UI.get('versionSelect');
+            const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
+            const webappUrl = selectedOption.dataset.webappUrl;
+
+            if (webappUrl && webappUrl !== 'null') {
+                window.open(webappUrl, '_blank');
+            } else {
+                alert('No web app URL found for the selected version, or URL is invalid.');
+            }
+        },
+
+        /**
+         * Handle reverting to a specific script version.
+         */
+        handleRevertVersion: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const versionSelect = UI.get('versionSelect');
+            const selectedVersion = versionSelect.value;
+            const revertButton = UI.get('revertVersionButton');
+            const getVersionsButton = UI.get('getVersionsButton');
+            
+            if (!scriptId) {
+                UI.setText('versionResult', 'Error: Please select or enter a Script ID.');
+                UI.show('versionResultContainer');
+                return;
+            }
+            if (!selectedVersion) {
+                UI.setText('versionResult', 'Error: Please select a version to revert to.');
+                UI.show('versionResultContainer');
+                return;
+            }
+
+            if (!confirm(`Reverting script ID ${scriptId} to version ${selectedVersion}. This cannot be undone. Do you wish to continue?`)) {
+                return;
+            }
+
+            UI.showSpinnerInButton(revertButton, 'Reverting...');
+            UI.disable('getVersionsButton');
+            UI.disable('versionSelect');
+            UI.disable('openWebAppButton');
+            UI.setText('openWebAppMessage', '');
+            UI.show('versionResultContainer');
+            UI.setText('versionResult', `Reverting script to version ${selectedVersion}...`);
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(revertButton);
+                    UI.enable('getVersionsButton');
+                    UI.enable('versionSelect');
+
+                    if (response.status === 'success') {
+                        UI.setText('versionResult', response.message);
+                        UI.setHtml('versionSelect', '<option value="">-- Select a version --</option>');
+                        UI.disable('revertVersionButton');
+                        UI.disable('openWebAppButton');
+                        UI.setText('openWebAppMessage', '');
+                    } else {
+                        UI.setText('versionResult', `Error: ${response.message}`);
+                        UI.disable('openWebAppButton');
+                        UI.setText('openWebAppMessage', '');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(revertButton);
+                    UI.enable('getVersionsButton');
+                    UI.enable('versionSelect');
+                    UI.disable('openWebAppButton');
+                    UI.setText('openWebAppMessage', '');
+                    UI.setText('versionResult', `Error reverting to version: ${error.message}`);
+                })
+                .revertToVersion(scriptId, parseInt(selectedVersion));
+        },
+
+        /**
+         * Handle getting the list of files for the target script.
+         */
+        handleGetFilesList: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const filesListDisplay = UI.get('filesListDisplay');
+            const getFilesListButton = UI.get('getFilesListButton');
+
+            UI.show('filesListContainer');
+            UI.setHtml('filesListDisplay', '');
+            UI.showSpinnerInButton(getFilesListButton, 'Getting Files...');
+
+            if (!scriptId) {
+                UI.setHtml('filesListDisplay', '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
+                UI.hideSpinnerInButton(getFilesListButton);
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(getFilesListButton);
+
+                    if (response.status === 'success') {
+                        if (response.files && response.files.length > 0) {
+                            UI.setHtml('filesListDisplay', '');
+                            response.files.forEach(file => {
+                                const fileItem = document.createElement('div');
+                                fileItem.className = 'file-item';
+
+                                let typeClass = '';
+                                let typeText = '';
+
+                                switch (file.type) {
+                                    case 'SERVER_JS':
+                                        typeClass = 'is-server-js';
+                                        typeText = 'JS';
+                                        break;
+                                    case 'JSON':
+                                        typeClass = 'is-json';
+                                        typeText = 'JSON';
+                                        break;
+                                    case 'HTML':
+                                        typeClass = 'is-html';
+                                        typeText = 'HTML';
+                                        break;
+                                    default:
+                                        typeClass = 'is-unknown';
+                                        typeText = 'UNKNOWN';
+                                }
+                                
+                                fileItem.classList.add(typeClass);
+
+                                fileItem.innerHTML = `
+                                    <div class="file-type-badge">${typeText}</div>
+                                    <div class="file-name">${Utils.escapeHtml(file.name)}.${Utils.getFileExtension(file.type)}</div>
+                                `;
+
+                                filesListDisplay.appendChild(fileItem);
+                            });
+                        } else {
+                            UI.setHtml('filesListDisplay', '<p>No files found in this script.</p>');
+                        }
+                    } else {
+                        UI.setHtml('filesListDisplay', `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
+                        if (response.apiErrorDetails) {
+                            UI.setHtml('filesListDisplay', UI.get('filesListDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(getFilesListButton);
+                    UI.setHtml('filesListDisplay', `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                })
+                .listTargetScriptFiles(scriptId);
+        }
+    };
+
+    // 5. Initialization on DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cache DOM elements for frequent access
+        AppState.domElements.scriptIdManualInput = document.getElementById('scriptIdManualInput');
+        AppState.domElements.gcpProjectId = document.getElementById('gcpProjectId');
+        AppState.domElements.openWebAppButton = document.getElementById('openWebAppButton');
+        AppState.domElements.openWebAppMessage = document.getElementById('openWebAppMessage');
+        AppState.domElements.policyContainer = document.getElementById('policy-container');
+        AppState.domElements.proposalContainer = document.getElementById('proposal-container');
+        AppState.domElements.applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
+        AppState.domElements.applyAndDeployButton = document.getElementById('applyAndDeployButton');
+        AppState.domElements.regenerateProposalButton = document.getElementById('regenerateProposalButton');
+        AppState.domElements.applyResultContainer = document.getElementById('apply-result-container');
+        AppState.domElements.fixApplyErrorsButton = document.getElementById('fixApplyErrorsButton');
+        AppState.domElements.generatePolicyButton = document.getElementById('generatePolicyButton');
+        AppState.domElements.regeneratePolicyButton = document.getElementById('regeneratePolicyButton');
+        AppState.domElements.prompt = document.getElementById('prompt');
+        AppState.domElements.aiPolicy = document.getElementById('ai-policy');
+        AppState.domElements.policyEditor = document.getElementById('policyEditor');
+        AppState.domElements.togglePolicyEditButton = document.getElementById('togglePolicyEditButton');
+        AppState.domElements.acceptPolicyButton = document.getElementById('acceptPolicyButton');
+        AppState.domElements.cancelAiOperationButton = document.getElementById('cancelAiOperationButton');
+        AppState.domElements.proposalPurpose = document.getElementById('proposal-purpose');
+        AppState.domElements.htmlValidationWarnings = document.getElementById('html-validation-warnings');
+        AppState.domElements.proposedFilesDisplay = document.getElementById('proposed-files-display');
+        AppState.domElements.applyResultContent = document.getElementById('apply-result-content');
+        AppState.domElements.versionResultContainer = document.getElementById('version-result-container');
+        AppState.domElements.filesListContainer = document.getElementById('filesListContainer');
+        AppState.domElements.versionSelect = document.getElementById('versionSelect');
+        AppState.domElements.getFilesListButton = document.getElementById('getFilesListButton');
+        AppState.domElements.logResultContainer = document.getElementById('log-result-container');
+        AppState.domElements.logResult = document.getElementById('log-result');
+        AppState.domElements.deployResultContainer = document.getElementById('deploy-result-container');
+        AppState.domElements.deployResult = document.getElementById('deploy-result');
+        AppState.domElements.addLibraryResultContainer = document.getElementById('add-library-result-container');
+        AppState.domElements.addLibraryResult = document.getElementById('add-library-result');
+        AppState.domElements.gcpSaveResultContainer = document.getElementById('gcp-save-result-container');
+        AppState.domElements.gcpSaveResult = document.getElementById('gcp-save-result');
+        AppState.domElements.fixErrorsButton = document.getElementById('fixErrorsButton');
+        AppState.domElements.cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+        AppState.domElements.revertVersionButton = document.getElementById('revertVersionButton');
+        AppState.domElements.getVersionsButton = document.getElementById('getVersionsButton');
+        AppState.domElements.libraryScriptId = document.getElementById('libraryScriptId');
+        AppState.domElements.libraryVersion = document.getElementById('libraryVersion');
+        AppState.domElements.deploymentDescription = document.getElementById('deploymentDescription');
+
+        // Load initial state from localStorage
+        const savedScriptId = localStorage.getItem('targetScriptId');
+        if (savedScriptId) {
+            UI.get('scriptIdManualInput').value = savedScriptId;
+        }
+        const savedGcpProjectId = localStorage.getItem('gcpProjectId');
+        if (savedGcpProjectId) {
+            UI.get('gcpProjectId').value = savedGcpProjectId;
+        }
+
+        // Initialize UI components
+        Utils.loadProjectsIntoDropdown(savedScriptId);
+        UI.hide('policyContainer');
+        UI.hide('proposalContainer');
+        UI.hide('applyChangesNoDeployButton');
+        UI.hide('applyAndDeployButton');
+        UI.hide('regenerateProposalButton');
+        UI.hide('applyResultContainer');
+        UI.hide('fixApplyErrorsButton');
+        UI.show('generatePolicyButton');
+        UI.hide('regeneratePolicyButton');
+        UI.hide('versionResultContainer');
+        UI.hide('filesListContainer');
+        UI.disable('openWebAppButton');
+        UI.setText('openWebAppMessage', '');
+        UI.hide('logResultContainer');
+        UI.hide('deployResultContainer');
+        UI.hide('addLibraryResultContainer');
+        UI.hide('gcpSaveResultContainer');
+
+        Utils.updateEditorUrlDisplay();
+        Handlers.initTabNavigation();
+
+        // Register event listeners
+        UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
+        UI.get('scriptIdManualInput').addEventListener('input', Utils.updateEditorUrlDisplay);
+        UI.get('prompt').addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                UI.get('agent-form').requestSubmit(UI.get('generatePolicyButton'));
+            }
+        });
+
+        UI.get('agent-form').addEventListener('submit', Handlers.handleAgentFormSubmit);
+        UI.get('togglePolicyEditButton').addEventListener('click', Handlers.handleTogglePolicyEdit);
+        UI.get('acceptPolicyButton').addEventListener('click', Handlers.handleAcceptPolicy);
+        UI.get('cancelAiOperationButton').addEventListener('click', Handlers.handleCancelAiOperation);
+        UI.get('regeneratePolicyButton').addEventListener('click', Handlers.handleRegeneratePolicy);
+        UI.get('applyChangesNoDeployButton').addEventListener('click', (e) => Handlers.handleApplyChanges(false, e.currentTarget));
+        UI.get('applyAndDeployButton').addEventListener('click', (e) => Handlers.handleApplyChanges(true, e.currentTarget));
+        UI.get('fixApplyErrorsButton').addEventListener('click', Handlers.handleFixApplyErrors);
+        UI.get('fix-errors-form').addEventListener('submit', Handlers.handleFixErrorsFormSubmit);
+        UI.get('cancelFixErrorsButton').addEventListener('click', Handlers.handleCancelAiOperation);
+        UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
+
+        UI.get('saveGcpProjectIdButton').addEventListener('click', Handlers.handleSaveGcpProjectId);
+        UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);
+        UI.get('deploy-form').addEventListener('submit', Handlers.handleDeployFormSubmit);
+        UI.get('add-library-form').addEventListener('submit', Handlers.handleAddLibraryFormSubmit);
+
+        UI.get('getVersionsButton').addEventListener('click', Handlers.handleGetVersions);
+        UI.get('versionSelect').addEventListener('change', Handlers.handleVersionSelectChange);
+        UI.get('openWebAppButton').addEventListener('click', Handlers.handleOpenWebApp);
+        UI.get('revertVersionButton').addEventListener('click', Handlers.handleRevertVersion);
+
+        UI.get('getFilesListButton').addEventListener('click', Handlers.handleGetFilesList);
     });
-  </script>
+</script>
