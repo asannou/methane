@@ -203,7 +203,7 @@ function deployScript(scriptId, description = '') {
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
-    // --- START: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ --- 
+    // --- START: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ ---
     console.log("新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブする必要があるか確認中...");
     const DEPLOYMENT_LIMIT = 20; // Google Apps Scriptのデプロイメント上限
 
@@ -263,7 +263,7 @@ function deployScript(scriptId, description = '') {
         console.log(`ウェブアプリデプロイメント数が上限 (${DEPLOYMENT_LIMIT}) 未満のため、古いデプロイメントのアーカイブはスキップします。`);
       }
     }
-    // --- END: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ --- 
+    // --- END: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ ---
 
     // 1. 新しいバージョンを作成する
     console.log("新しいスクリプトバージョンを作成中...");
@@ -533,7 +533,8 @@ function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
 }
 
 /**
- * Lists all script versions for a given Apps Script project.
+ * Lists all script versions for a given Apps Script project,
+ * and also includes associated web app deployment URLs.
  * @param {string} scriptId - The ID of the Apps Script project.
  * @returns {object} An object containing 'status' and either 'versions' (Array<object>) or 'message'.
  */
@@ -545,30 +546,69 @@ function listScriptVersions(scriptId) {
   try {
     const accessToken = ScriptApp.getOAuthToken();
     const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
+    const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
+    // 1. Fetch all versions
     console.log(`スクリプトID ${scriptId} のバージョンをリスト中...`);
-    const options = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const response = UrlFetchApp.fetch(versionsApiUrl, options);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
+    const versionOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const versionResponse = UrlFetchApp.fetch(versionsApiUrl, versionOptions);
+    const versionResponseCode = versionResponse.getResponseCode();
+    const versionResponseBody = versionResponse.getContentText();
 
-    if (responseCode !== 200) {
-      console.error(`バージョン取得APIエラー (ステータス: ${responseCode}): ${responseBody}`);
-      return { status: 'error', message: `Version retrieval error (HTTP ${responseCode}): ${responseBody}` };
+    if (versionResponseCode !== 200) {
+      console.error(`バージョン取得APIエラー (ステータス: ${versionResponseCode}): ${versionResponseBody}`);
+      return { status: 'error', message: `Version retrieval error (HTTP ${versionResponseCode}): ${versionResponseBody}` };
     }
 
-    const versionsData = JSON.parse(responseBody);
-    if (!versionsData.versions || versionsData.versions.length === 0) {
-      return { status: 'success', versions: [], message: 'No versions found for this script.' };
-    }
-
-    const versions = versionsData.versions.map(v => ({
+    const versionsData = JSON.parse(versionResponseBody);
+    let versions = (versionsData.versions || []).map(v => ({
       versionNumber: v.versionNumber,
       createTime: v.createTime,
-      description: v.description || '説明なし'
-    })).sort((a, b) => b.versionNumber - a.versionNumber); // 最新のバージョンが上位に来るようにソート
+      description: v.description || '説明なし',
+      webappUrl: null // Initialize webappUrl
+    }));
 
-    return { status: 'success', versions: versions };
+    // 2. Fetch all deployments to find web app URLs
+    console.log(`スクリプトID ${scriptId} のデプロイメントをリスト中...`);
+    const deploymentOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const deploymentResponse = UrlFetchApp.fetch(deploymentsApiUrl, deploymentOptions);
+    const deploymentResponseCode = deploymentResponse.getResponseCode();
+    const deploymentResponseBody = deploymentResponse.getContentText();
+
+    if (deploymentResponseCode !== 200) {
+      console.warn(`デプロイメント取得APIエラー (ステータス: ${deploymentResponseCode})。ウェブアプリURLは取得できませんでした: ${deploymentResponseBody}`);
+      // Continue without web app URLs if deployment fetch fails
+    } else {
+      const deploymentsData = JSON.parse(deploymentResponseBody);
+      const webAppUrlMap = {}; // Map to store versionNumber -> webAppUrl
+
+      (deploymentsData.deployments || []).forEach(d => {
+        if (d.entryPoints && Array.isArray(d.entryPoints)) {
+          d.entryPoints.forEach(ep => {
+            if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
+              const deployedVersion = d.versionNumber;
+              // If multiple web apps for the same version, just take the first one found (or latest if list is sorted by createTime)
+              if (deployedVersion && !webAppUrlMap[deployedVersion]) {
+                webAppUrlMap[deployedVersion] = ep.webApp.url;
+              }
+            }
+          });
+        }
+      });
+
+      // 3. Enrich versions with web app URLs
+      versions = versions.map(v => {
+        if (webAppUrlMap[v.versionNumber]) {
+          v.webappUrl = webAppUrlMap[v.versionNumber];
+        }
+        return v;
+      });
+    }
+
+    // Sort versions by versionNumber descending (latest first)
+    versions.sort((a, b) => b.versionNumber - a.versionNumber);
+
+    return { status: 'success', versions: versions, message: 'Versions retrieved successfully.' };
 
   } catch (e) {
     console.error("バージョン取得中にエラーが発生しました:", e);

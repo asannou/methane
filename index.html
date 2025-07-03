@@ -90,7 +90,7 @@
 
         <div id="proposal-container" class="box mt-4" style="display:none;">
           <h2 class="title is-4">AI Proposed Changes:</h2>
-          <p class="content"><strong id="proposal-purpose-label">Purpose of Change:</strong> <span id="proposal-purpose"></span></p>
+          <p class="content"><strong>Purpose of Change:</strong> <span id="proposal-purpose"></span></p>
           <div id="html-validation-warnings" class="notification is-danger is-light mb-4" style="display: none;"></div>
           <p class="content">The following changes have been proposed by the AI. Please review the content and click the "Apply Changes" button to apply if there are no issues.</p>
           <div id="proposed-files-display">
@@ -194,6 +194,9 @@
                   <option value="">-- Select a version --</option>
                 </select>
               </div>
+            </div>
+            <div class="control">
+              <button type="button" id="openWebAppButton" class="button is-link" disabled>Open Web App</button>
             </div>
             <div class="control">
               <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>

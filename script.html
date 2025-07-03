@@ -118,6 +118,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       const scriptIdManualInput = document.getElementById('scriptIdManualInput');
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
+      const openWebAppButton = getButton('openWebAppButton');
 
       const savedScriptId = localStorage.getItem('targetScriptId');
       if (savedScriptId) {
@@ -145,6 +146,7 @@
       
       document.getElementById('version-result-container').style.display = 'none';
       document.getElementById('filesListContainer').style.display = 'none';
+      openWebAppButton.disabled = true; // Set initial state for the new button
 
       updateEditorUrlDisplay();
 
@@ -1139,7 +1141,7 @@
                 <div class="notification is-warning">
                     <p><strong>Unexpected response status:</strong></p>
                     <pre>${escapeHtml(JSON.stringify(response, null, 2))}</pre>
-                </div>
+                }
             `;
             applyResultContainer.style.display = 'block';
             proposalContainer.style.display = 'block';
@@ -1664,6 +1666,7 @@
       const versionsSelect = document.getElementById('versionSelect');
       const getVersionsButton = this; // This is the button that was clicked
       const revertVersionButton = getButton('revertVersionButton');
+      const openWebAppButton = getButton('openWebAppButton'); // Get button reference
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
@@ -1671,6 +1674,7 @@
       versionsSelect.disabled = true;
       showSpinnerInButton(getVersionsButton, 'Getting Versions...');
       revertVersionButton.disabled = true;
+      openWebAppButton.disabled = true; // Ensure it's disabled when versions are loading/reloading
       versionResultContainer.style.display = 'none';
 
       if (!scriptId) {
@@ -1688,7 +1692,7 @@
         .withSuccessHandler(function(response) {
           hideSpinnerInButton(getVersionsButton);
           versionsSelect.disabled = false;
-          revertVersionButton.disabled = false;
+          // revertVersionButton.disabled and openWebAppButton.disabled will be handled by versionSelect change handler
 
           if (response.status === 'success') {
             versionsSelect.innerHTML = '<option value="">-- Select a version --</option>';
@@ -1697,19 +1701,25 @@
                 const option = document.createElement('option');
                 option.value = version.versionNumber;
                 option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
+                if (version.webappUrl) {
+                    option.dataset.webappUrl = version.webappUrl; // Store URL in dataset
+                }
                 versionsSelect.appendChild(option);
               });
               versionResultText.textContent = `Versions found: ${response.versions.length} items`;
             } else {
               versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
               versionResultText.textContent = response.message;
-              revertVersionButton.disabled = true;
             }
+            // Disable revert and open web app buttons if no version is selected or found
+            openWebAppButton.disabled = true; // Explicitly disable after options populate
+            revertVersionButton.disabled = true; // Explicitly disable after options populate
           }
           else {
             versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
             versionResultText.textContent = `Error: ${response.message}`;
-            revertVersionButton.disabled = true;
+            openWebAppButton.disabled = true; // Disable on error
+            revertVersionButton.disabled = true; // Disable on error
           }
           versionResultContainer.style.display = 'block';
         })
@@ -1717,11 +1727,41 @@
           hideSpinnerInButton(getVersionsButton);
           versionsSelect.disabled = false;
           revertVersionButton.disabled = true;
+          openWebAppButton.disabled = true; // Disable on error
           versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
           versionResultText.textContent = `Error getting versions: ${error.message}`;
           versionResultContainer.style.display = 'block';
         })
         .listScriptVersions(scriptId);
+    });
+
+    document.getElementById('versionSelect').addEventListener('change', function() {
+        const versionsSelect = this;
+        const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
+        const revertVersionButton = getButton('revertVersionButton');
+        const openWebAppButton = getButton('openWebAppButton');
+
+        // Enable/disable revert button based on selection
+        revertVersionButton.disabled = !selectedOption.value;
+
+        // Enable/disable open web app button based on webappUrl in dataset
+        if (selectedOption.dataset.webappUrl) {
+            openWebAppButton.disabled = false;
+        } else {
+            openWebAppButton.disabled = true;
+        }
+    });
+
+    document.getElementById('openWebAppButton').addEventListener('click', function() {
+        const versionsSelect = document.getElementById('versionSelect');
+        const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
+        const webappUrl = selectedOption.dataset.webappUrl;
+
+        if (webappUrl) {
+            window.open(webappUrl, '_blank');
+        } else {
+            alert('No web app URL found for the selected version.');
+        }
     });
 
     document.getElementById('revertVersionButton').addEventListener('click', function() {
@@ -1730,6 +1770,7 @@
       const selectedVersion = versionSelect.value;
       const revertButton = this; // This is the button that was clicked
       const getVersionsButton = getButton('getVersionsButton');
+      const openWebAppButton = getButton('openWebAppButton'); // Get button reference
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
@@ -1751,6 +1792,7 @@
       showSpinnerInButton(revertButton, 'Reverting...');
       getVersionsButton.disabled = true;
       versionSelect.disabled = true;
+      openWebAppButton.disabled = true; // Disable during revert operation
       versionResultContainer.style.display = 'block';
       versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
 
@@ -1761,21 +1803,25 @@
           hideSpinnerInButton(revertButton);
           getVersionsButton.disabled = false;
           versionSelect.disabled = false;
+          // openWebAppButton.disabled will be handled by versionSelect change after success
 
           if (response.status === 'success') {
             versionResultText.textContent = response.message;
             versionSelect.innerHTML = '<option value="">-- Select a version --</option>';
             revertButton.disabled = true;
+            openWebAppButton.disabled = true; // Ensure disabled after revert
           }
 
           else {
             versionResultText.textContent = `Error: ${response.message}`;
+            openWebAppButton.disabled = true; // Disable on error
           }
         })
         .withFailureHandler(function(error) {
           hideSpinnerInButton(revertButton);
           getVersionsButton.disabled = false;
           versionSelect.disabled = false;
+          openWebAppButton.disabled = true; // Disable on failure
           versionResultText.textContent = `Error reverting to version: ${error.message}`;
         })
         .revertToVersion(scriptId, parseInt(selectedVersion));
