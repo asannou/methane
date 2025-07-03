@@ -203,6 +203,68 @@ function deployScript(scriptId, description = '') {
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
+    // --- START: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ --- 
+    console.log("新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブする必要があるか確認中...");
+    const DEPLOYMENT_LIMIT = 20; // Google Apps Scriptのデプロイメント上限
+
+    const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
+    const listOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const listResponse = UrlFetchApp.fetch(listDeploymentsUrl, listOptions);
+    const listResponseBody = listResponse.getContentText();
+
+    if (listResponse.getResponseCode() !== 200) {
+      console.warn(`既存デプロイメントのリスト取得に失敗しましたが、新しいデプロイメントは続行されます。エラー: ${listResponseBody}`);
+    } else {
+      const allDeployments = JSON.parse(listResponseBody).deployments || [];
+      // Webアプリデプロイメントのみをフィルタリング
+      const webAppDeployments = allDeployments.filter(dep => 
+          dep.entryPoints && Array.isArray(dep.entryPoints) && 
+          dep.entryPoints.some(ep => ep.entryPointType === 'WEB_APP')
+      );
+      
+      console.log(`現在のウェブアプリデプロイメント数: ${webAppDeployments.length}`);
+
+      // 新しいデプロイメントのために空きを作るために削除する必要があるWebアプリデプロイメントの数を計算
+      // 目標は DEPLOYMENT_LIMIT - 1 にすることです。
+      const deploymentsToRemoveCount = webAppDeployments.length - (DEPLOYMENT_LIMIT - 1);
+
+      if (deploymentsToRemoveCount > 0) {
+        console.log(`ウェブアプリデプロイメント数が上限 (${DEPLOYMENT_LIMIT}) に近づいています (${webAppDeployments.length}個)。最も古い ${deploymentsToRemoveCount} 個のウェブアプリデプロイメントをアーカイブします。`);
+        
+        // 作成時間でソート（最も古いものが最初）
+        webAppDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
+
+        let removedCount = 0;
+        // 最も古い 'deploymentsToRemoveCount' 個のWebアプリデプロイメントを削除
+        for (let i = 0; i < deploymentsToRemoveCount && i < webAppDeployments.length; i++) {
+          const oldDeploymentToDelete = webAppDeployments[i];
+
+          console.log(`古いウェブアプリデプロイメントを削除中: ID = ${oldDeploymentToDelete.deploymentId}, 作成日時 = ${oldDeploymentToDelete.createTime}`);
+          const deleteDeploymentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments/${oldDeploymentToDelete.deploymentId}`;
+          const deleteOptions = { method: 'delete', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+          const deleteResponse = UrlFetchApp.fetch(deleteDeploymentUrl, deleteOptions);
+
+          if (deleteResponse.getResponseCode() !== 200) {
+            console.warn(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} の削除に失敗: ${deleteResponse.getContentText()}`);
+            if (deleteResponse.getContentText().includes("Read-only deployments may not be deleted.")) {
+                console.warn(`注: デプロイメント ${oldDeploymentToDelete.deploymentId} は読み取り専用のため削除できませんでした。`);
+            }
+          } else {
+            console.log(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} を正常に削除しました。`);
+            removedCount++;
+          }
+        }
+        if (removedCount > 0) {
+          console.log(`${removedCount} 個の古いウェブアプリデプロイメントを削除しました。`);
+        } else {
+          console.log("削除可能な古いウェブアプリデプロイメントが見つからなかったか、全て削除に失敗しました。利用可能なデプロイメントはすべて読み取り専用である可能性があります。");
+        }
+      } else {
+        console.log(`ウェブアプリデプロイメント数が上限 (${DEPLOYMENT_LIMIT}) 未満のため、古いデプロイメントのアーカイブはスキップします。`);
+      }
+    }
+    // --- END: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ --- 
+
     // 1. 新しいバージョンを作成する
     console.log("新しいスクリプトバージョンを作成中...");
     const createVersionPayload = { description: description };
@@ -280,70 +342,11 @@ function deployScript(scriptId, description = '') {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
-    // --- 新しいロジック: デプロイメントが上限に達している場合にのみ古いウェブアプリデプロイメントをアーカイブ（削除）する --- 
-    console.log("古いデプロイメントをアーカイブするか確認中...");
-    const DEPLOYMENT_LIMIT = 20; // Google Apps Scriptのデプロイメント上限
-
-    const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
-    const listOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const listResponse = UrlFetchApp.fetch(listDeploymentsUrl, listOptions);
-    const listResponseBody = listResponse.getContentText();
-
-    if (listResponse.getResponseCode() !== 200) {
-      console.warn(`既存デプロイメントのリスト取得に失敗しましたが、新しいデプロイメントは成功しています。エラー: ${listResponseBody}`);
-    } else {
-      const allDeployments = JSON.parse(listResponseBody).deployments || [];
-      console.log(`取得した全てのデプロイメント数: ${allDeployments.length}`);
-
-      // 新しく作成されたデプロイメントを除外
-      let deletableDeployments = allDeployments.filter(dep => dep.deploymentId !== newDeploymentId);
-      // Sort them by creation time (oldest first)
-      deletableDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
-
-      // Calculate how many deployments need to be removed to be below the limit
-      // Target DEPLOYMENT_LIMIT - 1 to make room for the newly created one, assuming it consumes one slot.
-      const deploymentsToRemoveCount = deletableDeployments.length - (DEPLOYMENT_LIMIT - 1);
-
-      if (deploymentsToRemoveCount > 0) {
-        console.log(`デプロイメント数が上限 (${DEPLOYMENT_LIMIT}) を超えています (${deletableDeployments.length}個)。最も古い ${deploymentsToRemoveCount} 個のデプロイメントをアーカイブします。`);
-        
-        let removedCount = 0;
-        // Attempt to delete 'deploymentsToRemoveCount' oldest deployments, but not more than available
-        for (let i = 0; i < deploymentsToRemoveCount && i < deletableDeployments.length; i++) {
-          const oldDeploymentToDelete = deletableDeployments[i];
-
-          console.log(`古いデプロイメントを削除中: ID = ${oldDeploymentToDelete.deploymentId}, 作成日時 = ${oldDeploymentToDelete.createTime}`);
-          const deleteDeploymentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments/${oldDeploymentToDelete.deploymentId}`;
-          const deleteOptions = { method: 'delete', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-          const deleteResponse = UrlFetchApp.fetch(deleteDeploymentUrl, deleteOptions);
-
-          if (deleteResponse.getResponseCode() !== 200) {
-            console.warn(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} の削除に失敗: ${deleteResponse.getContentText()}`);
-            // Log full error for read-only issue specifically
-            if (deleteResponse.getContentText().includes("Read-only deployments may not be deleted.")) {
-                console.warn(`注: デプロイメント ${oldDeploymentToDelete.deploymentId} は読み取り専用のため削除できませんでした。`);
-            }
-          } else {
-            console.log(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} を正常に削除しました。`);
-            removedCount++;
-          }
-        }
-        if (removedCount > 0) {
-          console.log(`${removedCount} 個の古いデプロイメントを削除しました。`);
-        } else {
-          console.log("削除可能な古いデプロイメントが見つからなかったか、全て削除に失敗しました。利用可能なデプロイメントはすべて読み取り専用である可能性があります。");
-        }
-      } else {
-        console.log(`デプロイメント数が上限 (${DEPLOYMENT_LIMIT}) 未満のため、古いデプロイメントのアーカイブはスキップします。`);
-      }
-    }
-    // --- 新しいロジック終了 ---
-
     if (!webappUrl) {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
       return {
         status: 'success',
-        message: 'Deployment completed successfully, but the web app URL was not found. Please verify the deployment. Old web app deployments were archived.',
+        message: 'Deployment completed successfully, but the web app URL was not found. Please verify the deployment.',
         deploymentId: newDeploymentId,
         webappUrl: 'URL not found in response'
       };
@@ -351,7 +354,7 @@ function deployScript(scriptId, description = '') {
 
     return {
       status: 'success',
-      message: 'Deployment completed successfully. Old web app deployments were archived.',
+      message: 'Deployment completed successfully.',
       deploymentId: newDeploymentId,
       webappUrl: webappUrl
     };
