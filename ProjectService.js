@@ -346,9 +346,9 @@ function deployScript(scriptId, description = '') {
       console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
       return {
         status: 'success',
-        message: 'Deployment completed successfully, but the web app URL was not found. Please verify the deployment.',
+        message: 'Deployment completed successfully, but the web app URL was not found. Please verify the deployment settings in appsscript.json.',
         deploymentId: newDeploymentId,
-        webappUrl: 'URL not found in response'
+        webappUrl: null
       };
     }
 
@@ -589,6 +589,10 @@ function listScriptVersions(scriptId) {
               const deployedVersion = d.versionNumber;
               // If multiple web apps for the same version, just take the first one found (or latest if list is sorted by createTime)
               if (deployedVersion && !webAppUrlMap[deployedVersion]) {
+                webAppUrlMap[deployedVersion] = ep.webApp.url;
+              } else if (deployedVersion && webAppUrlMap[deployedVersion]) {
+                // If a web app URL for this version already exists, prioritize the latest one if available (API's default sort order for deployments)
+                // Or, simply overwrite to take the last one found in the list.
                 webAppUrlMap[deployedVersion] = ep.webApp.url;
               }
             }

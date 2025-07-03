@@ -119,6 +119,7 @@
       const scriptIdManualInput = document.getElementById('scriptIdManualInput');
       const gcpProjectIdInput = document.getElementById('gcpProjectId');
       const openWebAppButton = getButton('openWebAppButton');
+      const openWebAppMessage = document.getElementById('openWebAppMessage');
 
       const savedScriptId = localStorage.getItem('targetScriptId');
       if (savedScriptId) {
@@ -147,6 +148,7 @@
       document.getElementById('version-result-container').style.display = 'none';
       document.getElementById('filesListContainer').style.display = 'none';
       openWebAppButton.disabled = true; // Set initial state for the new button
+      openWebAppMessage.textContent = ''; // Clear initial message
 
       updateEditorUrlDisplay();
 
@@ -952,10 +954,10 @@
                 if (response.deploymentId) {
                   messageBodyContent += `<li><strong>Deployment ID:</strong> ${escapeHtml(response.deploymentId)}</li>`;
                 }
-                if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
+                if (response.webappUrl && response.webappUrl !== 'null') { // Ensure webappUrl is a valid string, not 'null'
                   messageBodyContent += `<li><strong>Web App URL:</strong> <a href="${escapeHtml(response.webappUrl)}" target="_blank">${escapeHtml(response.webappUrl)}</a></li>`;
-                } else if (response.webappUrl === 'URL not found in response') {
-                  messageBodyContent += `<li><strong>Web App URL:</strong> ${escapeHtml(response.webappUrl)}</li>`;
+                } else if (response.webappUrl === null) { // Explicitly check for null from backend
+                  messageBodyContent += `<li><strong>Web App URL:</strong> Not found in deployment response.</li>`;
                 }
                 messageBodyContent += `</ul>`;
               } else if (response.deploymentStatus === 'error') {
@@ -1593,8 +1595,10 @@
           resultContainer.style.display = 'block';
           if (response.status === 'success') {
             let webappUrlHtml = `Web App URL: ${response.webappUrl}`;
-            if (response.webappUrl && response.webappUrl !== 'URL not found in response') {
+            if (response.webappUrl && response.webappUrl !== 'null') { // Check for actual URL, not 'null' string
               webappUrlHtml = `Web App URL: <a href="${response.webappUrl}" target="_blank">${response.webappUrl}</a>`;
+            } else if (response.webappUrl === null) { // Explicitly check for null from backend
+                webappUrlHtml = `Web App URL: Not found in deployment response.`;
             }
             resultText.innerHTML = `${response.message}<br>Deployment ID: ${response.deploymentId}<br>${webappUrlHtml}`;
           } else {
@@ -1667,6 +1671,7 @@
       const getVersionsButton = this; // This is the button that was clicked
       const revertVersionButton = getButton('revertVersionButton');
       const openWebAppButton = getButton('openWebAppButton'); // Get button reference
+      const openWebAppMessage = document.getElementById('openWebAppMessage');
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
@@ -1675,6 +1680,7 @@
       showSpinnerInButton(getVersionsButton, 'Getting Versions...');
       revertVersionButton.disabled = true;
       openWebAppButton.disabled = true; // Ensure it's disabled when versions are loading/reloading
+      openWebAppMessage.textContent = ''; // Clear message while loading
       versionResultContainer.style.display = 'none';
 
       if (!scriptId) {
@@ -1701,8 +1707,10 @@
                 const option = document.createElement('option');
                 option.value = version.versionNumber;
                 option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
-                if (version.webappUrl) {
-                    option.dataset.webappUrl = version.webappUrl; // Store URL in dataset
+                if (version.webappUrl !== null) { // Store 'null' as a string if it's null from backend
+                    option.dataset.webappUrl = version.webappUrl;
+                } else {
+                    option.dataset.webappUrl = 'null'; // Explicitly store 'null' string for proper checking
                 }
                 versionsSelect.appendChild(option);
               });
@@ -1711,15 +1719,15 @@
               versionsSelect.innerHTML = '<option value="">-- No versions found --</option>';
               versionResultText.textContent = response.message;
             }
-            // Disable revert and open web app buttons if no version is selected or found
-            openWebAppButton.disabled = true; // Explicitly disable after options populate
-            revertVersionButton.disabled = true; // Explicitly disable after options populate
+            // After populating options, trigger change event to correctly set button state and message
+            versionsSelect.dispatchEvent(new Event('change'));
           }
           else {
             versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
             versionResultText.textContent = `Error: ${response.message}`;
             openWebAppButton.disabled = true; // Disable on error
             revertVersionButton.disabled = true; // Disable on error
+            openWebAppMessage.textContent = ''; // Clear message on error
           }
           versionResultContainer.style.display = 'block';
         })
@@ -1728,6 +1736,7 @@
           versionsSelect.disabled = false;
           revertVersionButton.disabled = true;
           openWebAppButton.disabled = true; // Disable on error
+          openWebAppMessage.textContent = ''; // Clear message on error
           versionsSelect.innerHTML = '<option value="">-- Error loading versions --</option>';
           versionResultText.textContent = `Error getting versions: ${error.message}`;
           versionResultContainer.style.display = 'block';
@@ -1740,15 +1749,23 @@
         const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
         const revertVersionButton = getButton('revertVersionButton');
         const openWebAppButton = getButton('openWebAppButton');
+        const openWebAppMessage = document.getElementById('openWebAppMessage');
 
         // Enable/disable revert button based on selection
         revertVersionButton.disabled = !selectedOption.value;
 
         // Enable/disable open web app button based on webappUrl in dataset
-        if (selectedOption.dataset.webappUrl) {
+        const webappUrl = selectedOption.dataset.webappUrl;
+
+        if (selectedOption.value && webappUrl && webappUrl !== 'null') { 
             openWebAppButton.disabled = false;
-        } else {
+            openWebAppMessage.textContent = ''; // Clear message
+        } else if (selectedOption.value && (webappUrl === 'null' || !webappUrl)) { 
             openWebAppButton.disabled = true;
+            openWebAppMessage.textContent = 'No web app URL for this version.';
+        } else { // No version selected
+            openWebAppButton.disabled = true;
+            openWebAppMessage.textContent = ''; // Clear message
         }
     });
 
@@ -1757,10 +1774,10 @@
         const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
         const webappUrl = selectedOption.dataset.webappUrl;
 
-        if (webappUrl) {
+        if (webappUrl && webappUrl !== 'null') { // Ensure it's a valid URL string
             window.open(webappUrl, '_blank');
         } else {
-            alert('No web app URL found for the selected version.');
+            alert('No web app URL found for the selected version, or URL is invalid.'); // More specific message for consistency
         }
     });
 
@@ -1771,6 +1788,7 @@
       const revertButton = this; // This is the button that was clicked
       const getVersionsButton = getButton('getVersionsButton');
       const openWebAppButton = getButton('openWebAppButton'); // Get button reference
+      const openWebAppMessage = document.getElementById('openWebAppMessage');
       const versionResultContainer = document.getElementById('version-result-container');
       const versionResultText = document.getElementById('version-result');
 
@@ -1793,6 +1811,7 @@
       getVersionsButton.disabled = true;
       versionSelect.disabled = true;
       openWebAppButton.disabled = true; // Disable during revert operation
+      openWebAppMessage.textContent = ''; // Clear message during revert
       versionResultContainer.style.display = 'block';
       versionResultText.textContent = `Reverting script to version ${selectedVersion}...`;
 
@@ -1810,11 +1829,13 @@
             versionSelect.innerHTML = '<option value="">-- Select a version --</option>';
             revertButton.disabled = true;
             openWebAppButton.disabled = true; // Ensure disabled after revert
+            openWebAppMessage.textContent = ''; // Ensure cleared after revert
           }
 
           else {
             versionResultText.textContent = `Error: ${response.message}`;
             openWebAppButton.disabled = true; // Disable on error
+            openWebAppMessage.textContent = ''; // Clear message on error
           }
         })
         .withFailureHandler(function(error) {
@@ -1822,6 +1843,7 @@
           getVersionsButton.disabled = false;
           versionSelect.disabled = false;
           openWebAppButton.disabled = true; // Disable on failure
+          openWebAppMessage.textContent = ''; // Clear message on failure
           versionResultText.textContent = `Error reverting to version: ${error.message}`;
         })
         .revertToVersion(scriptId, parseInt(selectedVersion));
