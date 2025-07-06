@@ -139,6 +139,7 @@
                     AppState.activeRequestId = null;
                     UI.hideSpinnerInButton(UI.get('generatePolicyButton'));
                     UI.hide('cancelAiOperationButton');
+                    UI.enable('prompt');
 
                     if (response.status === 'policy') {
                         AppState.currentPolicyData = response;
@@ -147,7 +148,17 @@
                         UI.show('acceptPolicyButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
-                        UI.enable('prompt');
+                    } else if (response.status === 'unachievable') { /* NEW CONDITION FOR UNACHIEVABLE */
+                        AppState.currentPolicyData = null; /* Clear policy data as it's not usable */
+                        UI.setHtml('aiPolicy', `<div class="notification is-warning is-light"><strong>AI Policy Generation Status: UNACHIEVABLE</strong><br>${Utils.escapeHtml(response.message)}</div>`);
+                        UI.show('policyContainer');
+                        /* Disable further action buttons */
+                        UI.hide('acceptPolicyButton');
+                        UI.hide('regenerateProposalButton');
+                        UI.hide('regeneratePolicyButton'); /* Hide this as the previous policy was unachievable. User needs to generate a *new* policy (from generatePolicyButton) */
+                        UI.show('generatePolicyButton'); /* Allow user to try again with a new prompt */
+                        UI.appendNotification('applyResultContent', 'is-warning', 'AI Policy Generation Failed', response.message);
+                        UI.show('applyResultContainer');
                     } else if (response.status === 'error') {
                         UI.setText('aiPolicy', 'Error: ' + response.message);
                         UI.show('policyContainer');
@@ -186,7 +197,7 @@
                 UI.setHtml('aiPolicy', marked.parse(AppState.currentPolicyData.policy));
                 UI.show('aiPolicy');
                 UI.hide('policyEditor');
-                UI.setText('togglePolicyEditButton', 'Edit Policy');
+                UI.setText('togglePolicyEditButton', 'Finish Editing');
                 UI.enable('prompt');
             } else {
                 if (!AppState.currentPolicyData || !AppState.currentPolicyData.policy) {
@@ -385,6 +396,16 @@
                         UI.show('acceptPolicyButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
+                    } else if (response.status === 'unachievable') { /* NEW CONDITION FOR UNACHIEVABLE IN REGENERATE */
+                        AppState.currentPolicyData = null;
+                        UI.setHtml('aiPolicy', `<div class="notification is-warning is-light"><strong>AI Policy Generation Status: UNACHIEVABLE</strong><br>${Utils.escapeHtml(response.message)}</div>`);
+                        UI.show('policyContainer');
+                        UI.hide('acceptPolicyButton');
+                        UI.hide('regenerateProposalButton');
+                        UI.hide('regeneratePolicyButton'); /* User should use "Generate Policy" for a new attempt */
+                        UI.show('generatePolicyButton');
+                        UI.appendNotification('applyResultContent', 'is-warning', 'AI Policy Generation Failed', response.message);
+                        UI.show('applyResultContainer');
                     } else if (response.status === 'error') {
                         UI.setText('aiPolicy', 'Error: ' + response.message);
                         UI.show('policyContainer');
@@ -1022,7 +1043,8 @@
                         UI.setText('addLibraryResult', response.message);
                         UI.clearValue('libraryScriptId');
                         UI.clearValue('libraryVersion');
-                    } else {
+                    }
+                    else {
                         UI.setText('addLibraryResult', `Error: ${response.message}`);
                     }
                 })

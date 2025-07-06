@@ -28,7 +28,9 @@ function _generatePolicyFromGemini(projectContent, userInstructionForPolicy, err
   }
   
   aiPrompt += "## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n";
+  aiPrompt += "重要: もしユーザーの指示が現在のあなたの能力では達成不可能であると判断した場合、'policy'フィールドの先頭に'[UNACHIEVABLE]: 'というプレフィックスを付け、その後に達成不可能な理由を簡潔に記述してください。この場合、箇条書きの方針は不要です。\n";
   aiPrompt += `レスポンス形式の例:\n` + `{"policy": "...変更方針のテキスト..."}\n`;
+  aiPrompt += `達成不可能な場合のレスポンス形式の例:\n` + `{"policy": "[UNACHIEVABLE]: その要求は〇〇であるため、現時点では達成できません。'Policy'フィールドにこのプレフィックスが付与された場合、AIはそれ以上の提案生成を停止します。"} \n`;
 
   const requestBody = {
     "contents": [{
@@ -111,6 +113,13 @@ function generateProposalPolicy(formObject) {
 
     // Use the new internal helper for policy generation
     const policyText = _generatePolicyFromGemini(projectContent, userPrompt);
+
+    // NEW LOGIC: Check for UNACHIEVABLE prefix
+    const UNACHIEVABLE_PREFIX = "[UNACHIEVABLE]: ";
+    if (policyText.startsWith(UNACHIEVABLE_PREFIX)) {
+      const message = policyText.substring(UNACHIEVABLE_PREFIX.length).trim();
+      return { status: 'unachievable', message: message, scriptId: scriptId, userPrompt: userPrompt };
+    }
 
     return { status: 'policy', policy: policyText, scriptId: scriptId, userPrompt: userPrompt };
 
@@ -203,6 +212,14 @@ function fixErrorsFromLogs(targetScriptId) {
     // Automated Error Fix のためのポリシー生成指示
     const policyInstruction = `提供されたエラーログと既存のファイルに基づいて、これらのエラーを修正するための変更方針を策定してください。`;
     const policyText = _generatePolicyFromGemini(projectContent, policyInstruction, logs);
+
+    // NEW LOGIC: Check for UNACHIEVABLE prefix in policyText
+    const UNACHIEVABLE_PREFIX = "[UNACHIEVABLE]: ";
+    if (policyText.startsWith(UNACHIEVABLE_PREFIX)) {
+        const message = policyText.substring(UNACHIEVABLE_PREFIX.length).trim();
+        // For fixErrorsFromLogs, we'll return an error status if policy is unachievable
+        return { status: 'error', message: `AI cannot generate a fix: ${message}` };
+    }
 
     // 4. コード生成用のプロンプトを生成
     let aiPromptForCode = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
