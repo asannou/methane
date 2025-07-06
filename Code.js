@@ -1,5 +1,5 @@
 function doGet() {
-  return HtmlService.createTemplateFromFile('index').evaluate().setTitle('Methane AI Agent');
+  return HtmlService.createTemplateFromFile('index').evaluate().setTitle('methane');
 }
 
 /**
