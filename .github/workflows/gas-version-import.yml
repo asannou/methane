@@ -1,0 +1,20 @@
+name: Import GAS Versions
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Import GAS Versions
+        uses: asannou/gas-version-importer-action@v1
+        with:
+          script_id: '1wrA2WUuLc0MtdxqObZp4-wObZKwZiJNRQVdgum7nw93SIMdNSjxYhC_C'
+          author_name: 'methane[bot]'
+          author_email: 'methane[bot]@users.noreply.github.com'
+          CLASP_REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+          CLASP_CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLASP_CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
