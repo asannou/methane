@@ -411,14 +411,15 @@ function deployScript(scriptId, description = '') {
     let webappUrl;
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
       console.log("デプロイ応答のentryPointsプロパティ:", JSON.stringify(deploymentResult.entryPoints));
-      const entryPoint = deploymentResult.entryPoints[0];
-      if (entryPoint?.webApp?.url) {
-        webappUrl = entryPoint.webApp.url;
+      // WEB_APPタイプのエントリポイントを明示的に検索
+      const webAppEntryPoint = deploymentResult.entryPoints.find(ep => ep.entryPointType === 'WEB_APP');
+      if (webAppEntryPoint?.webApp?.url) {
+        webappUrl = webAppEntryPoint.webApp.url;
         console.log("WebアプリURLをentryPointから抽出しました:", webappUrl);
-      } else if (entryPoint?.webApp) {
-        console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", JSON.stringify(entryPoint.webApp, null, 2));
+      } else if (webAppEntryPoint?.webApp) {
+        console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", JSON.stringify(webAppEntryPoint.webApp, null, 2));
       } else {
-        console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", JSON.stringify(entryPoint, null, 2));
+        console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", JSON.stringify(webAppEntryPoint, null, 2));
       }
     } else {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
