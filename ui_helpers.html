@@ -9,6 +9,10 @@
         get: (id) => {
             if (!AppState.domElements[id]) {
                 AppState.domElements[id] = document.getElementById(id);
+                // Optionally log if element is not found during initial get
+                if (!AppState.domElements[id]) {
+                    console.warn(`UI.get: Element with ID "${id}" not found.`);
+                }
             }
             return AppState.domElements[id];
         },
@@ -17,25 +21,45 @@
          * Show a DOM element.
          * @param {string} elementId - The ID of the element.
          */
-        show: (elementId) => { UI.get(elementId).style.display = 'block'; },
+        show: (elementId) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.style.display = 'block';
+            }
+        },
 
         /**
          * Hide a DOM element.
          * @param {string} elementId - The ID of the element.
          */
-        hide: (elementId) => { UI.get(elementId).style.display = 'none'; },
+        hide: (elementId) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.style.display = 'none';
+            }
+        },
 
         /**
          * Enable a DOM element.
          * @param {string} elementId - The ID of the element.
          */
-        enable: (elementId) => { UI.get(elementId).disabled = false; },
+        enable: (elementId) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.disabled = false;
+            }
+        },
 
         /**
          * Disable a DOM element.
          * @param {string} elementId - The ID of the element.
          */
-        disable: (elementId) => { UI.get(elementId).disabled = true; },
+        disable: (elementId) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.disabled = true;
+            }
+        },
 
         /**
          * Shows a loading spinner directly within the button.
@@ -68,20 +92,35 @@
          * @param {string} elementId - The ID of the element.
          * @param {string} content - The HTML content.
          */
-        setHtml: (elementId, content) => { UI.get(elementId).innerHTML = content; },
+        setHtml: (elementId, content) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.innerHTML = content;
+            }
+        },
 
         /**
          * Set textContent of a DOM element.
          * @param {string} elementId - The ID of the element.
          * @param {string} content - The text content.
          */
-        setText: (elementId, content) => { UI.get(elementId).textContent = content; },
+        setText: (elementId, content) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.textContent = content;
+            }
+        },
 
         /**
          * Clear the value of a textarea or input.
          * @param {string} elementId - The ID of the textarea/input.
          */
-        clearValue: (elementId) => { UI.get(elementId).value = ''; },
+        clearValue: (elementId) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.value = '';
+            }
+        },
 
         /**
          * Append a notification message to a container.
@@ -92,6 +131,10 @@
          */
         appendNotification: (containerId, type, message, details = null) => {
             const container = UI.get(containerId);
+            if (!container) {
+                console.warn(`UI.appendNotification: Container with ID "${containerId}" not found. Cannot append notification.`);
+                return;
+            }
             const notificationDiv = document.createElement('div');
             notificationDiv.className = `notification ${type}`;
             let contentHtml = `<p><strong>${Utils.escapeHtml(message)}</strong></p>`;
@@ -109,7 +152,10 @@
          * @param {string} containerId - The ID of the container to clear.
          */
         clearNotifications: (containerId) => {
-            UI.get(containerId).innerHTML = '';
+            const element = UI.get(containerId);
+            if (element) {
+                element.innerHTML = '';
+            }
             UI.hide(containerId);
         }
     };
