@@ -1,4 +1,4 @@
-<script>
+<script>    
     // 2. UI Helper Functions
     const UI = {
         /**
@@ -75,7 +75,14 @@
          * @param {string} elementId - The ID of the element.
          * @param {string} content - The text content.
          */
-        setText: (elementId, content) => { UI.get(elementId).textContent = content; },
+        setText: (elementId, content) => {
+            const element = UI.get(elementId);
+            if (element) {
+                element.textContent = content;
+            } else {
+                console.warn(`UI.setText: Element with ID "${elementId}" not found. Cannot set text content.`);
+            }
+        },
 
         /**
          * Clear the value of a textarea or input.
