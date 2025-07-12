@@ -129,7 +129,7 @@
         
         <h2 class="title is-4 mt-5">Automated Error Fix</h2>
         <form id="fix-errors-form" class="box">
-          <p class="content">Allows AI to propose error fixes based on existing script logs. Proposed changes will appear in the "AI Proposed Changes" section under "AI Operations" tab.</p>
+          <p class="content">Allows AI to propose error fixes based on existing script logs. Proposed changes will appear in the "AI Operations" section under "AI Operations" tab.</p>
           <div class="field is-grouped">
             <div class="control">
               <button type="submit" id="fixErrorsButton" class="button is-danger">Fix Errors from Logs</button>
@@ -257,6 +257,7 @@
     </div>
   </section>
 
+  <?!= include('browser_error_logger'); ?>
   <?!= include('app_state'); ?>
   <?!= include('ui_helpers'); ?>
   <?!= include('utils'); ?>

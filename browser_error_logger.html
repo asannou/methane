@@ -1,0 +1,45 @@
+<script>
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    window.onerror = function(message, source, lineno, colno, error) {
+      google.script.run.logClientError({
+        type: 'onerror',
+        message: message,
+        source: source,
+        lineno: lineno,
+        colno: colno,
+        stack: error ? error.stack : 'No stack trace available'
+      });
+      // Returning false prevents the default browser error handling, which might show the error in the console
+      // in some browsers even if we log it. Return true to let default handling occur.
+      return false;
+    };
+
+    window.onunhandledrejection = function(event) {
+      let message = 'Unhandled promise rejection';
+      let stack = 'No stack trace available';
+      if (event.reason) {
+        if (typeof event.reason === 'string') {
+          message = event.reason;
+        } else if (event.reason instanceof Error) {
+          message = event.reason.message;
+          stack = event.reason.stack;
+        } else if (typeof event.reason.message === 'string') {
+          message = event.reason.message;
+          stack = event.reason.stack || stack;
+        } else {
+          // Fallback for complex or unknown reason types
+          try {
+            message = JSON.stringify(event.reason);
+          } catch (e) {
+            message = '[Serialization Error] Unable to stringify event.reason';
+          }
+        }
+      }
+      google.script.run.logClientError({
+        type: 'unhandledrejection',
+        message: message,
+        stack: stack
+      });
+    };
+  }
+</script>
