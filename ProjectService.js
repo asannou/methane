@@ -652,34 +652,42 @@ function listScriptVersions(scriptId) {
     }));
 
     // 2. Fetch all deployments to find web app URLs
-    console.log(`スクリプトID ${scriptId} のデプロイメントをリスト中...`);
+    console.log(`デプロイメントAPI呼び出しURL: ${deploymentsApiUrl}`);
     const deploymentOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const deploymentResponse = UrlFetchApp.fetch(deploymentsApiUrl, deploymentOptions);
     const deploymentResponseCode = deploymentResponse.getResponseCode();
     const deploymentResponseBody = deploymentResponse.getContentText();
+
+    console.log(`デプロイメント取得API応答 - ステータス: ${deploymentResponseCode}, ボディ: ${deploymentResponseBody}`);
 
     if (deploymentResponseCode !== 200) {
       console.warn(`デプロイメント取得APIエラー (ステータス: ${deploymentResponseCode})。ウェブアプリURLは取得できませんでした: ${deploymentResponseBody}`);
       // Continue without web app URLs if deployment fetch fails
     } else {
       const deploymentsData = JSON.parse(deploymentResponseBody);
+      console.log(`デプロイメントデータ解析成功。デプロイメント数: ${(deploymentsData.deployments || []).length}`);
       const webAppUrlMap = {}; // Map to store versionNumber -> webAppUrl
 
       (deploymentsData.deployments || []).forEach(d => {
         if (d.entryPoints && Array.isArray(d.entryPoints)) {
           d.entryPoints.forEach(ep => {
             if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
+              console.log(`WEB_APPタイプのエントリポイントを発見: ${JSON.stringify(ep)}`);
               const deployedVersion = d.versionNumber;
               // If multiple web apps for the same version, just take the first one found (or latest if list is sorted by createTime)
               if (deployedVersion && !webAppUrlMap[deployedVersion]) {
                 webAppUrlMap[deployedVersion] = ep.webApp.url;
+                console.log(`バージョン ${deployedVersion} のウェブアプリURLをマップに登録: ${ep.webApp.url}`);
               } else if (deployedVersion && webAppUrlMap[deployedVersion]) {
                 // If a web app URL for this version already exists, prioritize the latest one if available (API's default sort order for deployments)
                 // Or, simply overwrite to take the last one found in the list.
                 webAppUrlMap[deployedVersion] = ep.webApp.url;
+                console.log(`バージョン ${deployedVersion} の既存のウェブアプリURLを更新: ${ep.webApp.url}`);
               }
             }
           });
+        } else {
+          console.log(`デプロイメント ${d.deploymentId} にentryPointsプロパティがないか、空の配列です。`);
         }
       });
 
@@ -687,6 +695,9 @@ function listScriptVersions(scriptId) {
       versions = versions.map(v => {
         if (webAppUrlMap[v.versionNumber]) {
           v.webappUrl = webAppUrlMap[v.versionNumber];
+          console.log(`バージョン ${v.versionNumber} にウェブアプリURL ${v.webappUrl} を追加しました。`);
+        } else {
+          console.log(`バージョン ${v.versionNumber} にウェブアプリURLは見つかりませんでした。`);
         }
         return v;
       });
