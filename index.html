@@ -140,6 +140,18 @@
           </div>
         </form>
 
+        <h2 class="title is-4 mt-5">Browser Console Error Logging (for Target Script)</h2>
+        <div class="box">
+          <p class="content">Propose changes to the selected target script to enable logging of browser console errors (from its web app) to Google Cloud Logging. This will generate a proposal in the "AI Operations" tab.</p>
+          <div class="control">
+            <button type="button" id="proposeBrowserErrorLoggingButton" class="button is-warning">Propose Browser Error Logging</button>
+          </div>
+          <div id="propose-browser-error-logging-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Proposal Result:</h3>
+            <pre id="propose-browser-error-logging-result" class="content"></pre>
+          </div>
+        </div>
+
         <h2 class="title is-4 mt-5">Deploy Script</h2>
         <form id="deploy-form" class="box">
           <div class="field">

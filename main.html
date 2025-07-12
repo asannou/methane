@@ -44,6 +44,11 @@
         AppState.domElements.libraryScriptId = document.getElementById('libraryScriptId');
         AppState.domElements.libraryVersion = document.getElementById('libraryVersion');
         AppState.domElements.deploymentDescription = document.getElementById('deploymentDescription');
+        // NEW Elements
+        AppState.domElements.proposeBrowserErrorLoggingButton = document.getElementById('proposeBrowserErrorLoggingButton');
+        AppState.domElements.proposeBrowserErrorLoggingResultContainer = document.getElementById('propose-browser-error-logging-result-container');
+        AppState.domElements.proposeBrowserErrorLoggingResult = document.getElementById('propose-browser-error-logging-result');
+
 
         // Load initial state from localStorage
         const savedScriptId = localStorage.getItem('targetScriptId');
@@ -74,6 +79,8 @@
         UI.hide('deployResultContainer');
         UI.hide('addLibraryResultContainer');
         UI.hide('gcpSaveResultContainer');
+        UI.hide('proposeBrowserErrorLoggingResultContainer'); // NEW
+
 
         Utils.updateEditorUrlDisplay();
         Handlers.initTabNavigation();
@@ -99,6 +106,8 @@
         UI.get('fix-errors-form').addEventListener('submit', Handlers.handleFixErrorsFormSubmit);
         UI.get('cancelFixErrorsButton').addEventListener('click', Handlers.handleCancelAiOperation);
         UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
+        
+        UI.get('proposeBrowserErrorLoggingButton').addEventListener('click', Handlers.handleProposeBrowserErrorLogging); // NEW
 
         UI.get('saveGcpProjectIdButton').addEventListener('click', Handlers.handleSaveGcpProjectId);
         UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);
