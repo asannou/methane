@@ -225,14 +225,15 @@ function deployScript(scriptId, description = '') {
       } else {
         const allDeploymentsData = JSON.parse(allDeploymentsResponse.getContentText());
         (allDeploymentsData.deployments || []).forEach(d => {
-            if (d.versionNumber) {
+            // projects.deployments.list から取得したデプロイメントオブジェクトは versionNumber を deploymentConfig の下に持つ
+            if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
                 // WebアプリまたはAPI実行可能ファイルに紐づくデプロイメントの場合、そのバージョンをアクティブとマーク
                 if (d.entryPoints && Array.isArray(d.entryPoints)) {
                     const isActiveEntryPoint = d.entryPoints.some(ep => 
                         ep.entryPointType === 'WEB_APP' || ep.entryPointType === 'API_EXECUTABLE'
                     );
                     if (isActiveEntryPoint) {
-                        activeDeployedVersions.add(d.versionNumber);
+                        activeDeployedVersions.add(d.deploymentConfig.versionNumber);
                     }
                 }
             }
@@ -675,14 +676,15 @@ function listScriptVersions(scriptId) {
       const webAppUrlMap = {}; // versionNumber -> webAppUrl のマップを格納
 
       allDeployments.forEach(d => {
-        if (d.versionNumber) { // 特定のバージョンに紐づくデプロイメントのみ処理
+        // projects.deployments.list から取得したデプロイメントオブジェクトは versionNumber を deploymentConfig の下に持つ
+        if (d.deploymentConfig && d.deploymentConfig.versionNumber) { // 特定のバージョンに紐づくデプロイメントのみ処理
           if (d.entryPoints && Array.isArray(d.entryPoints)) {
             d.entryPoints.forEach(ep => {
               if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
                 // まだ存在しない場合のみ追加し、ソート順により最新のものを取得する
-                if (!webAppUrlMap[d.versionNumber]) {
-                  webAppUrlMap[d.versionNumber] = ep.webApp.url;
-                  console.log(`バージョン ${d.versionNumber} の最新ウェブアプリURLをマップに登録: ${ep.webApp.url}`);
+                if (!webAppUrlMap[d.deploymentConfig.versionNumber]) {
+                  webAppUrlMap[d.deploymentConfig.versionNumber] = ep.webApp.url;
+                  console.log(`バージョン ${d.deploymentConfig.versionNumber} の最新ウェブアプリURLをマップに登録: ${ep.webApp.url}`);
                 }
               }
             });
