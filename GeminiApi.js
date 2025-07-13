@@ -23,6 +23,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
   systemPrompt += "## あなたのタスク\n";
   systemPrompt += "- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n";
+  systemPrompt += "- **ファイルの削除を提案する場合、そのファイルオブジェクトの 'status' フィールドを 'DELETED' に設定し、'source' フィールドは空文字列にしてください。'name' と 'type' は削除するファイルの既存のものと一致させてください。**\n";
   systemPrompt += "- レスポンスは必ず、以下のJSON形式のみで返してください。\n";
   systemPrompt += "- 重要:\n";
   systemPrompt += "  - 変更が必要なファイル、または**新しく追加したいファイル**の新しいソースコードを生成してください。\n";
@@ -33,7 +34,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += "  - 生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。HTMLファイルでは、元の構造とインデントを厳密に保持してください。これにより、AI提案の粒度と精度を向上させ、ユーザーがレビューする際のノイズを最小限に抑え、意図しない副作用や予期せぬ挙動のリスクを低減することを目的とします。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
-  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}]}\n```";
+  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}, {\"name\": \"OldFile\", \"type\": \"SERVER_JS\", \"source\": \"\", \"status\": \"DELETED\"}]}\n```";
   systemPrompt += "- 'purpose'フィールドには、提案された変更の全体的な目的や理由を、ユーザーが理解しやすいように簡潔に説明してください。\n";
 
   const requestBody = {
@@ -65,7 +66,12 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
                 },
                 "source": {
                   "type": "STRING",
-                  "description": "変更後のファイル内容"
+                  "description": "変更後のファイル内容。ファイルが削除される場合は空文字列。"
+                },
+                "status": {
+                  "type": "STRING",
+                  "enum": ["UPDATED", "DELETED"],
+                  "description": "ファイルのステータス。変更の場合は 'UPDATED' (デフォルト)、削除の場合は 'DELETED'。新しいファイルは 'UPDATED' とみなされます。"
                 }
               },
               "required": ["name", "type", "source"]

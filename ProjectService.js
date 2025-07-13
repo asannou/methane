@@ -1,4 +1,32 @@
 /**
+ * Apps Script API経由で単一ファイルを削除するヘルパー関数。
+ * @param {string} scriptId - 対象スクリプトのID。
+ * @param {string} fileName - 削除するファイルの名称（拡張子なし）。
+ * @param {string} accessToken - OAuthアクセストークン。
+ * @throws {Error} ファイル削除APIが失敗した場合。
+ */
+function _deleteScriptFile(scriptId, fileName, accessToken) {
+  // Apps Script APIはファイル名がURLエンコードされていることを想定している場合がある
+  const encodedFileName = encodeURIComponent(fileName);
+  const deleteFileUrl = `https://script.googleapis.com/v1/projects/${scriptId}/files/${encodedFileName}`;
+  const options = {
+    method: 'delete',
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+    muteHttpExceptions: true
+  };
+  console.log(`ファイル '${fileName}' を削除中... URL: ${deleteFileUrl}`);
+  const response = UrlFetchApp.fetch(deleteFileUrl, options);
+  const responseCode = response.getResponseCode();
+  const responseBody = response.getContentText();
+
+  if (responseCode !== 200) {
+    console.error(`ファイル '${fileName}' の削除に失敗しました (HTTP ${responseCode}): ${responseBody}`);
+    throw new Error(`Failed to delete file '${fileName}' (Status: ${responseCode}): ${responseBody}`);
+  }
+  console.log(`ファイル '${fileName}' を正常に削除しました。`);
+}
+
+/**
  * ユーザーが承認したAIの提案に基づいてスクリプトファイルを更新します。
  * @param {string} scriptId - 更新対象のスクリプトID
  * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列
@@ -11,28 +39,54 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
+    const filesToDelete = proposedFiles.filter(f => f.status === 'DELETED');
+    const filesToUpdateOrAdd = proposedFiles.filter(f => f.status !== 'DELETED' || f.status === undefined); // files with no status are considered UPDATED
+
+    // 1. まずファイルを削除する
+    const deletedFileNames = new Set();
+    for (const file of filesToDelete) {
+      try {
+        _deleteScriptFile(scriptId, file.name, accessToken);
+        deletedFileNames.add(file.name);
+      } catch (deleteError) {
+        // ファイル削除が失敗しても、残りの操作を続行できるようにログに記録し、エラーを返す
+        console.error(`ファイル削除エラー: ${deleteError.message}`);
+        return {
+            status: 'error',
+            message: `Failed to delete file '${file.name}': ${deleteError.message}`,
+            fullErrorText: deleteError.message
+        };
+      }
+    }
+
+    // 2. 削除後の現在のファイル一覧を取得する
+    // これにより、削除されたファイルが PUT ペイロードに含まれないようにする
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        return { status: 'error', message: `Failed to retrieve script content again: ${getResponse.getContentText()}`, apiErrorDetails: JSON.parse(getResponse.getContentText() || '{}') };
+        return { status: 'error', message: `Failed to retrieve script content after potential deletions: ${getResponse.getContentText()}`, apiErrorDetails: JSON.parse(getResponse.getContentText() || '{}') };
     }
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    // Create a mutable copy of files to safely add/modify
+    // 3. 更新または追加するファイルを処理する
     const currentFiles = [...projectContent.files];
     const updatedFilesMap = new Map(currentFiles.map(file => [file.name, file]));
 
-    proposedFiles.forEach(updatedFile => {
+    filesToUpdateOrAdd.forEach(updatedFile => {
+      // statusが指定されていない場合はUPDATEDとみなす
       if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
            console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(updatedFile, null, 2));
            return;
+      }
+      if (updatedFile.status === 'DELETED') { // 念のため、すでに削除済みとマークされたファイルをスキップ
+        return;
       }
 
       const existingFile = updatedFilesMap.get(updatedFile.name);
       if (existingFile) {
         // Update existing file
         existingFile.source = updatedFile.source;
-        existingFile.type = updatedFile.type; // Ensure type is also updated if needed, although usually it stays the same.
+        existingFile.type = updatedFile.type;
       } else {
         // Add new file
         console.log(`新しいファイル '${updatedFile.name}' (タイプ: ${updatedFile.type}) を追加します。`);
@@ -43,6 +97,7 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     // Convert map back to array for payload
     projectContent.files = Array.from(updatedFilesMap.values());
 
+    // 4. 残りのファイル（更新・追加済み）をPUTリクエストで送信
     const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
     if (putResponse.getResponseCode() !== 200) {
@@ -50,7 +105,7 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
             status: 'error',
             message: `Failed to update script. (HTTP ${putResponse.getResponseCode()})`,
             apiErrorDetails: JSON.parse(putResponse.getContentText() || '{}'),
-            fullErrorText: putResponse.getContentText() // Provide full text for debugging
+            fullErrorText: putResponse.getContentText()
         };
     }
 
@@ -61,9 +116,14 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
       console.log("自動デプロイ結果:", JSON.stringify(deployResult, null, 2));
     }
 
+    let successMessage = `Script (ID: ${scriptId}) updated successfully. AI's proposal has been applied.`;
+    if (deletedFileNames.size > 0) {
+        successMessage += ` Deleted ${deletedFileNames.size} file(s): ${Array.from(deletedFileNames).join(', ')}.`;
+    }
+
     return {
       status: 'success',
-      message: `Script (ID: ${scriptId}) updated successfully. AI's proposal has been applied.`,
+      message: successMessage,
       deploymentStatus: deployResult ? deployResult.status : 'not_attempted',
       deploymentMessage: deployResult ? deployResult.message : 'Auto-deploy was not executed.',
       deploymentId: deployResult ? deployResult.deploymentId : null,

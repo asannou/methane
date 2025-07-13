@@ -382,6 +382,30 @@
   background-color: var(--gas-grey-dark) !important;
 }
 
+/* NEW: Style for deleted files in diff view */
+.file-comparison.is-deleted {
+  border: 1px dashed var(--gas-red) !important;
+  background-color: #ffe6e6; /* Lighter red */
+}
+
+.file-comparison.is-deleted .file-name-deleted {
+  color: var(--gas-red);
+  font-weight: bold;
+  text-decoration: line-through;
+}
+
+.file-comparison.is-deleted .deleted-message {
+  color: var(--gas-red);
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+  font-size: 1.1em;
+  background-color: #fff0f0;
+  border: 1px dashed #fcdcdc;
+  margin-top: 10px;
+}
+
+
 /* Styles for Bulma Tabs integration */
 .tabs {
   margin-bottom: 2rem;

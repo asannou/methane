@@ -163,7 +163,7 @@
                     } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                         j++;
-                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - i) < (originalFoundInProposedAhead - j))) {
+                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                         i++;
                     } else if (i < originalLines.length) {
@@ -292,56 +292,113 @@
             proposedFiles.forEach(proposedFile => {
                 const name = proposedFile.name;
                 const fileType = proposedFile.type;
+                const status = proposedFile.status || 'UPDATED'; // Default to UPDATED if status is not provided
 
                 const originalFile = (originalFiles || []).find(f => f.name === name);
                 const originalSource = originalFile ? originalFile.source : '';
                 const proposedSource = proposedFile.source;
 
-                const diffHtmlData = Utils.generateFormattedDiffPanels(originalSource, proposedSource);
-
                 const fileComparisonDiv = document.createElement('div');
                 fileComparisonDiv.className = 'file-comparison';
 
-                const originalContentDiv = document.createElement('div');
-                originalContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
-                    <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
-                    <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
-                </pre>`;
+                if (status === 'DELETED') {
+                    fileComparisonDiv.classList.add('is-deleted');
+                    fileComparisonDiv.innerHTML = `
+                        <div>
+                            <h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4>
+                            <pre class="scroll-sync-target">
+                                <div class="line-numbers-col">
+                                    ${Utils.generateLineNumbersHtml(originalSource)}
+                                </div>
+                                <div class="code-content-col">
+                                    ${Utils.generateSourceHtml(originalSource)}
+                                </div>
+                            </pre>
+                        </div>
+                        <div>
+                            <h4>${name}.${Utils.getFileExtension(fileType)} (Proposed) <span class="file-name-deleted">(DELETED)</span></h4>
+                            <div class="deleted-message">
+                                <p>This file will be deleted.</p>
+                                <p>Original content is shown on the left for reference.</p>
+                            </div>
+                        </div>
+                    `;
+                } else { // UPDATED or new file
+                    const diffHtmlData = Utils.generateFormattedDiffPanels(originalSource, proposedSource);
+
+                    const originalContentDiv = document.createElement('div');
+                    originalContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
+                        <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
+                        <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
+                    </pre>`;
+                    
+                    const proposedContentDiv = document.createElement('div');
+                    proposedContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
+                        <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
+                        <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
+                    </pre>`;
+                    
+                    fileComparisonDiv.appendChild(originalContentDiv);
+                    fileComparisonDiv.appendChild(proposedContentDiv);
+                }
                 
-                const proposedContentDiv = document.createElement('div');
-                proposedContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Proposed)</h4><pre class="scroll-sync-target">
-                    <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
-                    <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
-                </pre>`;
-                
-                fileComparisonDiv.appendChild(originalContentDiv);
-                fileComparisonDiv.appendChild(proposedContentDiv);
                 displayArea.appendChild(fileComparisonDiv);
 
-                const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
-                if (preElements.length === 2) {
-                    const pre1 = preElements[0];
-                    const pre2 = preElements[1];
+                // Re-apply scroll sync only for non-deleted comparisons
+                if (status !== 'DELETED') {
+                    const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
+                    if (preElements.length === 2) {
+                        const pre1 = preElements[0];
+                        const pre2 = preElements[1];
 
-                    let isSyncing = false;
+                        let isSyncing = false;
 
-                    pre1.addEventListener('scroll', function() {
-                        if (!isSyncing) {
-                            isSyncing = true;
-                            pre2.scrollTop = pre1.scrollTop;
-                            isSyncing = false;
-                        }
-                    });
+                        pre1.addEventListener('scroll', function() {
+                            if (!isSyncing) {
+                                isSyncing = true;
+                                pre2.scrollTop = pre1.scrollTop;
+                                isSyncing = false;
+                            }
+                        });
 
-                    pre2.addEventListener('scroll', function() {
-                        if (!isSyncing) {
-                            isSyncing = true;
-                            pre1.scrollTop = pre2.scrollTop;
-                            isSyncing = false;
-                        }
-                    });
+                        pre2.addEventListener('scroll', function() {
+                            if (!isSyncing) {
+                                isSyncing = true;
+                                pre1.scrollTop = pre2.scrollTop;
+                                isSyncing = false;
+                            }
+                        });
+                    }
                 }
             });
+        },
+
+        /**
+         * Helper to generate simple line numbers HTML for deleted files.
+         * @param {string} source - The source code.
+         * @returns {string} HTML for line numbers.
+         */
+        generateLineNumbersHtml: (source) => {
+            const lines = source ? source.split('\n') : [];
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                html += `<div>${i + 1}</div>`;
+            }
+            return html;
+        },
+
+        /**
+         * Helper to generate simple source HTML for deleted files.
+         * @param {string} source - The source code.
+         * @returns {string} HTML for source content.
+         */
+        generateSourceHtml: (source) => {
+            const lines = source ? source.split('\n') : [];
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                html += `<div class="diff-line-equal">${Utils.escapeHtml(lines[i])}</div>`;
+            }
+            return html;
         },
 
         /**
