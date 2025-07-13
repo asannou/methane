@@ -1,35 +1,8 @@
 /**
- * Apps Script API経由で単一ファイルを削除するヘルパー関数。
- * @param {string} scriptId - 対象スクリプトのID。
- * @param {string} fileName - 削除するファイルの名称（拡張子なし）。
- * @param {string} accessToken - OAuthアクセストークン。
- * @throws {Error} ファイル削除APIが失敗した場合。
- */
-function _deleteScriptFile(scriptId, fileName, accessToken) {
-  // Apps Script APIはファイル名がURLエンコードされていることを想定している場合がある
-  const encodedFileName = encodeURIComponent(fileName);
-  const deleteFileUrl = `https://script.googleapis.com/v1/projects/${scriptId}/files/${encodedFileName}`;
-  const options = {
-    method: 'delete',
-    headers: { 'Authorization': `Bearer ${accessToken}` },
-    muteHttpExceptions: true
-  };
-  console.log(`ファイル '${fileName}' を削除中... URL: ${deleteFileUrl}`);
-  const response = UrlFetchApp.fetch(deleteFileUrl, options);
-  const responseCode = response.getResponseCode();
-  const responseBody = response.getContentText();
-
-  if (responseCode !== 200) {
-    console.error(`ファイル '${fileName}' の削除に失敗しました (HTTP ${responseCode}): ${responseBody}`);
-    throw new Error(`Failed to delete file '${fileName}' (Status: ${responseCode}): ${responseBody}`);
-  }
-  console.log(`ファイル '${fileName}' を正常に削除しました。`);
-}
-
-/**
  * ユーザーが承認したAIの提案に基づいてスクリプトファイルを更新します。
+ * AIからのレスポンスに含まれないファイルは暗黙的に削除されます。
  * @param {string} scriptId - 更新対象のスクリプトID
- * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列
+ * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列 (更新または新規追加)
  * @param {boolean} autoDeploy - 変更適用後に自動的にデプロイするかどうか
  * @param {string} proposalPurpose - AIが提案した変更の主旨
  * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
@@ -39,66 +12,48 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
-    const filesToDelete = proposedFiles.filter(f => f.status === 'DELETED');
-    const filesToUpdateOrAdd = proposedFiles.filter(f => f.status !== 'DELETED' || f.status === undefined); // files with no status are considered UPDATED
-
-    // 1. まずファイルを削除する
-    const deletedFileNames = new Set();
-    for (const file of filesToDelete) {
-      try {
-        _deleteScriptFile(scriptId, file.name, accessToken);
-        deletedFileNames.add(file.name);
-      } catch (deleteError) {
-        // ファイル削除が失敗しても、残りの操作を続行できるようにログに記録し、エラーを返す
-        console.error(`ファイル削除エラー: ${deleteError.message}`);
-        return {
-            status: 'error',
-            message: `Failed to delete file '${file.name}': ${deleteError.message}`,
-            fullErrorText: deleteError.message
-        };
-      }
-    }
-
-    // 2. 削除後の現在のファイル一覧を取得する
-    // これにより、削除されたファイルが PUT ペイロードに含まれないようにする
+    // 1. 現在のスクリプトの全ファイル内容を取得
     const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
     const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
     if (getResponse.getResponseCode() !== 200) {
-        return { status: 'error', message: `Failed to retrieve script content after potential deletions: ${getResponse.getContentText()}`, apiErrorDetails: JSON.parse(getResponse.getContentText() || '{}') };
+        throw new Error(`Failed to retrieve script content for update: ${getResponse.getContentText()}`);
     }
-    const projectContent = JSON.parse(getResponse.getContentText());
+    const originalProjectContent = JSON.parse(getResponse.getContentText());
+    
+    // 新しいファイルセットを構築するためのマップ。最初は現在の全ファイルを含む。
+    const newProjectFilesMap = new Map(originalProjectContent.files.map(f => [f.name, f]));
 
-    // 3. 更新または追加するファイルを処理する
-    const currentFiles = [...projectContent.files];
-    const updatedFilesMap = new Map(currentFiles.map(file => [file.name, file]));
+    // AIが提案した変更をマップに適用する
+    // AIのレスポンスに含まれないファイルはマップから更新されず、最終ペイロードに含まれないため削除される。
+    // AIのレスポンスに含まれるファイルは、既存のものであれば更新され、新規であれば追加される。
+    for (const proposedFile of proposedFiles) {
+        // AIのファイルオブジェクトの形式を検証 (安全性のため)
+        if (!proposedFile || typeof proposedFile.name !== 'string' || typeof proposedFile.source !== 'string' || typeof proposedFile.type !== 'string') {
+            console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(proposedFile, null, 2));
+            continue;
+        }
+        newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
+    }
 
-    filesToUpdateOrAdd.forEach(updatedFile => {
-      // statusが指定されていない場合はUPDATEDとみなす
-      if (!updatedFile || typeof updatedFile.name !== 'string' || typeof updatedFile.source !== 'string' || typeof updatedFile.type !== 'string') {
-           console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(updatedFile, null, 2));
-           return;
-      }
-      if (updatedFile.status === 'DELETED') { // 念のため、すでに削除済みとマークされたファイルをスキップ
-        return;
-      }
+    // 最終的なPUTリクエスト用のファイル配列を生成
+    const finalFilesForPutPayload = Array.from(newProjectFilesMap.values());
+    
+    // Apps Scriptプロジェクトには少なくとも1つのファイルが必要。appsscript.jsonが常に存在するようにする。
+    // AIがappsscript.jsonを提案に含めなかった場合（または誤って削除を提案した場合）のフォールバックとして。
+    if (finalFilesForPutPayload.length === 0) {
+        const appsscriptJson = originalProjectContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
+        if (appsscriptJson && !newProjectFilesMap.has('appsscript')) {
+            finalFilesForPutPayload.push(appsscriptJson);
+            console.warn("最終ペイロードにファイルが含まれていなかったため、appsscript.jsonを強制的に追加しました。");
+        } else if (!appsscriptJson) {
+             throw new Error("Cannot apply changes: appsscript.json not found in original project, and no files proposed. Project would become empty.");
+        }
+    }
 
-      const existingFile = updatedFilesMap.get(updatedFile.name);
-      if (existingFile) {
-        // Update existing file
-        existingFile.source = updatedFile.source;
-        existingFile.type = updatedFile.type;
-      } else {
-        // Add new file
-        console.log(`新しいファイル '${updatedFile.name}' (タイプ: ${updatedFile.type}) を追加します。`);
-        updatedFilesMap.set(updatedFile.name, updatedFile);
-      }
-    });
-
-    // Convert map back to array for payload
-    projectContent.files = Array.from(updatedFilesMap.values());
-
-    // 4. 残りのファイル（更新・追加済み）をPUTリクエストで送信
-    const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(projectContent), muteHttpExceptions: true };
+    const finalPayload = { files: finalFilesForPutPayload };
+    
+    // 2. 最終的なファイルリストでスクリプト内容をPUTリクエストで更新
+    const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(finalPayload), muteHttpExceptions: true };
     const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
     if (putResponse.getResponseCode() !== 200) {
         return {
@@ -117,9 +72,6 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
     }
 
     let successMessage = `Script (ID: ${scriptId}) updated successfully. AI's proposal has been applied.`;
-    if (deletedFileNames.size > 0) {
-        successMessage += ` Deleted ${deletedFileNames.size} file(s): ${Array.from(deletedFileNames).join(', ')}.`;
-    }
 
     return {
       status: 'success',
@@ -757,8 +709,6 @@ function listScriptVersions(scriptId) {
         if (webAppUrlMap[v.versionNumber]) {
           v.webappUrl = webAppUrlMap[v.versionNumber];
           console.log(`バージョン ${v.versionNumber} にウェブアプリURL ${v.webappUrl} を追加しました。`);
-        } else {
-          console.log(`バージョン ${v.versionNumber} にウェブアプリURLは見つかりませんでした。`);
         }
         return v;
       });
