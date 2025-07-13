@@ -666,28 +666,27 @@ function listScriptVersions(scriptId) {
     } else {
       const deploymentsData = JSON.parse(deploymentResponseBody);
       console.log(`デプロイメントデータ解析成功。デプロイメント数: ${(deploymentsData.deployments || []).length}`);
-      const webAppUrlMap = {}; // Map to store versionNumber -> webAppUrl
+      
+      let allDeployments = deploymentsData.deployments || [];
 
-      (deploymentsData.deployments || []).forEach(d => {
-        if (d.entryPoints && Array.isArray(d.entryPoints)) {
-          d.entryPoints.forEach(ep => {
-            if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
-              console.log(`WEB_APPタイプのエントリポイントを発見: ${JSON.stringify(ep)}`);
-              const deployedVersion = d.versionNumber;
-              // If multiple web apps for the same version, just take the first one found (or latest if list is sorted by createTime)
-              if (deployedVersion && !webAppUrlMap[deployedVersion]) {
-                webAppUrlMap[deployedVersion] = ep.webApp.url;
-                console.log(`バージョン ${deployedVersion} のウェブアプリURLをマップに登録: ${ep.webApp.url}`);
-              } else if (deployedVersion && webAppUrlMap[deployedVersion]) {
-                // If a web app URL for this version already exists, prioritize the latest one if available (API's default sort order for deployments)
-                // Or, simply overwrite to take the last one found in the list.
-                webAppUrlMap[deployedVersion] = ep.webApp.url;
-                console.log(`バージョン ${deployedVersion} の既存のウェブアプリURLを更新: ${ep.webApp.url}`);
+      // 作成時間で降順にソートして、各バージョンにつき最新のウェブアプリURLを確実にする
+      allDeployments.sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime());
+
+      const webAppUrlMap = {}; // versionNumber -> webAppUrl のマップを格納
+
+      allDeployments.forEach(d => {
+        if (d.versionNumber) { // 特定のバージョンに紐づくデプロイメントのみ処理
+          if (d.entryPoints && Array.isArray(d.entryPoints)) {
+            d.entryPoints.forEach(ep => {
+              if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
+                // まだ存在しない場合のみ追加し、ソート順により最新のものを取得する
+                if (!webAppUrlMap[d.versionNumber]) {
+                  webAppUrlMap[d.versionNumber] = ep.webApp.url;
+                  console.log(`バージョン ${d.versionNumber} の最新ウェブアプリURLをマップに登録: ${ep.webApp.url}`);
+                }
               }
-            }
-          });
-        } else {
-          console.log(`デプロイメント ${d.deploymentId} にentryPointsプロパティがないか、空の配列です。`);
+            });
+          }
         }
       });
 
