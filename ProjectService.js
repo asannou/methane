@@ -211,7 +211,7 @@ function getScriptLogs(targetScriptId) {
 function deployScript(scriptId, description = '') {
   console.log("deployScript function called. Script ID:", scriptId, "Description:", description);
   const accessToken = ScriptApp.getOAuthToken();
-  const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
+  const versionsApiBaseUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
@@ -219,16 +219,38 @@ function deployScript(scriptId, description = '') {
     console.log("古いバージョンをクリーンアップする必要があるか確認中...");
     const VERSION_CLEANUP_THRESHOLD = 195; // 最新のN個のバージョンを保持する (Google Apps Scriptのバージョン上限は200)
 
-    // 1. 全バージョンを取得
-    const allVersionsResponse = UrlFetchApp.fetch(versionsApiUrl, { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true });
-    if (allVersionsResponse.getResponseCode() !== 200) {
-      console.warn(`全バージョン取得に失敗したため、バージョンクリーンアップをスキップします。エラー: ${allVersionsResponse.getContentText()}`);
-    } else {
-      const allVersionsData = JSON.parse(allVersionsResponse.getContentText());
+    // 1. 全バージョンを取得 (ページネーション対応)
+    let allVersionsFromApi = [];
+    let pageTokenForCleanup = null;
+    let hasMoreForCleanup = true;
+
+    while (hasMoreForCleanup) {
+      let versionsApiUrlForPage = versionsApiBaseUrl + `?pageSize=200`; // 最大ページサイズをリクエスト
+      if (pageTokenForCleanup) {
+        versionsApiUrlForPage += `&pageToken=${pageTokenForCleanup}`;
+      }
+      
+      const allVersionsResponse = UrlFetchApp.fetch(versionsApiUrlForPage, { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true });
+      
+      if (allVersionsResponse.getResponseCode() !== 200) {
+        console.warn(`全バージョン取得に失敗したため、バージョンクリーンアップをスキップします。エラー: ${allVersionsResponse.getContentText()}`);
+        allVersionsFromApi = []; // 部分的なデータでクリーンアップを試みないようにする
+        break; // ページネーションループを終了
+      } else {
+        const pageData = JSON.parse(allVersionsResponse.getContentText());
+        allVersionsFromApi = allVersionsFromApi.concat(pageData.versions || []);
+        pageTokenForCleanup = pageData.nextPageToken;
+        hasMoreForCleanup = !!pageTokenForCleanup;
+      }
+    }
+
+    if (allVersionsFromApi.length > 0) { // バージョンが正常に取得できた場合のみクリーンアップを進める
       // バージョン番号で昇順にソート（最も古いものが最初に来るように）
-      let allVersions = (allVersionsData.versions || []).sort((a, b) => a.versionNumber - b.versionNumber);
+      let allVersions = allVersionsFromApi.sort((a, b) => a.versionNumber - b.versionNumber);
 
       // 2. 全デプロイメントを取得し、アクティブなデプロイメントに紐づくバージョンを特定
+      // デプロイメントのリストもページネーションを考慮すべきだが、デプロイメントの数はバージョンほど多くないため、
+      // 現時点では単一リクエストのままとする。将来的に必要であればここも修正する。
       const allDeploymentsResponse = UrlFetchApp.fetch(deploymentsApiUrl, { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true });
       const activeDeployedVersions = new Set();
 
@@ -295,6 +317,8 @@ function deployScript(scriptId, description = '') {
       } else {
         console.log("削除対象の古いバージョンはありませんでした。または、すべてアクティブなデプロイメントに紐づいています。現在のバージョン数: " + allVersions.length);
       }
+    } else {
+      console.log("バージョン取得に失敗したため、バージョンクリーンアップはスキップされました。");
     }
     // --- END: Version Cleanup Logic ---
 
@@ -372,7 +396,7 @@ function deployScript(scriptId, description = '') {
       payload: JSON.stringify(createVersionPayload),
       muteHttpExceptions: true
     };
-    const createVersionResponse = UrlFetchApp.fetch(versionsApiUrl, createVersionOptions);
+    const createVersionResponse = UrlFetchApp.fetch(versionsApiBaseUrl, createVersionOptions);
     const createVersionResponseCode = createVersionResponse.getResponseCode();
     const createVersionResponseBody = createVersionResponse.getContentText();
 
@@ -641,23 +665,38 @@ function listScriptVersions(scriptId) {
 
   try {
     const accessToken = ScriptApp.getOAuthToken();
-    const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
+    const versionsApiBaseUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
     const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
-    // 1. Fetch all versions
-    console.log(`スクリプトID ${scriptId} のバージョンをリスト中...`);
-    const versionOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const versionResponse = UrlFetchApp.fetch(versionsApiUrl, versionOptions);
-    const versionResponseCode = versionResponse.getResponseCode();
-    const versionResponseBody = versionResponse.getContentText();
+    // 1. Fetch all versions with pagination
+    console.log(`スクリプトID ${scriptId} のバージョンをリスト中 (全ページ取得)...`);
+    let allVersionsFromApi = [];
+    let pageToken = null;
+    let hasMore = true;
 
-    if (versionResponseCode !== 200) {
-      console.error(`バージョン取得APIエラー (ステータス: ${versionResponseCode}): ${versionResponseBody}`);
-      return { status: 'error', message: `Version retrieval error (HTTP ${versionResponseCode}): ${versionResponseBody}` };
+    while (hasMore) {
+      let versionsApiUrlForPage = versionsApiBaseUrl + `?pageSize=200`; // 最大ページサイズをリクエスト
+      if (pageToken) {
+        versionsApiUrlForPage += `&pageToken=${pageToken}`;
+      }
+      
+      const versionOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+      const versionResponse = UrlFetchApp.fetch(versionsApiUrlForPage, versionOptions);
+      const versionResponseCode = versionResponse.getResponseCode();
+      const versionResponseBody = versionResponse.getContentText();
+
+      if (versionResponseCode !== 200) {
+        console.error(`バージョン取得APIエラー (ステータス: ${versionResponseCode}): ${versionResponseBody}`);
+        return { status: 'error', message: `Version retrieval error (HTTP ${versionResponseCode}): ${versionResponseBody}` };
+      }
+
+      const versionsData = JSON.parse(versionResponseBody);
+      allVersionsFromApi = allVersionsFromApi.concat(versionsData.versions || []);
+      pageToken = versionsData.nextPageToken;
+      hasMore = !!pageToken; // next page tokenがあれば続ける
     }
 
-    const versionsData = JSON.parse(versionResponseBody);
-    let versions = (versionsData.versions || []).map(v => ({
+    let versions = allVersionsFromApi.map(v => ({
       versionNumber: v.versionNumber,
       createTime: v.createTime,
       description: v.description || '説明なし',
