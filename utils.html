@@ -279,8 +279,9 @@
          * Display file comparisons in the UI.
          * @param {Array<object>} originalFiles - The original files array.
          * @param {Array<object>} proposedFiles - The proposed files array.
+         * @param {Array<string>} [deletedFileNames=[]] - Array of file names explicitly marked for deletion by AI.
          */
-        displayFileComparison: (originalFiles, proposedFiles) => {
+        displayFileComparison: (originalFiles, proposedFiles, deletedFileNames = []) => {
             const displayArea = UI.get('proposedFilesDisplay');
             UI.setHtml('proposedFilesDisplay', '');
 
@@ -288,16 +289,27 @@
             const proposedFilesMap = new Map(proposedFiles.map(f => [f.name, f]));
             const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
 
-            // 1. Identify and display DELETED files
-            const deletedFiles = originalFiles.filter(originalFile => !proposedFilesMap.has(originalFile.name));
+            // 1. Identify and display DELETED files explicitly from `deletedFileNames`
+            const explicitDeletedFiles = [];
+            if (deletedFileNames && Array.isArray(deletedFileNames)) {
+                deletedFileNames.forEach(deletedName => {
+                    const fileToDelete = originalFilesMap.get(deletedName);
+                    if (fileToDelete) {
+                        explicitDeletedFiles.push(fileToDelete);
+                    } else {
+                        console.warn(`File '${deletedName}' was marked for deletion but not found in original project content. It might already be gone or name is incorrect.`);
+                    }
+                });
+            }
 
-            // If there are no proposed files and no files were deleted, then no changes were proposed at all.
-            if (deletedFiles.length === 0 && proposedFiles.length === 0) {
+            // If there are no proposed changes (neither additions/updates nor explicit deletions).
+            // Check if proposedFiles is empty AND explicitDeletedFiles is empty.
+            if (explicitDeletedFiles.length === 0 && proposedFiles.length === 0) {
                 UI.setHtml('proposedFilesDisplay', '<p>AI did not propose any changes (no files added, updated, or deleted).</p>');
                 return;
             }
 
-            deletedFiles.forEach(deletedFile => {
+            explicitDeletedFiles.forEach(deletedFile => {
                 const name = deletedFile.name;
                 const fileType = deletedFile.type;
                 const originalSource = deletedFile.source;
@@ -307,7 +319,7 @@
 
                 fileComparisonDiv.innerHTML = `
                     <div>
-                        <h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4>
+                        <h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Original)</h4>
                         <pre class="scroll-sync-target">
                             <div class="line-numbers-col">
                                 ${Utils.generateLineNumbersHtml(originalSource)}
@@ -318,7 +330,7 @@
                         </pre>
                     </div>
                     <div>
-                        <h4>${name}.${Utils.getFileExtension(fileType)} (Proposed) <span class="file-name-deleted">(DELETED)</span></h4>
+                        <h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Proposed) <span class="file-name-deleted">(DELETED)</span></h4>
                         <div class="deleted-message">
                             <p>このファイルは削除されます。</p>
                             <p>元のコンテンツは参照用に左側に表示されています。</p>
@@ -331,6 +343,13 @@
 
             // 2. Identify and display UPDATED/NEW files
             proposedFiles.forEach(proposedFile => {
+                // Ensure this file wasn't also in the explicit deleted list.
+                // If AI follows instructions, files in `proposedFiles` should NOT be in `deletedFileNames`.
+                if (explicitDeletedFiles.some(f => f.name === proposedFile.name)) {
+                    console.warn(`File '${proposedFile.name}' was proposed for update/addition AND for deletion. This should not happen. Skipping update/new file display as it's already handled as deleted.`);
+                    return;
+                }
+
                 const name = proposedFile.name;
                 const fileType = proposedFile.type;
                 
@@ -345,13 +364,13 @@
                 const statusLabel = originalFile ? '(Updated)' : '(New File)'; // Determine status for display purposes
 
                 const originalContentDiv = document.createElement('div');
-                originalContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
+                originalContentDiv.innerHTML = `<h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
                     <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
                     <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
                 </pre>`;
                 
                 const proposedContentDiv = document.createElement('div');
-                proposedContentDiv.innerHTML = `<h4>${name}.${Utils.getFileExtension(fileType)} (Proposed) <span class="has-text-info is-size-7">${statusLabel}</span></h4><pre class="scroll-sync-target">
+                proposedContentDiv.innerHTML = `<h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Proposed) <span class="has-text-info is-size-7">${statusLabel}</span></h4><pre class="scroll-sync-target">
                     <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
                     <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
                 </pre>`;

@@ -160,6 +160,7 @@ function processPrompt(formObject) {
       originalFiles: projectContent.files,
       proposedFiles: aiResponse.files,
       purpose: proposalPurpose,
+      deletedFileNames: aiResponse.deletedFileNames || [],
       message: "AI proposal generated. Please review the content and apply."
     };
 
@@ -208,9 +209,9 @@ function fixErrorsFromLogs(targetScriptId) {
     let aiPromptForCode = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
     aiPromptForCode += `修正は、エラーを解消し、既存の機能性を損なわないように、可能な限り最小限にしてください。\n\n`;
     aiPromptForCode += `## エラーログ\n\n${logs}\n\n`;
-    aiPromptForCode += `## あなたのタスク\n上記のログと既存のファイルに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
+    aiPromptForCode += `## あなたのタスク\n上記指示とエラーログに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
     aiPromptForCode += `提案は必ずJSON形式で、修正が必要なファイルのみを含めてください。\n`;
-    aiPromptForCode += `ファイル名、タイプ、ソースを正確に指定してください。`;
+    aiPromptForCode += `ファイル名、タイプ、ソースを正確に指定してください。\n`;
 
     // 5. Gemini APIを呼び出し（生成されたポリシーを渡す）
     const aiResponse = callGenerativeAI(aiPromptForCode, projectContent, policyText);
@@ -227,6 +228,7 @@ function fixErrorsFromLogs(targetScriptId) {
       originalFiles: projectContent.files,
       proposedFiles: aiResponse.files,
       purpose: proposalPurpose,
+      deletedFileNames: aiResponse.deletedFileNames || [],
       message: "AI error fix proposal generated. Please review the content and apply."
     };
 

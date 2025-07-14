@@ -43,7 +43,7 @@
             UI.hideSpinnerInButton(UI.get('applyAndDeployButton'));
             UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
             UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
-            UI.hideSpinnerInButton(UI.get('proposeBrowserErrorLoggingButton')); // NEW
+            UI.hideSpinnerInButton(UI.get('proposeBrowserErrorLoggingButton'));
 
             UI.enable('prompt');
             UI.hide('cancelAiOperationButton');
@@ -57,8 +57,8 @@
             UI.setHtml('apply-result-content', '');
             UI.hide('html-validation-warnings');
             UI.setHtml('html-validation-warnings', '');
-            UI.hide('propose-browser-error-logging-result-container'); // NEW
-            UI.setHtml('propose-browser-error-logging-result', ''); // NEW
+            UI.hide('propose-browser-error-logging-result-container');
+            UI.setHtml('propose-browser-error-logging-result', '');
 
 
             UI.hide('policy-container');
@@ -127,8 +127,8 @@
             UI.setText('togglePolicyEditButton', 'Edit Policy');
             AppState.isPolicyEditing = false;
             UI.setHtml('apply-result-content', '');
-            UI.hide('propose-browser-error-logging-result-container'); // NEW
-            UI.setHtml('propose-browser-error-logging-result', ''); // NEW
+            UI.hide('propose-browser-error-logging-result-container');
+            UI.setHtml('propose-browser-error-logging-result', '');
 
 
             const formData = { scriptId: scriptId, prompt: promptText };
@@ -232,8 +232,8 @@
             UI.setText('togglePolicyEditButton', 'Edit Policy');
             AppState.isPolicyEditing = false;
             UI.setHtml('apply-result-content', '');
-            UI.hide('propose-browser-error-logging-result-container'); // NEW
-            UI.setHtml('propose-browser-error-logging-result', ''); // NEW
+            UI.hide('propose-browser-error-logging-result-container');
+            UI.setHtml('propose-browser-error-logging-result', '');
 
 
             const formData = { scriptId: AppState.currentPolicyData.scriptId, prompt: AppState.currentPolicyData.userPrompt, policy: AppState.currentPolicyData.policy };
@@ -274,11 +274,9 @@
 
                         if (hasHtmlErrors) {
                             UI.show('html-validation-warnings');
-                        } else {
-                            UI.hide('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
@@ -364,8 +362,8 @@
             UI.setText('togglePolicyEditButton', 'Edit Policy');
             AppState.isPolicyEditing = false;
             UI.setHtml('apply-result-content', '');
-            UI.hide('propose-browser-error-logging-result-container'); // NEW
-            UI.setHtml('propose-browser-error-logging-result', ''); // NEW
+            UI.hide('propose-browser-error-logging-result-container');
+            UI.setHtml('propose-browser-error-logging-result', '');
 
 
             AppState.currentPolicyData = null;
@@ -444,7 +442,7 @@
             }
             UI.disable('regenerateProposalButton');
             UI.disable('fixApplyErrorsButton');
-            UI.disable('proposeBrowserErrorLoggingButton'); // NEW
+            UI.disable('proposeBrowserErrorLoggingButton');
 
             UI.hide('fixApplyErrorsButton');
             UI.setHtml('apply-result-content', `
@@ -462,7 +460,7 @@
                     UI.enable('applyAndDeployButton');
                     UI.enable('regenerateProposalButton');
                     UI.enable('fixApplyErrorsButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
                     UI.setHtml('apply-result-content', '');
 
                     if (response.status === 'success') {
@@ -547,11 +545,11 @@
                     UI.enable('applyAndDeployButton');
                     UI.enable('regenerateProposalButton');
                     UI.enable('fixApplyErrorsButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
                     UI.appendNotification('apply-result-content', 'is-danger', 'Error applying changes (Uncaught):', error.message);
                     UI.show('fixApplyErrorsButton');
                 })
-                .applyProposedChanges(AppState.currentProposal.scriptId, AppState.currentProposal.proposedFiles, autoDeploy, AppState.currentProposal.purpose);
+                .applyProposedChanges(AppState.currentProposal.scriptId, AppState.currentProposal.proposedFiles, AppState.currentProposal.deletedFileNames, autoDeploy, AppState.currentProposal.purpose);
         },
 
         /**
@@ -572,7 +570,7 @@
             UI.disable('applyAndDeployButton');
             UI.disable('prompt');
             UI.show('cancelAiOperationButton');
-            UI.disable('proposeBrowserErrorLoggingButton'); // NEW
+            UI.disable('proposeBrowserErrorLoggingButton');
 
 
             UI.hide('proposal-container');
@@ -585,8 +583,8 @@
             UI.setHtml('apply-result-content', '');
             UI.hide('html-validation-warnings');
             UI.setHtml('html-validation-warnings', '');
-            UI.hide('propose-browser-error-logging-result-container'); // NEW
-            UI.setHtml('propose-browser-error-logging-result', ''); // NEW
+            UI.hide('propose-browser-error-logging-result-container');
+            UI.setHtml('propose-browser-error-logging-result', '');
 
 
             AppState.currentProposal = null;
@@ -609,7 +607,7 @@
                     UI.enable('applyAndDeployButton');
                     UI.enable('prompt');
                     UI.hide('cancelAiOperationButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
 
 
                     if (response.status === 'proposal') {
@@ -635,7 +633,7 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
@@ -661,7 +659,7 @@
                     UI.enable('applyAndDeployButton');
                     UI.enable('prompt');
                     UI.hide('cancelAiOperationButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
 
                     UI.appendNotification('apply-result-content', 'is-danger', 'Error regenerating proposal:', error.message);
                     UI.show('apply-result-container');
@@ -697,7 +695,7 @@
             UI.setHtml('proposed-files-display', '');
             UI.hide('html-validation-warnings');
             UI.setHtml('html-validation-warnings', '');
-            UI.disable('proposeBrowserErrorLoggingButton'); // NEW
+            UI.disable('proposeBrowserErrorLoggingButton');
 
 
             Utils.saveScriptIdToLocalStorage(scriptId);
@@ -715,7 +713,7 @@
                     UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
                     UI.enable('prompt');
                     UI.hide('cancelFixErrorsButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
 
 
                     if (response.status === 'proposal') {
@@ -741,7 +739,7 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
@@ -765,7 +763,7 @@
                     UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
                     UI.enable('prompt');
                     UI.hide('cancelFixErrorsButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
 
                     UI.appendNotification('apply-result-content', 'is-danger', 'Error calling AI for fix:', error.message);
                     UI.show('apply-result-container');
@@ -805,7 +803,7 @@
             UI.setHtml('apply-result-content', '');
             UI.hide('html-validation-warnings');
             UI.setHtml('html-validation-warnings', '');
-            UI.disable('proposeBrowserErrorLoggingButton'); // NEW
+            UI.disable('proposeBrowserErrorLoggingButton');
 
 
             Utils.saveScriptIdToLocalStorage(scriptId);
@@ -823,7 +821,7 @@
                     UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
                     UI.enable('prompt');
                     UI.hide('cancelFixErrorsButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
 
 
                     if (response.status === 'proposal') {
@@ -849,7 +847,7 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
@@ -873,7 +871,7 @@
                     UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
                     UI.enable('prompt');
                     UI.hide('cancelFixErrorsButton');
-                    UI.enable('proposeBrowserErrorLoggingButton'); // NEW
+                    UI.enable('proposeBrowserErrorLoggingButton');
 
                     UI.appendNotification('apply-result-content', 'is-danger', 'Error calling AI for fix:', error.message);
                     UI.show('apply-result-container');
@@ -886,7 +884,7 @@
         /**
          * Handle proposing browser error logging changes for the target script.
          */
-        handleProposeBrowserErrorLogging: () => { // NEW HANDLER
+        handleProposeBrowserErrorLogging: () => {
             const scriptId = Utils.getEffectiveScriptId();
             if (!scriptId) {
                 alert('Please select or enter a Script ID for the target script.');
@@ -960,7 +958,7 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles);
+                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');

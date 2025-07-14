@@ -3,11 +3,12 @@
  * AIからのレスポンスに含まれないファイルは暗黙的に削除されます。
  * @param {string} scriptId - 更新対象のスクリプトID
  * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列 (更新または新規追加)
+ * @param {Array<string>} deletedFileNames - AIが削除を提案したファイル名の配列
  * @param {boolean} autoDeploy - 変更適用後に自動的にデプロイするかどうか
  * @param {string} proposalPurpose - AIが提案した変更の主旨
  * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
  */
-function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpose) {
+function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDeploy, proposalPurpose) {
   try {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
@@ -35,6 +36,18 @@ function applyProposedChanges(scriptId, proposedFiles, autoDeploy, proposalPurpo
         newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
     }
 
+    // NEW: AIが削除を提案したファイルをマップから削除する
+    if (deletedFileNames && Array.isArray(deletedFileNames)) {
+        deletedFileNames.forEach(fileName => {
+            if (newProjectFilesMap.has(fileName)) {
+                newProjectFilesMap.delete(fileName);
+                console.log(`File marked for deletion: ${fileName}`);
+            } else {
+                console.warn(`File '${fileName}' was marked for deletion but not found in original project content. Skipping deletion.`);
+            }
+        });
+    }
+    
     // 最終的なPUTリクエスト用のファイル配列を生成
     const finalFilesForPutPayload = Array.from(newProjectFilesMap.values());
     
@@ -458,7 +471,8 @@ function deployScript(scriptId, description = '') {
       } else {
         console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", JSON.stringify(webAppEntryPoint, null, 2));
       }
-    } else {
+    }
+     else {
       console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
     }
 
@@ -840,7 +854,7 @@ function revertToVersion(scriptId, versionNumber) {
 }
 
 /**
- * 指定されたApps Scriptプロジェクトのファイル一覧（ファイル名とタイプ）を取得します。
+ * 指定されたApps Scriptのファイル一覧（ファイル名とタイプ）を取得します。
  * @param {string} scriptId - ファイル一覧を取得するApps ScriptのID
  * @returns {object} - 処理結果 (成功/失敗) とファイル一覧 (成功時) を示すオブジェクト
  */

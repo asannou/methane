@@ -6,7 +6,7 @@ const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-
  * @param {string} userPrompt - ユーザーが入力したプロンプト
  * @param {object} projectContent - 対象プロジェクトの全ファイル情報
  * @param {string} [policy] - AIが生成した変更方針（オプション）
- * @returns {object} - AIが生成した修正後のファイル情報を含むオブジェクト
+ * @returns {object} - AIが生成した修正後のファイル情報を含むオブジェクト (filesとdeletedFileNamesを含む)
  */
 function callGenerativeAI(userPrompt, projectContent, policy = null) {
   let systemPrompt = "あなたはGoogle Apps Scriptの専門家です。以下のファイル群とユーザーの指示を基に、修正後のファイル内容を生成してください。\n\n";
@@ -23,10 +23,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
   systemPrompt += "## あなたのタスク\n";
   systemPrompt += "- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n";
-  systemPrompt += "- **ファイルの削除を提案する場合、そのファイルはAIのレスポンスから除外してください。これは、Apps Script APIのprojects.updateContent（PUT）の挙動により、含まれていないファイルが自動的に削除されるためです。**\n";
-  systemPrompt += "- レスポンスは必ず、以下のJSON形式のみで返してください。\n";
-  systemPrompt += "- 重要:\n";
-  systemPrompt += "  - 変更が必要なファイル、または**新しく追加したいファイル**の新しいソースコードを生成してください。\n";
+  systemPrompt += "- **ファイルの削除を提案する場合、そのファイルはAIのレスポンスの`files`配列から除外してください。そして、そのファイル名を`deletedFileNames`配列にリストアップしてください。これにより、ユーザーインターフェースで削除されたファイルと変更がないファイルが明確に区別されます。**\n";
   systemPrompt += "  - 新しいファイルを提案する場合、適切なファイル名（例: `NewScript`, `util`, `styles`, `dialog`など）とタイプ（`SERVER_JS`, `HTML`, `JSON`のいずれか）を含めてください。\n";
   systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
   systemPrompt += "  - 生成するソースコードの内容において、ユーザーの指示に直接関連しない無関係な変更（不必要な書式変更、無意味な空白文字の修正、無関係なコメントの追加・削除、未使用コードの削除など）を極力行わないことを最優先してください。\n";
@@ -34,7 +31,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += "  - 生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデントなどは重要です。HTMLファイルでは、元の構造とインデントを厳密に保持してください。これにより、AI提案の粒度と精度を向上させ、ユーザーがレビューする際のノイズを最小限に抑え、意図しない副作用や予期せぬ挙動のリスクを低減することを目的とします。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
-  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}]}\n```";
+  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}], \"deletedFileNames\": [\"OldFile\", \"AnotherOldFile\"]}\n```";
   systemPrompt += "- 'purpose'フィールドには、提案された変更の全体的な目的や理由を、ユーザーが理解しやすいように簡潔に説明してください。\n";
 
   const requestBody = {
@@ -72,6 +69,13 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
               "required": ["name", "type", "source"]
             },
             "description": "修正が必要なファイルの新しいソースコードを含むオブジェクトの配列。"
+          },
+          "deletedFileNames": {
+            "type": "ARRAY",
+            "items": {
+              "type": "STRING"
+            },
+            "description": "削除を提案するファイルのファイル名の配列。"
           }
         },
         "required": ["purpose", "files"]
