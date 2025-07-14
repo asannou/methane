@@ -44,6 +44,7 @@
             UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
             UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
             UI.hideSpinnerInButton(UI.get('proposeBrowserErrorLoggingButton'));
+            UI.hideSpinnerInButton(UI.get('getOAuthScopesButton'));
 
             UI.enable('prompt');
             UI.hide('cancelAiOperationButton');
@@ -1418,14 +1419,14 @@
             const resultDisplay = UI.get('oauth-scopes-result');
 
             UI.showSpinnerInButton(getScopesButton, 'Getting Scopes...');
-            UI.hide(resultContainer);
-            UI.setHtml(resultDisplay, '');
+            // UIポリシー: 初期フィードバック強化のため、即座にローディングメッセージを表示
+            UI.setHtml(resultDisplay, '<p>OAuthスコープ取得中...</p>');
+            UI.show(resultContainer);
 
             if (!scriptId) {
-                UI.setHtml(resultDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
-                UI.show(resultContainer);
                 UI.hideSpinnerInButton(getScopesButton);
-                return;
+                UI.setHtml(resultDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
+                return; // Script IDがない場合はサーバーコールをしない
             }
 
             Utils.saveScriptIdToLocalStorage(scriptId);
@@ -1433,7 +1434,6 @@
             google.script.run
                 .withSuccessHandler(function(response) {
                     UI.hideSpinnerInButton(getScopesButton);
-                    UI.show(resultContainer);
 
                     if (response.status === 'success') {
                         if (response.scopes && response.scopes.length > 0) {
@@ -1446,7 +1446,8 @@
                         } else {
                             UI.setHtml(resultDisplay, '<p>No OAuth scopes found in <code>appsscript.json</code> for this script.</p>');
                         }
-                    } else {
+                    } else { 
+                        // UIポリシー: エラーハンドリングと詳細情報の表示改善
                         UI.setHtml(resultDisplay, `<p class="has-text-danger">Error retrieving scopes: ${Utils.escapeHtml(response.message)}</p>`);
                         if (response.apiErrorDetails) {
                             UI.setHtml(resultDisplay, UI.get('oauth-scopes-result').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
@@ -1455,7 +1456,6 @@
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(getScopesButton);
-                    UI.show(resultContainer);
                     UI.setHtml(resultDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
                 })
                 .getProjectOAuthScopes(scriptId);

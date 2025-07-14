@@ -263,7 +263,7 @@ function deployScript(scriptId, description = '') {
 
       // 2. 全デプロイメントを取得し、アクティブなデプロイメントに紐づくバージョンを特定
       // デプロイメントのリストもページネーションを考慮すべきだが、デプロイメントの数はバージョンほど多くないため、
-      // 現時点では単一リクエストのままとする。将来的に必要であればここも修正する。
+      // 現時点では単一リクエストのまとする。将来的に必要であればここも修正する。
       const allDeploymentsResponse = UrlFetchApp.fetch(deploymentsApiUrl, { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true });
       const activeDeployedVersions = new Set();
 
@@ -895,7 +895,7 @@ function listTargetScriptFiles(scriptId) {
 }
 
 /**
- * 指定されたApps Scriptプロジェクトのappsscript.jsonからOAuthスコープを取得します。
+ * 指定されたApps ScriptのプロジェクトからOAuthスコープを取得します。
  * @param {string} scriptId - OAuthスコープを取得するApps ScriptのID
  * @returns {object} - 処理結果 (成功/失敗) とOAuthスコープの配列 (成功時) を示すオブジェクト
  */
@@ -916,24 +916,49 @@ function getProjectOAuthScopes(scriptId) {
 
     if (responseCode !== 200) {
         console.error(`Apps Script APIエラー (appsscript.json取得) - ステータス: ${responseCode}, ボディ: ${responseBody}`);
-        return { status: 'error', message: `Failed to retrieve script content: ${responseBody}`, apiErrorDetails: JSON.parse(responseBody || '{}') };
+        return { 
+            status: 'error', 
+            message: `Failed to retrieve script content (HTTP ${responseCode}). Please ensure the Script ID is correct and you have permission to access the project content.`, 
+            apiErrorDetails: JSON.parse(responseBody || '{}') 
+        };
     }
     
-    const projectContent = JSON.parse(responseBody);
+    let projectContent;
+    try {
+        projectContent = JSON.parse(responseBody);
+    } catch (e) {
+        console.error(`Apps Script API応答のJSON解析に失敗しました: ${e.message}. 受信したボディ: ${responseBody}`);
+        return { 
+            status: 'error', 
+            message: `Failed to parse API response for script content. The response was not valid JSON.`, 
+            apiErrorDetails: { originalResponse: responseBody.substring(0, 500) + (responseBody.length > 500 ? '...' : ''), parseError: e.message }
+        };
+    }
     
     const appsscriptJsonFile = projectContent.files.find(file => file.name === 'appsscript' && file.type === 'JSON');
 
     if (!appsscriptJsonFile) {
-      return { status: 'error', message: 'appsscript.json not found in the target script content.' };
+      return { status: 'error', message: 'appsscript.json not found in the target script content. Please ensure the project has a valid appsscript.json file.' };
     }
 
-    const manifest = JSON.parse(appsscriptJsonFile.source);
+    let manifest;
+    try {
+        manifest = JSON.parse(appsscriptJsonFile.source);
+    } catch (e) {
+        console.error(`appsscript.jsonの内容解析に失敗しました: ${e.message}. ファイル内容: ${appsscriptJsonFile.source}`);
+        return { 
+            status: 'error', 
+            message: `Failed to parse appsscript.json. Its content might be malformed JSON. Error: ${e.message}`, 
+            apiErrorDetails: { fileName: appsscriptJsonFile.name, fileType: appsscriptJsonFile.type, parseError: e.message, fileContentSnippet: appsscriptJsonFile.source.substring(0, 500) + (appsscriptJsonFile.source.length > 500 ? '...' : '') }
+        };
+    }
+    
     const oauthScopes = manifest.oauthScopes || [];
 
     return { status: 'success', scopes: oauthScopes, message: `Successfully retrieved ${oauthScopes.length} OAuth scopes.` };
 
   } catch (error) {
-    console.error("OAuthスコープ取得中にエラーが発生しました:", error);
-    return { status: 'error', message: `OAuth scope retrieval error: ${error.message}` };
+    console.error("OAuthスコープ取得中に予期せぬエラーが発生しました:", error);
+    return { status: 'error', message: `An unexpected error occurred during OAuth scope retrieval: ${error.message}` };
   }
 }
