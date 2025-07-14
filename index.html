@@ -152,6 +152,18 @@
           </div>
         </div>
 
+        <h2 class="title is-4 mt-5">OAuth Scopes</h2>
+        <div class="box">
+          <p class="content">Displays the OAuth scopes defined in the selected Apps Script project's <code>appsscript.json</code> manifest file.</p>
+          <div class="control">
+            <button type="button" id="getOAuthScopesButton" class="button is-info">Get OAuth Scopes</button>
+          </div>
+          <div id="oauth-scopes-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">OAuth Scopes:</h3>
+            <pre id="oauth-scopes-result" class="content"></pre>
+          </div>
+        </div>
+
         <h2 class="title is-4 mt-5">Deploy Script</h2>
         <form id="deploy-form" class="box">
           <div class="field">

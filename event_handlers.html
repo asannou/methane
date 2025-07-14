@@ -59,6 +59,8 @@
             UI.setHtml('html-validation-warnings', '');
             UI.hide('propose-browser-error-logging-result-container');
             UI.setHtml('propose-browser-error-logging-result', '');
+            UI.hide('oauth-scopes-result-container');
+            UI.setHtml('oauth-scopes-result', '');
 
 
             UI.hide('policy-container');
@@ -1405,6 +1407,58 @@
                     UI.setHtml('filesListDisplay', `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
                 })
                 .listTargetScriptFiles(scriptId);
+        },
+        /**
+         * Handle getting OAuth scopes for the target script.
+         */
+        handleGetOAuthScopes: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const getScopesButton = UI.get('getOAuthScopesButton');
+            const resultContainer = UI.get('oauth-scopes-result-container');
+            const resultDisplay = UI.get('oauth-scopes-result');
+
+            UI.showSpinnerInButton(getScopesButton, 'Getting Scopes...');
+            UI.hide(resultContainer);
+            UI.setHtml(resultDisplay, '');
+
+            if (!scriptId) {
+                UI.setHtml(resultDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
+                UI.show(resultContainer);
+                UI.hideSpinnerInButton(getScopesButton);
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(getScopesButton);
+                    UI.show(resultContainer);
+
+                    if (response.status === 'success') {
+                        if (response.scopes && response.scopes.length > 0) {
+                            let scopesHtml = '<ul>';
+                            response.scopes.forEach(scope => {
+                                scopesHtml += `<li><code>${Utils.escapeHtml(scope)}</code></li>`;
+                            });
+                            scopesHtml += '</ul>';
+                            UI.setHtml(resultDisplay, scopesHtml);
+                        } else {
+                            UI.setHtml(resultDisplay, '<p>No OAuth scopes found in <code>appsscript.json</code> for this script.</p>');
+                        }
+                    } else {
+                        UI.setHtml(resultDisplay, `<p class="has-text-danger">Error retrieving scopes: ${Utils.escapeHtml(response.message)}</p>`);
+                        if (response.apiErrorDetails) {
+                            UI.setHtml(resultDisplay, UI.get('oauth-scopes-result').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(getScopesButton);
+                    UI.show(resultContainer);
+                    UI.setHtml(resultDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                })
+                .getProjectOAuthScopes(scriptId);
         }
     };
 </script>

@@ -48,6 +48,10 @@
         AppState.domElements.proposeBrowserErrorLoggingButton = document.getElementById('proposeBrowserErrorLoggingButton');
         AppState.domElements.proposeBrowserErrorLoggingResultContainer = document.getElementById('propose-browser-error-logging-result-container');
         AppState.domElements.proposeBrowserErrorLoggingResult = document.getElementById('propose-browser-error-logging-result');
+        // NEW Elements for OAuth Scopes
+        AppState.domElements.getOAuthScopesButton = document.getElementById('getOAuthScopesButton');
+        AppState.domElements.oauthScopesResultContainer = document.getElementById('oauth-scopes-result-container');
+        AppState.domElements.oauthScopesResult = document.getElementById('oauth-scopes-result');
 
 
         // Load initial state from localStorage
@@ -80,6 +84,7 @@
         UI.hide('addLibraryResultContainer');
         UI.hide('gcpSaveResultContainer');
         UI.hide('proposeBrowserErrorLoggingResultContainer'); // NEW
+        UI.hide('oauthScopesResultContainer'); // NEW
 
 
         Utils.updateEditorUrlDisplay();
@@ -108,6 +113,7 @@
         UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
         
         UI.get('proposeBrowserErrorLoggingButton').addEventListener('click', Handlers.handleProposeBrowserErrorLogging); // NEW
+        UI.get('getOAuthScopesButton').addEventListener('click', Handlers.handleGetOAuthScopes); // NEW
 
         UI.get('saveGcpProjectIdButton').addEventListener('click', Handlers.handleSaveGcpProjectId);
         UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);

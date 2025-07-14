@@ -893,3 +893,47 @@ function listTargetScriptFiles(scriptId) {
     return { status: 'error', message: `File list retrieval error: ${error.message}` };
   }
 }
+
+/**
+ * 指定されたApps Scriptプロジェクトのappsscript.jsonからOAuthスコープを取得します。
+ * @param {string} scriptId - OAuthスコープを取得するApps ScriptのID
+ * @returns {object} - 処理結果 (成功/失敗) とOAuthスコープの配列 (成功時) を示すオブジェクト
+ */
+function getProjectOAuthScopes(scriptId) {
+  if (!scriptId || scriptId.trim() === '') {
+    return { status: 'error', message: 'Script ID is not specified.' };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
+
+    console.log(`スクリプトID ${scriptId} の appsscript.json を取得中...`);
+    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
+    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
+    const responseCode = getResponse.getResponseCode();
+    const responseBody = getResponse.getContentText();
+
+    if (responseCode !== 200) {
+        console.error(`Apps Script APIエラー (appsscript.json取得) - ステータス: ${responseCode}, ボディ: ${responseBody}`);
+        return { status: 'error', message: `Failed to retrieve script content: ${responseBody}`, apiErrorDetails: JSON.parse(responseBody || '{}') };
+    }
+    
+    const projectContent = JSON.parse(responseBody);
+    
+    const appsscriptJsonFile = projectContent.files.find(file => file.name === 'appsscript' && file.type === 'JSON');
+
+    if (!appsscriptJsonFile) {
+      return { status: 'error', message: 'appsscript.json not found in the target script content.' };
+    }
+
+    const manifest = JSON.parse(appsscriptJsonFile.source);
+    const oauthScopes = manifest.oauthScopes || [];
+
+    return { status: 'success', scopes: oauthScopes, message: `Successfully retrieved ${oauthScopes.length} OAuth scopes.` };
+
+  } catch (error) {
+    console.error("OAuthスコープ取得中にエラーが発生しました:", error);
+    return { status: 'error', message: `OAuth scope retrieval error: ${error.message}` };
+  }
+}
