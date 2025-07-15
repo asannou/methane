@@ -2,7 +2,6 @@
     // 5. Initialization on DOMContentLoaded
     document.addEventListener('DOMContentLoaded', function() {
         // Cache DOM elements for frequent access
-        AppState.domElements.scriptIdManualInput = document.getElementById('scriptIdManualInput');
         AppState.domElements.gcpProjectId = document.getElementById('gcpProjectId');
         AppState.domElements.openWebAppButton = document.getElementById('openWebAppButton');
         AppState.domElements.openWebAppMessage = document.getElementById('openWebAppMessage');
@@ -57,7 +56,7 @@
         // Load initial state from localStorage
         const savedScriptId = localStorage.getItem('targetScriptId');
         if (savedScriptId) {
-            UI.get('scriptIdManualInput').value = savedScriptId;
+            UI.get('scriptIdSelect').value = savedScriptId; // Set dropdown value directly
         }
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
         if (savedGcpProjectId) {
@@ -92,7 +91,6 @@
 
         // Register event listeners
         UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
-        UI.get('scriptIdManualInput').addEventListener('input', Utils.updateEditorUrlDisplay);
         UI.get('prompt').addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();

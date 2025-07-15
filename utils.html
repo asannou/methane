@@ -6,10 +6,6 @@
          * @returns {string} The effective Script ID.
          */
         getEffectiveScriptId: () => {
-            const manualId = UI.get('scriptIdManualInput').value.trim();
-            if (manualId) {
-                return manualId;
-            }
             return UI.get('scriptIdSelect').value.trim();
         },
 
@@ -39,7 +35,7 @@
          */
         loadProjectsIntoDropdown: (selectedId = null) => {
             const scriptIdSelect = UI.get('scriptIdSelect');
-            scriptIdSelect.innerHTML = '<option value="">-- Select or type manually --</option>';
+            scriptIdSelect.innerHTML = '<option value="">-- Select a Script ID --</option>';
 
             google.script.run
                 .withSuccessHandler(function(response) {
