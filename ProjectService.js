@@ -29,11 +29,44 @@ function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDep
     // AIのレスポンスに含まれるファイルは、既存のものであれば更新され、新規であれば追加される。
     for (const proposedFile of proposedFiles) {
         // AIのファイルオブジェクトの形式を検証 (安全性のため)
-        if (!proposedFile || typeof proposedFile.name !== 'string' || typeof proposedFile.source !== 'string' || typeof proposedFile.type !== 'string') {
+        if (!proposedFile || typeof proposedFile.name !== 'string' || typeof proposedFile.type !== 'string') {
             console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(proposedFile, null, 2));
             continue;
         }
-        newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
+
+        if (proposedFile.type === 'REPLACE') {
+            const currentFile = newProjectFilesMap.get(proposedFile.name);
+            if (!currentFile) {
+                console.warn(`REPLACE操作の対象ファイル '${proposedFile.name}' が現在のプロジェクトに見つかりません。スキップします。`);
+                continue;
+            }
+            // REPLACE操作は既存のファイルのsourceを変更するため、REPLACEタイプのファイルを上書きする想定ではない
+            if (currentFile.type === 'REPLACE') { 
+                 console.warn(`REPLACE操作の対象ファイル '${proposedFile.name}' はすでにREPLACEタイプとマークされています。これは予期せぬ状況です。スキップします。`);
+                continue;
+            }
+
+            const currentSource = currentFile.source;
+            const oldString = proposedFile.old_string;
+            const newString = proposedFile.new_string;
+
+            if (typeof oldString !== 'string' || typeof newString !== 'string') {
+                console.warn(`REPLACE操作のold_stringまたはnew_stringが不正な形式です。スキップします: ${JSON.stringify(proposedFile, null, 2)}`);
+                continue;
+            }
+
+            // old_stringが現在のファイルソースに存在するかを確認
+            // 最初の合致のみを置換 (replace() は文字列引数に対して最初の合致のみを置換)
+            const originalIncludesOldString = currentSource.includes(oldString);
+            if (originalIncludesOldString) {
+                currentFile.source = currentSource.replace(oldString, newString);
+                console.log(`ファイル '${proposedFile.name}' でREPLACE操作を実行しました。`);
+            } else {
+                console.warn(`REPLACE操作のold_stringがファイル '${proposedFile.name}' の内容に見つかりません。置換をスキップします。提案されたOld String (先頭100文字): "${oldString.substring(0, 100)}..."`);
+            }
+        } else { // Handle existing types (SERVER_JS, JSON, HTML)
+            newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
+        }
     }
 
     // NEW: AIが削除を提案したファイルをマップから削除する
@@ -183,7 +216,7 @@ function getScriptLogs(targetScriptId) {
     const responseBody = response.getContentText();
 
     if (responseCode !== 200) {
-      throw new Error(`Cloud Logging API error (Status: ${responseCode}): ${responseBody}`);
+      throw new Error(`Cloud Logging APIエラー (Status: ${responseCode}): ${responseBody}`);
     }
 
     const logsData = JSON.parse(responseBody);

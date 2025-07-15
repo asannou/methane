@@ -405,6 +405,47 @@
   margin-top: 10px;
 }
 
+/* NEW: Styles for REPLACE operation display */
+.file-comparison.is-replace {
+  border: 1px dashed var(--gas-blue-light) !important;
+  background-color: #e6f0ff; /* Lighter blue */
+  display: block; /* Override flex, as it's a single block of content */
+  padding: 20px;
+}
+
+.file-comparison.is-replace h4 {
+  margin-bottom: 15px;
+  color: var(--gas-blue-dark);
+}
+
+.replacement-view {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid var(--gas-grey-medium);
+  font-family: monospace;
+  font-size: 0.9em;
+  line-height: 1.4;
+  white-space: pre-wrap; /* Ensure line breaks are preserved */
+  word-break: break-all;
+  max-height: 200px; /* Limit height for long strings */
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.replacement-view.replacement-old {
+  background-color: #fff0f0; /* Light red background for old */
+  border-color: var(--gas-red);
+}
+
+.replacement-view.replacement-new {
+  background-color: #e6ffea; /* Light green background for new */
+  border-color: var(--gas-green);
+}
+
+.replacement-details .columns {
+  margin-top: 15px;
+}
 
 /* Styles for Bulma Tabs integration */
 .tabs {

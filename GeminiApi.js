@@ -23,6 +23,16 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += `## ユーザーの指示\n${userPrompt}\n\n`;
   systemPrompt += "## あなたのタスク\n";
   systemPrompt += "- 上記の指示に従って、変更が必要なファイルの新しいソースコードを生成してください。\n";
+  systemPrompt += "- AIは以下の2種類の変更操作を提案できます。\n";
+  systemPrompt += "  1. `source`によるファイル内容の更新/追加:\n";
+  systemPrompt += "     - `name`: ファイル名\n";
+  systemPrompt += "     - `type`: ファイルタイプ（`SERVER_JS`, `JSON`, `HTML`のいずれか）\n";
+  systemPrompt += "     - `source`: 変更後のファイル内容全体の文字列\n";
+  systemPrompt += "  2. `replace`による文字列置換:\n";
+  systemPrompt += "     - `name`: 置換操作を行う対象ファイルの名前\n";
+  systemPrompt += "     - `type`: `REPLACE` (固定)\n";
+  systemPrompt += "     - `old_string`: 置換対象の文字列。**誤った置換を防ぐため、変更箇所の前後数行の文脈を含めることを強く推奨します。これにより、意図した箇所だけを正確に変更します。**\n";
+  systemPrompt += "     - `new_string`: 置換後の新しい文字列。\n";
   systemPrompt += "- **ファイルの削除を提案する場合、そのファイルはAIのレスポンスの`files`配列から除外してください。そして、そのファイル名を`deletedFileNames`配列にリストアップしてください。これにより、ユーザーインターフェースで削除されたファイルと変更がないファイルが明確に区別されます。**\n";
   systemPrompt += "  - 新しいファイルを提案する場合、適切なファイル名（例: `NewScript`, `util`, `styles`, `dialog`など）とタイプ（`SERVER_JS`, `HTML`, `JSON`のいずれか）を含めてください。\n";
   systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
@@ -30,7 +40,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += "  - 生成されるコードは必ず構文的に有効で、完全なものとしてください。特に、ソースコード内のコメント、空行、ブロックのインデント、**そして改行は非常に重要です。HTMLファイルにおいては、`script`タグ内のJavaScriptやスタイルシートを含め、元の構造とインデント、改行を厳密に保持してください。**これにより、AI提案の粒度と精度を向上させ、ユーザーがレビューする際のノイズを最小限に抑え、意図しない副作用や予期せぬ挙動のリスクを低減することを目的とします。\n";
   systemPrompt += "- JSON以外の説明や前置き、言い訳は一切不要です。\n\n";
   systemPrompt += "レスポンス形式の例:\n";
-  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}], \"deletedFileNames\": [\"OldFile\", \"AnotherOldFile\"]}\n```";
+  systemPrompt += "```json\n{\"purpose\": \"変更の主旨を簡潔に説明してください。\", \"files\": [{\"name\": \"Code\", \"type\": \"SERVER_JS\", \"source\": \"function example() {\\n  Logger.log('Hello, world!');\\n}\"}, {\"name\": \"MyScript\", \"type\": \"REPLACE\", \"old_string\": \"oldFunctionCall(arg);\", \"new_string\": \"newFunctionCall(arg);\"}], \"deletedFileNames\": [\"OldFile\"]}\n```";
   systemPrompt += "- 'purpose'フィールドには、提案された変更の全体的な目的や理由を、ユーザーが理解しやすいように簡潔に説明してください。\n";
 
   const requestBody = {
@@ -49,25 +59,52 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
           "files": {
             "type": "ARRAY",
             "items": {
-              "type": "OBJECT",
-              "properties": {
-                "name": {
-                  "type": "STRING",
-                  "description": "ファイル名（例: Code, appsscript, index）"
+              "oneOf": [
+                { 
+                  "type": "OBJECT",
+                  "properties": {
+                    "name": {
+                      "type": "STRING",
+                      "description": "ファイル名（例: Code, appsscript, index）"
+                    },
+                    "source": {
+                      "type": "STRING",
+                      "description": "変更後のファイル内容。"
+                    },
+                    "type": {
+                      "type": "STRING",
+                      "description": "ファイルタイプ（SERVER_JS, JSON, HTMLのいずれか）",
+                      "enum": ["SERVER_JS", "JSON", "HTML"]
+                    }
+                  },
+                  "required": ["name", "type", "source"]
                 },
-                "type": {
-                  "type": "STRING",
-                  "enum": ["SERVER_JS", "JSON", "HTML"],
-                  "description": "ファイルタイプ（SERVER_JS, JSON, HTMLのいずれか）"
-                },
-                "source": {
-                  "type": "STRING",
-                  "description": "変更後のファイル内容。"
+                { 
+                  "type": "OBJECT",
+                  "properties": {
+                    "name": {
+                      "type": "STRING",
+                      "description": "置換操作を行う対象ファイルの名前。"
+                    },
+                    "type": {
+                      "type": "STRING",
+                      "description": "操作タイプ（REPLACE固定）",
+                      "enum": ["REPLACE"]
+                    },
+                    "old_string": {
+                      "type": "STRING",
+                      "description": "置換対象の文字列。誤った置換を防ぐため、変更箇所の前後数行の文脈を含めることを強く推奨。"
+                    },
+                    "new_string": {
+                      "type": "STRING",
+                      "description": "置換後の新しい文字列。"
+                    }
+                  },
+                  "required": ["name", "type", "old_string", "new_string"]
                 }
-              },
-              "required": ["name", "type", "source"]
+              ]
             },
-            "description": "修正が必要なファイルの新しいソースコードを含むオブジェクトの配列。"
+            "description": "修正が必要なファイルの新しいソースコードを含むオブジェクトの配列、または置換操作の配列。"
           },
           "deletedFileNames": {
             "type": "ARRAY",
