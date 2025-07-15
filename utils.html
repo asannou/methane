@@ -335,7 +335,7 @@
 
             proposedFiles.forEach(proposedFile => {
                 if (explicitDeletedFiles.some(f => f.name === proposedFile.name)) {
-                    return; 
+                    return;
                 }
 
                 const name = proposedFile.name;
@@ -344,70 +344,82 @@
                 const fileComparisonDiv = document.createElement('div');
                 fileComparisonDiv.className = 'file-comparison';
 
+                let originalSourceForDiff;
+                let proposedSourceForDiff;
+                let statusLabel;
+                let additionalMessageHtml = ''; // For the REPLACE warning
+
                 if (fileType === 'REPLACE') {
+                    const originalFile = originalFilesMap.get(name);
+                    if (!originalFile) {
+                        console.warn(`Skipping REPLACE proposal for file '${name}': original file not found.`);
+                        return;
+                    }
                     if (typeof proposedFile.old_string !== 'string' || typeof proposedFile.new_string !== 'string') {
                         console.warn(`Skipping malformed REPLACE proposal for file '${name}': missing old_string or new_string.`);
                         return;
                     }
-                    fileComparisonDiv.classList.add('is-replace');
-                    fileComparisonDiv.innerHTML = `
-                        <div style="flex: 1 1 100%;">
-                            <h4>${Utils.escapeHtml(name)} (Replacement Operation)</h4>
-                            <div class="notification is-info is-light">
-                                <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」を「新しい文字列」に置換します。</p>
-                                <p><strong>注: 最初の1つのみが置換されます。グローバルな置換が必要な場合は、AIに変更提案を再生成するか、手動で複数の置換を適用してください。</strong></p>
-                            </div>
-                            <div class="columns">
-                                <div class="column">
-                                    <p><strong>置換対象文字列 (old_string):</strong></p>
-                                    <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string)}</pre>
-                                </div>
-                                <div class="column">
-                                    <p><strong>新しい文字列 (new_string):</strong></p>
-                                    <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string)}</pre>
-                                </div>
-                            </div>
+
+                    originalSourceForDiff = originalFile.source;
+                    // Generate the "proposed" source by applying the replacement to the original source
+                    // This matches the backend logic of replacing only the first occurrence
+                    proposedSourceForDiff = originalSourceForDiff.replace(proposedFile.old_string, proposedFile.new_string);
+                    statusLabel = '(Replaced)';
+                    fileComparisonDiv.classList.add('is-replace'); // Keep class for distinct styling
+                    additionalMessageHtml = `
+                        <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
+                            <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」を「新しい文字列」に置換します。</p>
+                            <p><strong>注: この差分表示は、提案された置換がファイルに適用された場合の仮想的な結果を示しています。バックエンドの実際の適用は、文字列の最初の出現箇所のみを置換します。グローバルな置換が必要な場合は、AIに変更提案を再生成するか、手動で複数の置換を適用してください。</strong></p>
+                            <p class="mt-2 is-size-7"><strong>置換対象文字列 (old_string):</strong> <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string.substring(0, 200))}${proposedFile.old_string.length > 200 ? '...' : ''}</pre></p>
+                            <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
                         </div>
                     `;
-                    displayArea.appendChild(fileComparisonDiv);
                 } else { // Existing logic for source updates/additions
                     const originalFile = originalFilesMap.get(name);
-                    const originalSource = originalFile ? originalFile.source : '';
+                    originalSourceForDiff = originalFile ? originalFile.source : '';
+                    proposedSourceForDiff = proposedFile.source;
+                    statusLabel = originalFile ? '(Updated)' : '(New File)';
+                }
 
-                    const diffHtmlData = Utils.generateFormattedDiffPanels(originalSource, proposedFile.source);
+                const diffHtmlData = Utils.generateFormattedDiffPanels(originalSourceForDiff, proposedSourceForDiff);
 
-                    const statusLabel = originalFile ? '(Updated)' : '(New File)';
+                const originalContentDiv = document.createElement('div');
+                originalContentDiv.innerHTML = `<h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
+                    <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
+                    <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
+                </pre>`;
+                
+                const proposedContentDiv = document.createElement('div');
+                proposedContentDiv.innerHTML = `<h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Proposed) <span class="has-text-info is-size-7">${statusLabel}</span></h4><pre class="scroll-sync-target">
+                    <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
+                    <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
+                </pre>`;
+                
+                fileComparisonDiv.appendChild(originalContentDiv);
+                fileComparisonDiv.appendChild(proposedContentDiv);
+                
+                // Append the additional message only if it's a REPLACE operation
+                if (additionalMessageHtml) {
+                    const messageContainer = document.createElement('div');
+                    messageContainer.style.flex = '1 1 100%'; // Make it full width below diff
+                    messageContainer.innerHTML = additionalMessageHtml;
+                    fileComparisonDiv.appendChild(messageContainer);
+                }
 
-                    const originalContentDiv = document.createElement('div');
-                    originalContentDiv.innerHTML = `<h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Original)</h4><pre class="scroll-sync-target">
-                        <div class="line-numbers-col">${diffHtmlData.originalLineNumbersHtml}</div>
-                        <div class="code-content-col">${diffHtmlData.originalCodeContentHtml}</div>
-                    </pre>`;
-                    
-                    const proposedContentDiv = document.createElement('div');
-                    proposedContentDiv.innerHTML = `<h4>${Utils.escapeHtml(name)}.${Utils.getFileExtension(fileType)} (Proposed) <span class="has-text-info is-size-7">${statusLabel}</span></h4><pre class="scroll-sync-target">
-                        <div class="line-numbers-col">${diffHtmlData.proposedLineNumbersHtml}</div>
-                        <div class="code-content-col">${diffHtmlData.proposedCodeContentHtml}</div>
-                    </pre>`;
-                    
-                    fileComparisonDiv.appendChild(originalContentDiv);
-                    fileComparisonDiv.appendChild(proposedContentDiv);
-                    
-                    displayArea.appendChild(fileComparisonDiv);
+                displayArea.appendChild(fileComparisonDiv);
 
-                    const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
-                    if (preElements.length === 2) {
-                        const pre1 = preElements[0];
-                        const pre2 = preElements[1];
+                const preElements = fileComparisonDiv.querySelectorAll('.scroll-sync-target');
+                if (preElements.length === 2) {
+                    const pre1 = preElements[0];
+                    const pre2 = preElements[1];
 
-                        let isSyncing = false;
-                        pre1.addEventListener('scroll', function() {
-                            if (!isSyncing) { isSyncing = true; pre2.scrollTop = pre1.scrollTop; isSyncing = false; }
-                        });
-                        pre2.addEventListener('scroll', function() {
-                            if (!isSyncing) { isSyncing = true; pre1.scrollTop = pre2.scrollTop; isSyncing = false; }
-                        });
-                    }
+                    let isSyncing = false;
+                    pre1.addEventListener('scroll', function() {
+                        if (!isSyncing) { isSyncing = true; pre2.scrollTop = pre1.scrollTop; isSyncing = false; }
+                    });
+                    pre2.addEventListener('scroll', function() {
+                        if (!isSyncing) { isSyncing = true; pre1.scrollTop = pre2.scrollTop; isSyncing = false; }
+                    });
                 }
             });
         },

@@ -405,32 +405,33 @@
   margin-top: 10px;
 }
 
-/* NEW: Styles for REPLACE operation display */
+/* NEW: Styles for REPLACE operation display - Adjusted to be a flex container */
 .file-comparison.is-replace {
   border: 1px dashed var(--gas-blue-light) !important;
   background-color: #e6f0ff; /* Lighter blue */
-  display: block; /* Override flex, as it's a single block of content */
-  padding: 20px;
+  /* Removed display: block; padding: 20px; */
 }
 
 .file-comparison.is-replace h4 {
-  margin-bottom: 15px;
-  color: var(--gas-blue-dark);
+  /* Keeps existing styles */
 }
 
+/* NEW: Styles for inline pre-blocks within the notification for REPLACE details */
 .replacement-view {
   background-color: #f8f9fa;
-  padding: 10px;
-  border-radius: 4px;
+  padding: 0.25em 0.5em;
+  border-radius: 3px;
   border: 1px solid var(--gas-grey-medium);
   font-family: monospace;
-  font-size: 0.9em;
+  font-size: 0.8em;
   line-height: 1.4;
   white-space: pre-wrap; /* Ensure line breaks are preserved */
   word-break: break-all;
-  max-height: 200px; /* Limit height for long strings */
+  max-height: 100px; /* Limit height for long strings */
   overflow-y: auto;
-  margin-bottom: 10px;
+  display: inline-block; /* Make it inline */
+  margin: 0; /* Remove block-level margins */
+  vertical-align: middle; /* Align with text */
 }
 
 .replacement-view.replacement-old {
@@ -443,9 +444,7 @@
   border-color: var(--gas-green);
 }
 
-.replacement-details .columns {
-  margin-top: 15px;
-}
+/* Removed .replacement-details .columns as they are no longer needed */
 
 /* Styles for Bulma Tabs integration */
 .tabs {
