@@ -117,86 +117,65 @@
         },
 
         /**
-         * Generate formatted diff panels HTML using diff-match-patch library.
+         * Generate formatted diff panels HTML.
          * @param {string} originalSource - The original source code.
          * @param {string} proposedSource - The proposed source code.
          * @returns {{originalLineNumbersHtml: string, originalCodeContentHtml: string, proposedLineNumbersHtml: string, proposedCodeContentHtml: string}} HTML parts for diff display.
          */
         generateFormattedDiffPanels: (originalSource, proposedSource) => {
-            // Ensure diff_match_patch is loaded
-            if (typeof diff_match_patch === 'undefined') {
-                console.error("diff_match_patch library is not loaded. Cannot generate diffs.");
-                // Fallback to simple side-by-side display if the library is not available
-                const originalLines = originalSource ? originalSource.split('\n') : [];
-                const proposedLines = proposedSource ? proposedSource.split('\n') : [];
-                let originalLineNumbersHtml = '';
-                let originalCodeContentHtml = '';
-                let proposedLineNumbersHtml = '';
-                let proposedCodeContentHtml = '';
+            const originalLines = originalSource ? originalSource.split('\n') : [];
+            const proposedLines = proposedSource ? proposedSource.split('\n') : [];
 
-                originalLines.forEach((line, i) => {
-                    originalLineNumbersHtml += `<div>${i + 1}</div>`;
-                    originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`;
-                });
-                proposedLines.forEach((line, i) => {
-                    proposedLineNumbersHtml += `<div>${i + 1}</div>`;
-                    proposedCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`;
-                });
-                return { originalLineNumbersHtml, originalCodeContentHtml, proposedLineNumbersHtml, proposedCodeContentHtml };
-            }
+            const diffResult = [];
+            let i = 0;
+            let j = 0;
+            const lookAheadWindow = 5;
 
-            const dmp = new diff_match_patch();
-            dmp.Diff_Timeout = 1.0; // Timeout in seconds to prevent very long diff computations
+            while (i < originalLines.length || j < proposedLines.length) {
+                const currentOriginalLine = originalLines[i];
+                const currentProposedLine = proposedLines[j];
 
-            // Perform line-based diff using dmp's helper functions
-            const a = dmp.diff_linesToChars_(originalSource, proposedSource);
-            const lineText1 = a[0];
-            const lineText2 = a[1];
-            const lineArray = a[2];
-
-            const diffs = dmp.diff_main(lineText1, lineText2, false); // false for checklines
-            dmp.diff_charsToLines_(diffs, lineArray);
-
-            // Process diffs to handle 'modified' lines (removed + added at same logical position)
-            // and split multi-line diff entries into single-line entries for easier processing.
-            const processedDiffs = [];
-            for (let i = 0; i < diffs.length; i++) {
-                const type = diffs[i][0];
-                const text = diffs[i][1];
-                const lines = text.split('\n');
-
-                // Check for removed + added pair to form a 'modified' line
-                if (type === diff_match_patch.DIFF_DELETE && i + 1 < diffs.length && diffs[i+1][0] === diff_match_patch.DIFF_INSERT) {
-                    const nextText = diffs[i+1][1];
-                    const nextLines = nextText.split('\n');
-                    
-                    // If both are single lines, consider them a modification
-                    if (lines.length === 1 && nextLines.length === 1) {
-                        processedDiffs.push({ type: 'modified', original: lines[0], proposed: nextLines[0] });
-                        i++; // Skip the next element as it's been processed
-                        continue;
+                if (i < originalLines.length && j < proposedLines.length && currentOriginalLine === currentProposedLine) {
+                    diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
+                    i++;
+                    j++;
+                } else {
+                    let originalFoundInProposedAhead = -1;
+                    for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
+                        if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
+                            originalFoundInProposedAhead = k;
+                            break;
+                        }
                     }
-                    // If multi-line or not a single-line pair, fall through to default handling below
+
+                    let proposedFoundInOriginalAhead = -1;
+                    for (let k = i + 1; k < Math.min(i + 1 + lookAheadWindow, originalLines.length); k++) {
+                        if (j < proposedLines.length && proposedLines[j] === originalLines[k]) {
+                            proposedFoundInOriginalAhead = k;
+                            break;
+                        }
+                    }
+
+                    if (i < originalLines.length && j < proposedLines.length && originalFoundInProposedAhead === -1 && proposedFoundInOriginalAhead === -1) {
+                        diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
+                        i++;
+                        j++;
+                    } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
+                        diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                        j++;
+                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (proposedFoundInOriginalAhead - i))) {
+                        diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                        i++;
+                    } else if (i < originalLines.length) {
+                        diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
+                        i++;
+                    } else if (j < proposedLines.length) {
+                        diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
+                        j++;
+                    }
                 }
-
-                // Default handling for equal, single remove, single add, or multi-line remove/add
-                lines.forEach((line, index) => {
-                    // Avoid adding an empty string line if it's the very last line and was just a trailing newline character
-                    // The `split('\n')` method will add an empty string at the end if the string ends with a newline.
-                    if (line === '' && index === lines.length - 1 && text.endsWith('\n')) {
-                        return;
-                    }
-                    if (type === diff_match_patch.DIFF_EQUAL) {
-                        processedDiffs.push({ type: 'equal', original: line, proposed: line });
-                    } else if (type === diff_match_patch.DIFF_DELETE) {
-                        processedDiffs.push({ type: 'removed', original: line, proposed: '' });
-                    } else if (type === diff_match_patch.DIFF_INSERT) {
-                        processedDiffs.push({ type: 'added', original: '', proposed: line });
-                    }
-                });
             }
 
-            // Now apply the omission logic to processedDiffs (adapted from original logic)
             const OMIT_THRESHOLD = 8;
             const CONTEXT_LINES = 3;
 
@@ -209,22 +188,21 @@
             let currentProposedLineNum = 1;
 
             let k = 0;
-            while (k < processedDiffs.length) {
-                const entry = processedDiffs[k];
+            while (k < diffResult.length) {
+                const entry = diffResult[k];
 
                 if (entry.type === 'equal') {
                     let equalBlockStartIndex = k;
                     let equalCount = 0;
 
-                    while (k < processedDiffs.length && processedDiffs[k].type === 'equal') {
+                    while (k < diffResult.length && diffResult[k].type === 'equal') {
                         equalCount++;
                         k++;
                     }
 
                     if (equalCount > OMIT_THRESHOLD) {
-                        // Add leading context lines
-                        for (let l = 0; l < CONTEXT_LINES && (equalBlockStartIndex + l) < processedDiffs.length; l++) {
-                            const lineEntry = processedDiffs[equalBlockStartIndex + l];
+                        for (let l = 0; l < CONTEXT_LINES; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + l];
                             originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
                             originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
                             proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
@@ -245,9 +223,8 @@
                         proposedLineNumbersHtml += `<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLineNum - 1}</div>`;
                         proposedCodeContentHtml += `<div class="diff-line-omitted">... ${omittedLinesCount} lines omitted ...</div>`;
 
-                        // Add trailing context lines
-                        for (let l = 0; l < CONTEXT_LINES && (equalBlockStartIndex + equalCount - CONTEXT_LINES + l) < processedDiffs.length; l++) {
-                            const lineEntry = processedDiffs[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
+                        for (let l = 0; l < CONTEXT_LINES; l++) {
+                            const lineEntry = diffResult[equalBlockStartIndex + equalCount - CONTEXT_LINES + l];
                             originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
                             originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
                             proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
@@ -258,7 +235,7 @@
 
                     } else {
                         for (let l = 0; l < equalCount; l++) {
-                            const lineEntry = processedDiffs[equalBlockStartIndex + l];
+                            const lineEntry = diffResult[equalBlockStartIndex + l];
                             originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
                             originalCodeContentHtml += `<div class="diff-line-equal">${Utils.escapeHtml(lineEntry.original)}</div>`;
                             proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
