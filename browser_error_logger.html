@@ -2,6 +2,7 @@
   if (typeof google !== 'undefined' && google.script && google.script.run) {
     window.onerror = function(message, source, lineno, colno, error) {
       google.script.run.logClientError({
+        logLevel: 'ERROR',
         type: 'onerror',
         message: message,
         source: source,
@@ -36,7 +37,44 @@
         }
       }
       google.script.run.logClientError({
+        logLevel: 'ERROR',
         type: 'unhandledrejection',
+        message: message,
+        stack: stack
+      });
+      return false; // Prevent default browser unhandled rejection reporting
+    };
+
+    // NEW: Intercept console.warn to send to server
+    const originalConsoleWarn = console.warn;
+    console.warn = function(...args) {
+      originalConsoleWarn.apply(console, args); // Call original console.warn first
+
+      let message = args.map(arg => {
+        if (typeof arg === 'string') return arg;
+        try {
+          return JSON.stringify(arg);
+        } catch (e) {
+          return '[Serialization Error]';
+        }
+      }).join(' ');
+
+      let stack = 'No stack trace available for console.warn';
+      try {
+        throw new Error(); // Create an error to get a stack trace
+      } catch (e) {
+        stack = e.stack || stack;
+        // Clean up stack to remove the throw Error line itself
+        const stackLines = stack.split('\n');
+        // Remove the first few lines related to this interceptor if they appear
+        if (stackLines.length > 2 && stackLines[1].includes('console.warn')) {
+            stack = stackLines.slice(2).join('\n');
+        }
+      }
+
+      google.script.run.logClientError({
+        logLevel: 'WARNING',
+        type: 'console.warn',
         message: message,
         stack: stack
       });

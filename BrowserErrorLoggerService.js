@@ -1,27 +1,37 @@
 /**
- * クライアントサイド（ブラウザ）から送信されたエラー情報をCloud Loggingに記録します。
+ * クライアントサイド（ブラウザ）から送信されたログ情報をCloud Loggingに記録します。
  * この関数はWebアプリケーションがデプロイされている場合にのみ利用可能です。
  *
- * @param {object} errorInfo - クライアントから送信されたエラー情報オブジェクト。
- * @param {string} errorInfo.type - エラーイベントのタイプ ('onerror' または 'unhandledrejection')。
- * @param {string} errorInfo.message - エラーメッセージ。
- * @param {string} [errorInfo.source] - エラーが発生したスクリプトのURL (onerrorのみ)。
- * @param {number} [errorInfo.lineno] - エラーが発生した行番号 (onerrorのみ)。
- * @param {number} [errorInfo.colno] - エラーが発生した列番号 (onerrorのみ)。
- * @param {string} [errorInfo.stack] - エラーのスタックトレース。
+ * @param {object} logInfo - クライアントから送信されたログ情報オブジェクト。
+ * @param {string} logInfo.logLevel - ログのレベル ('ERROR' または 'WARNING')。
+ * @param {string} logInfo.type - イベントのタイプ ('onerror', 'unhandledrejection', 'console.warn')。
+ * @param {string} logInfo.message - メッセージ。
+ * @param {string} [logInfo.source] - ソースURL (onerrorのみ)。
+ * @param {number} [logInfo.lineno] - 行番号 (onerrorのみ)。
+ * @param {number} [logInfo.colno] - 列番号 (onerrorのみ)。
+ * @param {string} [logInfo.stack] - スタックトレース。
  */
-function logClientError(errorInfo) {
-  if (typeof errorInfo !== 'object' || errorInfo === null) {
-    Logger.log('Received invalid errorInfo object from client: %s', errorInfo);
+function logClientError(logInfo) {
+  if (typeof logInfo !== 'object' || logInfo === null) {
+    // Use console.log or Logger.log for this internal warning, as it's not a client-side error/warning
+    console.warn('Received invalid logInfo object from client: %s', logInfo);
     return;
   }
 
-  const logMessage = `Client-side Error (${errorInfo.type}):\n` +
-                     `Message: ${errorInfo.message}\n` +
-                     (errorInfo.source ? `Source: ${errorInfo.source}\n` : '') +
-                     (errorInfo.lineno ? `Line: ${errorInfo.lineno}\n` : '') +
-                     (errorInfo.colno ? `Column: ${errorInfo.colno}\n` : '') +
-                     (errorInfo.stack ? `Stack: ${errorInfo.stack}\n` : 'No stack trace.');
+  const messagePrefix = logInfo.logLevel === 'WARNING' ? 'Client-side Warning' : 'Client-side Error';
+  const logMessage = `${messagePrefix} (${logInfo.type}):\n` +
+                     `Message: ${logInfo.message}\n` +
+                     (logInfo.source ? `Source: ${logInfo.source}\n` : '') +
+                     (logInfo.lineno ? `Line: ${logInfo.lineno}\n` : '') +
+                     (logInfo.colno ? `Column: ${logInfo.colno}\n` : '') +
+                     (logInfo.stack ? `Stack: ${logInfo.stack}\n` : 'No stack trace.');
 
-  Logger.log(logMessage);
+  if (logInfo.logLevel === 'WARNING') {
+    console.warn(logMessage); // Logs as WARNING in Cloud Logging
+  } else if (logInfo.logLevel === 'ERROR') {
+    console.error(logMessage); // Logs as ERROR in Cloud Logging
+  } else {
+    // Default to INFO for unexpected log levels
+    console.log(`Client-side Log (${logInfo.type} - Unknown Level ${logInfo.logLevel}):\n` + logMessage);
+  }
 }

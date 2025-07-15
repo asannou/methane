@@ -27,14 +27,14 @@ function proposeBrowserErrorLoggingChanges(targetScriptId) {
     const projectContent = JSON.parse(getResponse.getContentText());
 
     // 2. AIに渡すプロンプトと既存のファイルを準備
-    let aiPrompt = "以下のGoogle Apps Scriptプロジェクトに、ブラウザコンソールで発生したエラーをCloud Loggingに記録する機能を追加してください。\n\n";
+    let aiPrompt = "以下のGoogle Apps Scriptプロジェクトに、ブラウザコンソールで発生したエラーおよび警告をCloud Loggingに記録する機能を追加してください。\n\n";
     aiPrompt += "- この機能は、ウェブアプリとしてデプロイされた際にのみ有効になるように設計してください。\n";
-    aiPrompt += "- クライアントサイド（HTMLファイル内）でJavaScriptの`window.onerror`および`unhandledrejection`イベントを捕捉し、サーバーサイドの関数を呼び出してエラー情報を送信してください。\n";
-    aiPrompt += "- サーバーサイドの関数は、受け取ったエラー情報を`Logger.log()`を使用してCloud Loggingに記録してください。\n";
+    aiPrompt += "- クライアントサイド（HTMLファイル内）でJavaScriptの`window.onerror`、`window.onunhandledrejection`イベント、および`console.warn`メッセージを捕捉し、サーバーサイドの関数を呼び出して情報（エラーまたは警告）を送信してください。\n";
+    aiPrompt += "- サーバーサイドの関数は、受け取った情報（エラーまたは警告）を適切なログレベル（例: エラーは`console.error()`、警告は`console.warn()`）を使用してCloud Loggingに記録してください。\n";
     aiPrompt += "- 必要なOAuthスコープ（`https://www.googleapis.com/auth/logging.write`）を`appsscript.json`に追加してください。\n";
     aiPrompt += "- 既存のコードの構造やロジックは変更しないでください。新しい機能を追加する形にしてください。\n";
-    aiPrompt += "- クライアントサイドのスクリプトは、必要な情報（エラーメッセージ、URL、行番号、列番号、エラーオブジェクトのスタックトレースなど）を捕捉し、サーバーサイドに送信してください。\n";
-    aiPrompt += "- サーバーサイドでエラーログを処理する新しい`.gs`ファイルを作成してください。ファイル名は`BrowserErrorLoggerService.gs`としてください。\n";
+    aiPrompt += "- クライアントサイドのスクリプトは、必要な情報（メッセージ、URL、行番号、列番号、スタックトレースなど）を捕捉し、サーバーサイドに送信してください。\n";
+    aiPrompt += "- サーバーサイドでログを処理する新しい`.gs`ファイルを作成してください。ファイル名は`BrowserErrorLoggerService.gs`としてください。\n";
     aiPrompt += "- HTMLファイルへの変更は、既存の `<script>` ブロック内、または新しい `<script>` ブロックを追記する形で行い、既存の要素やスクリプトを破壊しないでください。\n";
     aiPrompt += "- HTMLとJSは、既存の規約（例: `<?!= include('file'); ?>` の使用）に従って最小限の変更をしてください。\n";
     aiPrompt += "- AI生成ポリシーの「このスクリプトにおいて実行時にブラウザコンソールで発生したエラーをCloud のログに記録させる」ものではないという指示を守ってください。つまり、提案される変更はこのスクリプト自体ではなく、**指定されたTarget Script**に対して適用されるものです。\n";
