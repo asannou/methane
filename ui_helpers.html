@@ -19,10 +19,10 @@
 
         /**
          * Show a DOM element.
-         * @param {string} elementId - The ID of the element.
+         * @param {string|HTMLElement} elementOrId - The ID of the element or the element itself.
          */
-        show: (elementId) => {
-            const element = UI.get(elementId);
+        show: (elementOrId) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.style.display = 'block';
             }
@@ -30,10 +30,10 @@
 
         /**
          * Hide a DOM element.
-         * @param {string} elementId - The ID of the element.
+         * @param {string|HTMLElement} elementOrId - The ID of the element or the element itself.
          */
-        hide: (elementId) => {
-            const element = UI.get(elementId);
+        hide: (elementOrId) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.style.display = 'none';
             }
@@ -41,10 +41,10 @@
 
         /**
          * Enable a DOM element.
-         * @param {string} elementId - The ID of the element.
+         * @param {string|HTMLElement} elementOrId - The ID of the element or the element itself.
          */
-        enable: (elementId) => {
-            const element = UI.get(elementId);
+        enable: (elementOrId) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.disabled = false;
             }
@@ -52,10 +52,10 @@
 
         /**
          * Disable a DOM element.
-         * @param {string} elementId - The ID of the element.
+         * @param {string|HTMLElement} elementOrId - The ID of the element or the element itself.
          */
-        disable: (elementId) => {
-            const element = UI.get(elementId);
+        disable: (elementOrId) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.disabled = true;
             }
@@ -89,11 +89,11 @@
 
         /**
          * Set innerHTML of a DOM element.
-         * @param {string} elementId - The ID of the element.
+         * @param {string|HTMLElement} elementOrId - The ID of the element or the element itself.
          * @param {string} content - The HTML content.
          */
-        setHtml: (elementId, content) => {
-            const element = UI.get(elementId);
+        setHtml: (elementOrId, content) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.innerHTML = content;
             }
@@ -101,11 +101,11 @@
 
         /**
          * Set textContent of a DOM element.
-         * @param {string} elementId - The ID of the element.
+         * @param {string|HTMLElement} elementOrId - The ID of the element or the element itself.
          * @param {string} content - The text content.
          */
-        setText: (elementId, content) => {
-            const element = UI.get(elementId);
+        setText: (elementOrId, content) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.textContent = content;
             }
@@ -113,10 +113,10 @@
 
         /**
          * Clear the value of a textarea or input.
-         * @param {string} elementId - The ID of the textarea/input.
+         * @param {string|HTMLElement} elementOrId - The ID of the textarea/input or the element itself.
          */
-        clearValue: (elementId) => {
-            const element = UI.get(elementId);
+        clearValue: (elementOrId) => {
+            const element = typeof elementOrId === 'string' ? UI.get(elementOrId) : elementOrId;
             if (element) {
                 element.value = '';
             }
@@ -124,15 +124,15 @@
 
         /**
          * Append a notification message to a container.
-         * @param {string} containerId - The ID of the container to append to.
+         * @param {string|HTMLElement} containerOrId - The ID of the container or the container element itself to append to.
          * @param {string} type - The type of notification (e.g., 'is-danger', 'is-success', 'is-info', 'is-warning').
          * @param {string} message - The message to display.
          * @param {object} [details=null] - Optional detailed error object.
          */
-        appendNotification: (containerId, type, message, details = null) => {
-            const container = UI.get(containerId);
+        appendNotification: (containerOrId, type, message, details = null) => {
+            const container = typeof containerOrId === 'string' ? UI.get(containerOrId) : containerOrId;
             if (!container) {
-                console.warn(`UI.appendNotification: Container with ID "${containerId}" not found. Cannot append notification.`);
+                console.warn(`UI.appendNotification: Container with ID or Element "${containerOrId}" not found. Cannot append notification.`);
                 return;
             }
             const notificationDiv = document.createElement('div');
@@ -140,23 +140,29 @@
             let contentHtml = `<p><strong>${Utils.escapeHtml(message)}</strong></p>`;
 
             if (details) {
-                contentHtml += `<h4 class="mt-2">Details:</h4><pre class="has-text-danger-dark is-size-7 mt-1">${Utils.escapeHtml(JSON.stringify(details, null, 2))}</pre>`;
+                let detailsString;
+                try {
+                    detailsString = JSON.stringify(details, Object.getOwnPropertyNames(details), 2);
+                } catch (e) {
+                    detailsString = String(details);
+                }
+                contentHtml += `<h4 class="mt-2">Details:</h4><pre class="has-text-danger-dark is-size-7 mt-1">${Utils.escapeHtml(detailsString)}</pre>`;
             }
             notificationDiv.innerHTML = contentHtml;
             container.appendChild(notificationDiv);
-            UI.show(containerId);
+            UI.show(container);
         },
 
         /**
          * Clear all notifications from a container.
-         * @param {string} containerId - The ID of the container to clear.
+         * @param {string|HTMLElement} containerOrId - The ID of the container or the container element itself to clear.
          */
-        clearNotifications: (containerId) => {
-            const element = UI.get(containerId);
+        clearNotifications: (containerOrId) => {
+            const element = typeof containerOrId === 'string' ? UI.get(containerOrId) : containerOrId;
             if (element) {
                 element.innerHTML = '';
             }
-            UI.hide(containerId);
+            UI.hide(element);
         }
     };
 </script>
