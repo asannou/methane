@@ -258,7 +258,7 @@ function getScriptLogs(targetScriptId) {
         `projects/${gcpProjectId}`
       ],
       // Policy change: Filter specifically for the targetScriptId
-      "filter": `resource.type="app_script_function" AND resource.labels.script_id="${targetScriptId}"`, 
+      "filter": `resource.labels.script_id="${targetScriptId}"`, 
       "orderBy": "timestamp desc",
       "pageSize": 50
     };
