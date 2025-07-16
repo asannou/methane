@@ -55,14 +55,25 @@ function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDep
                 continue;
             }
 
-            // old_stringが現在のファイルソースに存在するかを確認
-            // 最初の合致のみを置換 (replace() は文字列引数に対して最初の合致のみを置換)
-            const originalIncludesOldString = currentSource.includes(oldString);
-            if (originalIncludesOldString) {
-                currentFile.source = currentSource.replace(oldString, newString);
-                console.log(`ファイル '${proposedFile.name}' でREPLACE操作を実行しました。`);
+            const isGlobalReplace = proposedFile.isGlobalReplace === true; // Ensure it's explicitly true
+            let replacementPerformed = false;
+
+            if (isGlobalReplace) {
+                if (currentSource.includes(oldString)) { // Check if oldString exists at all for logging
+                    currentFile.source = currentSource.replaceAll(oldString, newString);
+                    console.log(`ファイル '${proposedFile.name}' でREPLACE (グローバル) 操作を実行しました。`);
+                    replacementPerformed = true;
+                }
             } else {
-                console.warn(`REPLACE操作のold_stringがファイル '${proposedFile.name}' の内容に見つかりません。置換をスキップします。提案されたOld String (先頭100文字): "${oldString.substring(0, 100)}..."`);
+                if (currentSource.includes(oldString)) { // Check if oldString exists for single replace
+                    currentFile.source = currentSource.replace(oldString, newString);
+                    console.log(`ファイル '${proposedFile.name}' でREPLACE (単一) 操作を実行しました。`);
+                    replacementPerformed = true;
+                }
+            }
+
+            if (!replacementPerformed) {
+                console.warn(`REPLACE操作のold_stringがファイル '${proposedFile.name}' の内容に見つかりません。置換をスキップします。提案されたOld String (先頭100文字): "${oldString.substring(0, 100)}"...`);
             }
         } else { // Handle existing types (SERVER_JS, JSON, HTML)
             newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new

@@ -363,19 +363,30 @@
                     }
 
                     originalSourceForDiff = originalFile.source;
-                    // Generate the "proposed" source by applying the replacement to the original source
-                    // This matches the backend logic of replacing only the first occurrence
-                    proposedSourceForDiff = originalSourceForDiff.replace(proposedFile.old_string, proposedFile.new_string);
+                    const isGlobalReplaceVisualization = proposedFile.isGlobalReplace === true;
+                    if (isGlobalReplaceVisualization) {
+                        proposedSourceForDiff = originalSourceForDiff.replaceAll(proposedFile.old_string, proposedFile.new_string);
+                        additionalMessageHtml = `
+                            <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
+                                <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」の<strong>全ての出現箇所</strong>を「新しい文字列」に置換します。</p>
+                                <p><strong>注: この差分表示は、提案されたグローバル置換がファイルに適用された場合の仮想的な結果を示しています。</strong></p>
+                                <p class="mt-2 is-size-7"><strong>置換対象文字列 (old_string):</strong> <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string.substring(0, 200))}${proposedFile.old_string.length > 200 ? '...' : ''}</pre></p>
+                                <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
+                            </div>
+                        `;
+                    } else {
+                        proposedSourceForDiff = originalSourceForDiff.replace(proposedFile.old_string, proposedFile.new_string);
+                        additionalMessageHtml = `
+                            <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
+                                <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」の<strong>最初の出現箇所のみ</strong>を「新しい文字列」に置換します。</p>
+                                <p><strong>注: この差分表示は、提案された単一置換がファイルに適用された場合の仮想的な結果を示しています。AIにグローバルな置換を依頼する場合は、プロンプトで具体的に指定してください。</strong></p>
+                                <p class="mt-2 is-size-7"><strong>置換対象文字列 (old_string):</strong> <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string.substring(0, 200))}${proposedFile.old_string.length > 200 ? '...' : ''}</pre></p>
+                                <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
+                            </div>
+                        `;
+                    }
                     statusLabel = '(Replaced)';
                     fileComparisonDiv.classList.add('is-replace'); // Keep class for distinct styling
-                    additionalMessageHtml = `
-                        <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
-                            <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」を「新しい文字列」に置換します。</p>
-                            <p><strong>注: この差分表示は、提案された置換がファイルに適用された場合の仮想的な結果を示しています。バックエンドの実際の適用は、文字列の最初の出現箇所のみを置換します。グローバルな置換が必要な場合は、AIに変更提案を再生成するか、手動で複数の置換を適用してください。</strong></p>
-                            <p class="mt-2 is-size-7"><strong>置換対象文字列 (old_string):</strong> <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string.substring(0, 200))}${proposedFile.old_string.length > 200 ? '...' : ''}</pre></p>
-                            <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
-                        </div>
-                    `;
                 } else { // Existing logic for source updates/additions
                     const originalFile = originalFilesMap.get(name);
                     originalSourceForDiff = originalFile ? originalFile.source : '';

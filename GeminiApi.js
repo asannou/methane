@@ -33,6 +33,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   systemPrompt += "     - `type`: `REPLACE` (固定)\n";
   systemPrompt += "     - `old_string`: 置換対象の文字列。**誤った置換を防ぐため、変更箇所の前後数行の文脈を含めることを強く推奨します。これにより、意図した箇所だけを正確に変更します。**\n";
   systemPrompt += "     - `new_string`: 置換後の新しい文字列。\n";
+  systemPrompt += "     - `isGlobalReplace`: (オプション, boolean) trueの場合、`old_string`の全ての出現箇所を`new_string`に置換します。falseまたは未指定の場合、最初の出現箇所のみを置換します。\n";
   systemPrompt += "- **ファイルの削除を提案する場合、そのファイルはAIのレスポンスの`files`配列から除外してください。そして、そのファイル名を`deletedFileNames`配列にリストアップしてください。これにより、ユーザーインターフェースで削除されたファイルと変更がないファイルが明確に区別されます。**\n";
   systemPrompt += "  - 新しいファイルを提案する場合、適切なファイル名（例: `NewScript`, `util`, `styles`, `dialog`など）とタイプ（`SERVER_JS`, `HTML`, `JSON`のいずれか）を含めてください。\n";
   systemPrompt += "  - 変更が不要なファイルはレスポンスに含めないでください。\n";
@@ -98,6 +99,11 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
                     "new_string": {
                       "type": "STRING",
                       "description": "置換後の新しい文字列。"
+                    },
+                    "isGlobalReplace": {
+                      "type": "boolean",
+                      "description": "trueの場合、old_stringの全ての出現箇所をnew_stringに置換します。falseまたは未指定の場合、最初の出現箇所のみを置換します。",
+                      "default": false
                     }
                   },
                   "required": ["name", "type", "old_string", "new_string"]
