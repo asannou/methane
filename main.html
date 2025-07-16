@@ -56,7 +56,9 @@
         // Load initial state from localStorage
         const savedScriptId = localStorage.getItem('targetScriptId');
         if (savedScriptId) {
-            UI.get('scriptIdSelect').value = savedScriptId; // Set dropdown value directly
+            UI.get('scriptIdSelect').value = savedScriptId;
+            // Explicitly trigger change event to update editor URL display and load files
+            UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
         }
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
         if (savedGcpProjectId) {
@@ -90,6 +92,7 @@
 
         // Register event listeners
         UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList); /* NEW: Automatically get files on script ID change */
         UI.get('prompt').addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();

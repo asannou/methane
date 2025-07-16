@@ -1335,18 +1335,29 @@
         /**
          * Handle getting the list of files for the target script.
          */
-        handleGetFilesList: () => {
+        handleGetFilesList: (event) => { /* Added event parameter */
             const scriptId = Utils.getEffectiveScriptId();
             const filesListDisplay = UI.get('filesListDisplay');
             const getFilesListButton = UI.get('getFilesListButton');
 
             UI.show('filesListContainer');
-            UI.setHtml('filesListDisplay', '');
-            UI.showSpinnerInButton(getFilesListButton, 'Getting Files...');
+
+            // Determine if the call is from the explicit button click or an automatic change event
+            const isManualButtonClick = event && event.type === 'click' && event.currentTarget.id === 'getFilesListButton';
+
+            if (isManualButtonClick) {
+                UI.showSpinnerInButton(getFilesListButton, 'Getting Files...');
+                UI.setHtml(filesListDisplay, ''); // Clear previous results immediately for manual trigger
+            } else {
+                // For automatic trigger (e.g., dropdown change), show spinner directly in the display area
+                UI.setHtml(filesListDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>`);
+            }
 
             if (!scriptId) {
-                UI.setHtml('filesListDisplay', '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
-                UI.hideSpinnerInButton(getFilesListButton);
+                if (isManualButtonClick) {
+                    UI.hideSpinnerInButton(getFilesListButton);
+                }
+                UI.setHtml(filesListDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
                 return;
             }
 
@@ -1354,7 +1365,10 @@
 
             google.script.run
                 .withSuccessHandler(function(response) {
-                    UI.hideSpinnerInButton(getFilesListButton);
+                    if (isManualButtonClick) {
+                        UI.hideSpinnerInButton(getFilesListButton);
+                    }
+                    UI.setHtml(filesListDisplay, ''); // Clear loading message
 
                     if (response.status === 'success') {
                         if (response.files && response.files.length > 0) {
@@ -1394,18 +1408,20 @@
                                 filesListDisplay.appendChild(fileItem);
                             });
                         } else {
-                            UI.setHtml('filesListDisplay', '<p>No files found in this script.</p>');
+                            UI.setHtml(filesListDisplay, '<p>No files found in this script.</p>');
                         }
                     } else {
-                        UI.setHtml('filesListDisplay', `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
+                        UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
                         if (response.apiErrorDetails) {
                             UI.setHtml('filesListDisplay', UI.get('filesListDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
                         }
                     }
                 })
                 .withFailureHandler(function(error) {
-                    UI.hideSpinnerInButton(getFilesListButton);
-                    UI.setHtml('filesListDisplay', `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                    if (isManualButtonClick) {
+                        UI.hideSpinnerInButton(getFilesListButton);
+                    }
+                    UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
                 })
                 .listTargetScriptFiles(scriptId);
         },
@@ -1446,7 +1462,7 @@
                         } else {
                             UI.setHtml(resultDisplay, '<p>No OAuth scopes found in <code>appsscript.json</code> for this script.</p>');
                         }
-                    } else { 
+                    } else {
                         // UIポリシー: エラーハンドリングと詳細情報の表示改善
                         UI.setHtml(resultDisplay, `<p class="has-text-danger">Error retrieving scopes: ${Utils.escapeHtml(response.message)}</p>`);
                         if (response.apiErrorDetails) {
