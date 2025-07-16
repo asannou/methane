@@ -1,131 +1,50 @@
 /**
- * ユーザーが承認したAIの提案に基づいてスクリプトファイルを更新します。
- * AIからのレスポンスに含まれないファイルは暗黙的に削除されます。
- * @param {string} scriptId - 更新対象のスクリプトID
- * @param {Array<object>} proposedFiles - AIが提案した（ユーザー承認済みの）ファイルオブジェクトの配列 (更新または新規追加)
- * @param {Array<string>} deletedFileNames - AIが削除を提案したファイル名の配列
- * @param {boolean} autoDeploy - 変更適用後に自動的にデプロイするかどうか
- * @param {string} proposalPurpose - AIが提案した変更の主旨
- * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
+ * Applies changes proposed by AI to the script files.
+ * @param {string} scriptId - The ID of the script to update.
+ * @param {Array<object>} proposedFiles - Array of file objects (new or modified source, or REPLACE operations).
+ * @param {Array<string>} deletedFileNames - Array of file names to be deleted.
+ * @param {boolean} autoDeploy - Whether to automatically deploy after applying changes.
+ * @param {string} proposalPurpose - The purpose of the changes proposed by the AI.
+ * @returns {object} - Object indicating the success or failure of the operation.
  */
 function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDeploy, proposalPurpose) {
   try {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
-    // 1. 現在のスクリプトの全ファイル内容を取得
-    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
-    if (getResponse.getResponseCode() !== 200) {
-        throw new Error(`Failed to retrieve script content for update: ${getResponse.getContentText()}`);
-    }
+    // 1. Retrieve current script content
+    console.log(`Retrieving current script content for ID: ${scriptId}`);
+    const getResponse = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content for update');
     const originalProjectContent = JSON.parse(getResponse.getContentText());
     
-    // 新しいファイルセットを構築するためのマップ。最初は現在の全ファイルを含む。
+    // Initialize map with current files, ready for updates/deletions
     const newProjectFilesMap = new Map(originalProjectContent.files.map(f => [f.name, f]));
 
-    // AIが提案した変更をマップに適用する
-    // AIのレスポンスに含まれないファイルはマップから更新されず、最終ペイロードに含まれないため削除される。
-    // AIのレスポンスに含まれるファイルは、既存のものであれば更新され、新規であれば追加される。
+    // Apply proposed changes to the map (update existing or add new)
     for (const proposedFile of proposedFiles) {
-        // AIのファイルオブジェクトの形式を検証 (安全性のため)
-        if (!proposedFile || typeof proposedFile.name !== 'string' || typeof proposedFile.type !== 'string') {
-            console.warn("AI応答に含まれるファイルオブジェクトが不正な形式です。スキップします:", JSON.stringify(proposedFile, null, 2));
-            continue;
-        }
-
-        if (proposedFile.type === 'REPLACE') {
-            const currentFile = newProjectFilesMap.get(proposedFile.name);
-            if (!currentFile) {
-                console.warn(`REPLACE操作の対象ファイル '${proposedFile.name}' が現在のプロジェクトに見つかりません。スキップします。`);
-                continue;
-            }
-            // REPLACE操作は既存のファイルのsourceを変更するため、REPLACEタイプのファイルを上書きする想定ではない
-            if (currentFile.type === 'REPLACE') { 
-                 console.warn(`REPLACE操作の対象ファイル '${proposedFile.name}' はすでにREPLACEタイプとマークされています。これは予期せぬ状況です。スキップします。`);
-                continue;
-            }
-
-            const currentSource = currentFile.source;
-            const oldString = proposedFile.old_string;
-            const newString = proposedFile.new_string;
-
-            if (typeof oldString !== 'string' || typeof newString !== 'string') {
-                console.warn(`REPLACE操作のold_stringまたはnew_stringが不正な形式です。スキップします: ${JSON.stringify(proposedFile, null, 2)}`);
-                continue;
-            }
-
-            const isGlobalReplace = proposedFile.isGlobalReplace === true; // Ensure it's explicitly true
-            let replacementPerformed = false;
-
-            if (isGlobalReplace) {
-                if (currentSource.includes(oldString)) { // Check if oldString exists at all for logging
-                    currentFile.source = currentSource.replaceAll(oldString, newString);
-                    console.log(`ファイル '${proposedFile.name}' でREPLACE (グローバル) 操作を実行しました。`);
-                    replacementPerformed = true;
-                }
-            } else {
-                if (currentSource.includes(oldString)) { // Check if oldString exists for single replace
-                    currentFile.source = currentSource.replace(oldString, newString);
-                    console.log(`ファイル '${proposedFile.name}' でREPLACE (単一) 操作を実行しました。`);
-                    replacementPerformed = true;
-                }
-            }
-
-            if (!replacementPerformed) {
-                console.warn(`REPLACE操作のold_stringがファイル '${proposedFile.name}' の内容に見つかりません。置換をスキップします。提案されたOld String (先頭100文字): "${oldString.substring(0, 100)}"...`);
-            }
-        } else { // Handle existing types (SERVER_JS, JSON, HTML)
-            newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
-        }
+      _applyFileChangeToMap(newProjectFilesMap, proposedFile);
     }
 
-    // NEW: AIが削除を提案したファイルをマップから削除する
-    if (deletedFileNames && Array.isArray(deletedFileNames)) {
-        deletedFileNames.forEach(fileName => {
-            if (newProjectFilesMap.has(fileName)) {
-                newProjectFilesMap.delete(fileName);
-                console.log(`File marked for deletion: ${fileName}`);
-            } else {
-                console.warn(`File '${fileName}' was marked for deletion but not found in original project content. Skipping deletion.`);
-            }
-        });
-    }
+    // Remove files marked for deletion from the map
+    _deleteFilesFromMap(newProjectFilesMap, deletedFileNames, originalProjectContent.files);
     
-    // 最終的なPUTリクエスト用のファイル配列を生成
-    const finalFilesForPutPayload = Array.from(newProjectFilesMap.values());
+    // Convert map to array for the final PUT payload
+    let finalFilesForPutPayload = Array.from(newProjectFilesMap.values());
     
-    // Apps Scriptプロジェクトには少なくとも1つのファイルが必要。appsscript.jsonが常に存在するようにする。
-    // AIがappsscript.jsonを提案に含めなかった場合（または誤って削除を提案した場合）のフォールバックとして。
-    if (finalFilesForPutPayload.length === 0) {
-        const appsscriptJson = originalProjectContent.files.find(f => f.name === 'appsscript' && f.type === 'JSON');
-        if (appsscriptJson && !newProjectFilesMap.has('appsscript')) {
-            finalFilesForPutPayload.push(appsscriptJson);
-            console.warn("最終ペイロードにファイルが含まれていなかったため、appsscript.jsonを強制的に追加しました。");
-        } else if (!appsscriptJson) {
-             throw new Error("Cannot apply changes: appsscript.json not found in original project, and no files proposed. Project would become empty.");
-        }
-    }
+    // Ensure appsscript.json is always present, even if AI's proposal somehow removes it
+    finalFilesForPutPayload = _ensureAppsscriptJsonFallback(finalFilesForPutPayload, originalProjectContent.files);
 
     const finalPayload = { files: finalFilesForPutPayload };
     
-    // 2. 最終的なファイルリストでスクリプト内容をPUTリクエストで更新
-    const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(finalPayload), muteHttpExceptions: true };
-    const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
-    if (putResponse.getResponseCode() !== 200) {
-        return {
-            status: 'error',
-            message: `Failed to update script. (HTTP ${putResponse.getResponseCode()})`,
-            apiErrorDetails: JSON.parse(putResponse.getContentText() || '{}'),
-            fullErrorText: putResponse.getContentText()
-        };
-    }
+    // 2. Update the script content with the final file list
+    console.log(`Updating script content for ID: ${scriptId}`);
+    const putResponse = _makeApiCall(contentUrl, 'put', accessToken, JSON.stringify(finalPayload), 'Failed to update script');
 
     let deployResult = null;
     if (autoDeploy) {
-      console.log(`自動デプロイを開始します。スクリプトID: ${scriptId}`);
+      console.log(`Initiating automatic deployment for Script ID: ${scriptId}`);
       deployResult = deployScript(scriptId, proposalPurpose);
-      console.log("自動デプロイ結果:", JSON.stringify(deployResult, null, 2));
+      console.log("Automatic deployment result:", JSON.stringify(deployResult, null, 2));
     }
 
     let successMessage = `Script (ID: ${scriptId}) updated successfully. AI's proposal has been applied.`;
@@ -140,9 +59,143 @@ function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDep
     };
 
   } catch (error) {
-    console.error("スクリプト適用中にエラーが発生しました:", error);
-    return { status: 'error', message: `Script application error: ${error.message}` };
+    console.error("Error applying script changes:", error);
+    return { status: 'error', message: `Script application error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null, fullErrorText: error.fullErrorText || null };
   }
+}
+
+/**
+ * Internal helper to make an authenticated Apps Script API call.
+ * @param {string} url - The URL to fetch.
+ * @param {'get'|'post'|'put'|'delete'} method - The HTTP method.
+ * @param {string} accessToken - OAuth token.
+ * @param {string} [payload] - JSON payload for POST/PUT requests.
+ * @param {string} errorMessagePrefix - Prefix for error messages.
+ * @returns {GoogleAppsScript.URL_Fetch.HTTPResponse} The successful response.
+ * @throws {Error} If the API call fails.
+ */
+function _makeApiCall(url, method, accessToken, payload = null, errorMessagePrefix = 'API call failed') {
+  const options = {
+    method: method,
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+    muteHttpExceptions: true
+  };
+  if (payload) {
+    options.contentType = 'application/json';
+    options.payload = payload;
+  }
+
+  const response = UrlFetchApp.fetch(url, options);
+  const responseCode = response.getResponseCode();
+  if (responseCode !== 200) {
+    const errorDetails = JSON.parse(response.getContentText() || '{}');
+    const error = new Error(`${errorMessagePrefix} (Status: ${responseCode}): ${errorDetails.error?.message || response.getContentText()}`);
+    error.apiErrorDetails = errorDetails;
+    error.fullErrorText = response.getContentText();
+    throw error;
+  }
+  return response;
+}
+
+/**
+ * Applies a single proposed file change (update, add, or replace) to the files map.
+ * @param {Map<string, object>} newProjectFilesMap - The map of current project files to update.
+ * @param {object} proposedFile - The file object proposed by AI.
+ */
+function _applyFileChangeToMap(newProjectFilesMap, proposedFile) {
+  if (!proposedFile || typeof proposedFile.name !== 'string' || typeof proposedFile.type !== 'string') {
+    console.warn("AI response contains a malformed file object. Skipping:", JSON.stringify(proposedFile));
+    return;
+  }
+
+  if (proposedFile.type === 'REPLACE') {
+    const currentFile = newProjectFilesMap.get(proposedFile.name);
+    if (!currentFile) {
+      console.warn(`REPLACE operation target file '${proposedFile.name}' not found in current project. Skipping.`);
+      return;
+    }
+    if (currentFile.type === 'REPLACE') {
+      console.warn(`REPLACE operation target file '${proposedFile.name}' is already marked as REPLACE type. This is unexpected. Skipping.`);
+      return;
+    }
+
+    const currentSource = currentFile.source;
+    const oldString = proposedFile.old_string;
+    const newString = proposedFile.new_string;
+
+    if (typeof oldString !== 'string' || typeof newString !== 'string') {
+      console.warn(`REPLACE operation for '${proposedFile.name}' has malformed old_string or new_string. Skipping.`);
+      return;
+    }
+
+    const isGlobalReplace = proposedFile.isGlobalReplace === true;
+    let replacementPerformed = false;
+
+    if (isGlobalReplace) {
+      if (currentSource.includes(oldString)) {
+        currentFile.source = currentSource.replaceAll(oldString, newString);
+        console.log(`File '${proposedFile.name}' (Global REPLACE) executed.`);
+        replacementPerformed = true;
+      }
+    } else {
+      if (currentSource.includes(oldString)) {
+        currentFile.source = currentSource.replace(oldString, newString);
+        console.log(`File '${proposedFile.name}' (Single REPLACE) executed.`);
+        replacementPerformed = true;
+      }
+    }
+
+    if (!replacementPerformed) {
+      console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Skipping replacement. Proposed Old String (first 100 chars): "${oldString.substring(0, 100)}"...`);
+    }
+  } else { // Handle SERVER_JS, JSON, HTML types
+    newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
+  }
+}
+
+/**
+ * Deletes files from the project files map based on the provided list of file names.
+ * @param {Map<string, object>} newProjectFilesMap - The map of project files to modify.
+ * @param {Array<string>} deletedFileNames - Array of file names to delete.
+ * @param {Array<object>} originalProjectFiles - The original list of files (for logging purposes).
+ */
+function _deleteFilesFromMap(newProjectFilesMap, deletedFileNames, originalProjectFiles) {
+  if (deletedFileNames && Array.isArray(deletedFileNames)) {
+    deletedFileNames.forEach(fileName => {
+      if (newProjectFilesMap.has(fileName)) {
+        newProjectFilesMap.delete(fileName);
+        console.log(`File marked for deletion and removed from map: ${fileName}`);
+      } else {
+        console.warn(`File '${fileName}' was marked for deletion but not found in current map. Skipping deletion.`);
+      }
+    });
+  }
+}
+
+/**
+ * Ensures that `appsscript.json` is always present in the final payload.
+ * This acts as a fallback if AI's proposal somehow omits or deletes it.
+ * @param {Array<object>} currentFilesPayload - The array of files prepared for the PUT request.
+ * @param {Array<object>} originalProjectFiles - The original files array from the project.
+ * @returns {Array<object>} The updated files array including appsscript.json if necessary.
+ * @throws {Error} If `appsscript.json` is critically missing and cannot be restored.
+ */
+function _ensureAppsscriptJsonFallback(currentFilesPayload, originalProjectFiles) {
+  const hasAppsscriptJson = currentFilesPayload.some(f => f.name === 'appsscript' && f.type === 'JSON');
+  if (!hasAppsscriptJson) {
+    const appsscriptJson = originalProjectFiles.find(f => f.name === 'appsscript' && f.type === 'JSON');
+    if (appsscriptJson) {
+      currentFilesPayload.push(appsscriptJson);
+      console.warn("appsscript.json was missing from proposed files; forcibly re-added from original project.");
+    } else {
+      // This case should ideally not happen if original project is valid, but good for robustness
+      throw new Error("Cannot apply changes: appsscript.json not found in original project content. Project would become empty or invalid.");
+    }
+  }
+  if (currentFilesPayload.length === 0) {
+     throw new Error("Cannot apply changes: Proposed file list is empty after all operations. At least one file must remain.");
+  }
+  return currentFilesPayload;
 }
 
 /**
@@ -165,7 +218,7 @@ function setGcpProjectId(gcpProjectId) {
 
 /**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
- * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID (このIDはGCPプロジェクト内の全てのApps Scriptログを取得するために使用されません)
+ * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID
  * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
  */
 function getScriptLogs(targetScriptId) {
@@ -178,12 +231,8 @@ function getScriptLogs(targetScriptId) {
     if (!gcpProjectId) {
       console.log("Script propertiesにGCPプロジェクトIDが見つかりません。メタデータから取得を試みます。");
       const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
-      const metadataOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-      const metadataResponse = UrlFetchApp.fetch(currentScriptMetadataUrl, metadataOptions);
+      const metadataResponse = _makeApiCall(currentScriptMetadataUrl, 'get', accessToken, null, 'Failed to retrieve current script metadata');
       
-      if (metadataResponse.getResponseCode() !== 200) {
-        throw new Error(`Failed to retrieve current script metadata: ${metadataResponse.getContentText()}`);
-      }
       const metadata = JSON.parse(metadataResponse.getContentText());
 
       if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
@@ -208,34 +257,21 @@ function getScriptLogs(targetScriptId) {
       "resourceNames": [
         `projects/${gcpProjectId}`
       ],
-      "filter": `resource.type="app_script_function"`,
+      // Policy change: Filter specifically for the targetScriptId
+      "filter": `resource.type="app_script_function" AND resource.labels.script_id="${targetScriptId}"`, 
       "orderBy": "timestamp desc",
       "pageSize": 50
     };
 
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(requestBody),
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      muteHttpExceptions: true
-    };
-
-    console.log(`スクリプトID ${targetScriptId} のログをGCPプロジェクト ${gcpProjectId} から取得中...`);
-    const response = UrlFetchApp.fetch(loggingApiUrl, options);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
-
-    if (responseCode !== 200) {
-      throw new Error(`Cloud Logging APIエラー (Status: ${responseCode}): ${responseBody}`);
-    }
-
-    const logsData = JSON.parse(responseBody);
+    console.log(`Retrieving logs for Script ID ${targetScriptId} from GCP project ${gcpProjectId}...`);
+    const response = _makeApiCall(loggingApiUrl, 'post', accessToken, JSON.stringify(requestBody), 'Cloud Logging API error');
+    
+    const logsData = JSON.parse(response.getContentText());
     if (!logsData.entries || logsData.entries.length === 0) {
-      return "No Apps Script logs found for the specified Script ID, or across the GCP project.\n";
+      return `No Apps Script logs found for Script ID: ${targetScriptId} in GCP project: ${gcpProjectId}.\n`;
     }
 
-    let formattedLogs = "--- Latest Logs ---\n";
+    let formattedLogs = `--- Latest Logs for Script ID: ${targetScriptId} ---\n`;
     logsData.entries.forEach(entry => {
       const timestamp = new Date(entry.timestamp).toLocaleString();
       let logPayload = '';
@@ -252,282 +288,53 @@ function getScriptLogs(targetScriptId) {
     return formattedLogs;
 
   } catch (e) {
-    console.error("ログ取得中にエラーが発生しました:", e);
+    console.error("Error retrieving logs:", e);
     return `Log retrieval error: ${e.message}`;
   }
 }
 
 /**
- * スクリプトの新しいバージョンを作成し、それを新しいウェブアプリとしてデプロイします。
- * appsscript.jsonに定義されたウェブアプリ設定を適用します。
- * デプロイメント数が上限に達している場合にのみ、最も古いウェブアプリデプロイメントをアーカイブ（削除）します。
- * @param {string} scriptId - デプロイするスクリプトのID
- * @param {string} description - デプロイの説明（オプション、AIの変更主旨または手動入力）
- * @returns {object} - デプロイ結果（成功/失敗、デプロイID、URL）
+ * Creates a new Apps Script version and deploys it as a new web app.
+ * Handles cleanup of old versions and web app deployments if limits are reached.
+ * @param {string} scriptId - The ID of the script to deploy.
+ * @param {string} description - The deployment description (optional).
+ * @returns {object} - Deployment result (success/failure, deployment ID, URL).
  */
 function deployScript(scriptId, description = '') {
-  console.log("deployScript function called. Script ID:", scriptId, "Description:", description);
+  console.log("Starting deployScript for Script ID:", scriptId, "Description:", description);
   const accessToken = ScriptApp.getOAuthToken();
   const versionsApiBaseUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
-    // --- START: Version Cleanup Logic --- (新しいバージョン作成前に古いバージョンをクリーンアップ)
-    console.log("古いバージョンをクリーンアップする必要があるか確認中...");
-    const VERSION_CLEANUP_THRESHOLD = 195; // 最新のN個のバージョンを保持する (Google Apps Scriptのバージョン上限は200)
+    // Cleanup old versions before creating a new one
+    _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deploymentsApiUrl);
 
-    // 1. 全バージョンを取得 (ページネーション対応)
-    let allVersionsFromApi = [];
-    let pageTokenForCleanup = null;
-    let hasMoreForCleanup = true;
+    // Cleanup old web app deployments before creating a new one
+    _cleanupOldDeployments(scriptId, accessToken, deploymentsApiUrl);
 
-    while (hasMoreForCleanup) {
-      let versionsApiUrlForPage = versionsApiBaseUrl + `?pageSize=200`; // 最大ページサイズをリクエスト
-      if (pageTokenForCleanup) {
-        versionsApiUrlForPage += `&pageToken=${pageTokenForCleanup}`;
-      }
-      
-      const allVersionsResponse = UrlFetchApp.fetch(versionsApiUrlForPage, { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true });
-      
-      if (allVersionsResponse.getResponseCode() !== 200) {
-        console.warn(`全バージョン取得に失敗したため、バージョンクリーンアップをスキップします。エラー: ${allVersionsResponse.getContentText()}`);
-        allVersionsFromApi = []; // 部分的なデータでクリーンアップを試みないようにする
-        break; // ページネーションループを終了
-      } else {
-        const pageData = JSON.parse(allVersionsResponse.getContentText());
-        allVersionsFromApi = allVersionsFromApi.concat(pageData.versions || []);
-        pageTokenForCleanup = pageData.nextPageToken;
-        hasMoreForCleanup = !!pageTokenForCleanup;
-      }
-    }
-
-    if (allVersionsFromApi.length > 0) { // バージョンが正常に取得できた場合のみクリーンアップを進める
-      // バージョン番号で昇順にソート（最も古いものが最初に来るように）
-      let allVersions = allVersionsFromApi.sort((a, b) => a.versionNumber - b.versionNumber);
-
-      // 2. 全デプロイメントを取得し、アクティブなデプロイメントに紐づくバージョンを特定
-      // デプロイメントのリストもページネーションを考慮すべきだが、デプロイメントの数はバージョンほど多くないため、
-      // 現時点では単一リクエストのまとする。将来的に必要であればここも修正する。
-      const allDeploymentsResponse = UrlFetchApp.fetch(deploymentsApiUrl, { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true });
-      const activeDeployedVersions = new Set();
-
-      if (allDeploymentsResponse.getResponseCode() !== 200) {
-        console.warn(`アクティブなバージョンを特定するためのデプロイメント取得に失敗しました。エラー: ${allDeploymentsResponse.getContentText()}。クリーンアップは続行しますが、アクティブなバージョンを除外できない可能性があります。`);
-      } else {
-        const allDeploymentsData = JSON.parse(allDeploymentsResponse.getContentText());
-        (allDeploymentsData.deployments || []).forEach(d => {
-            // projects.deployments.list から取得したデプロイメントオブジェクトは versionNumber を deploymentConfig の下に持つ
-            if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
-                // WebアプリまたはAPI実行可能ファイルに紐づくデプロイメントの場合、そのバージョンをアクティブとマーク
-                if (d.entryPoints && Array.isArray(d.entryPoints)) {
-                    const isActiveEntryPoint = d.entryPoints.some(ep => 
-                        ep.entryPointType === 'WEB_APP' || ep.entryPointType === 'API_EXECUTABLE'
-                    );
-                    if (isActiveEntryPoint) {
-                        activeDeployedVersions.add(d.deploymentConfig.versionNumber);
-                    }
-                }
-            }
-        });
-      }
-
-      console.log(`現在のバージョン数: ${allVersions.length}`);
-      console.log(`アクティブなデプロイメントに紐づくバージョン: ${Array.from(activeDeployedVersions).join(', ')}`);
-
-      // 削除対象のバージョンを特定
-      let versionsToDelete = [];
-      if (allVersions.length > VERSION_CLEANUP_THRESHOLD) {
-        // 古い方から順に、保持する数を超えたバージョンを対象とする
-        const numberOfVersionsToCull = allVersions.length - VERSION_CLEANUP_THRESHOLD;
-        for (let i = 0; i < numberOfVersionsToCull; i++) {
-            const version = allVersions[i]; // 最も古いバージョンから順に処理
-            // アクティブなデプロイメントに紐づいていない場合のみ削除対象とする
-            if (!activeDeployedVersions.has(version.versionNumber)) {
-                versionsToDelete.push(version);
-            } else {
-                console.log(`バージョン ${version.versionNumber} (作成日時: ${version.createTime}) はアクティブなデプロイメントに紐づいているため保持します。`);
-            }
-        }
-      }
-
-      if (versionsToDelete.length > 0) {
-        console.log(`古いバージョンを ${versionsToDelete.length} 個削除します。`);
-        let deletedCount = 0;
-        for (const version of versionsToDelete) {
-          console.log(`バージョン ${version.versionNumber} を削除中...`);
-          const deleteVersionUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions/${version.versionNumber}`;
-          const deleteOptions = { method: 'delete', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-          const deleteResponse = UrlFetchApp.fetch(deleteVersionUrl, deleteOptions);
-
-          if (deleteResponse.getResponseCode() !== 200) {
-            console.warn(`バージョン ${version.versionNumber} の削除に失敗 (HTTP ${deleteResponse.getResponseCode()}): ${deleteResponse.getContentText()}`);
-            if (deleteResponse.getContentText().includes("This version cannot be deleted as it is a currently deployed version.")) {
-                console.warn(`注: バージョン ${version.versionNumber} はデプロイ済みのため削除できませんでした。このバージョンはアクティブなデプロイメントに紐づいていると判断されます。`);
-                activeDeployedVersions.add(version.versionNumber); // APIがデプロイ済みと明示した場合、念のためアクティブリストに追加
-            }
-          } else {
-            console.log(`バージョン ${version.versionNumber} を正常に削除しました。`);
-            deletedCount++;
-          }
-        }
-        console.log(`${deletedCount} 個の古いバージョンを削除しました。`);
-      } else {
-        console.log("削除対象の古いバージョンはありませんでした。または、すべてアクティブなデプロイメントに紐づいています。現在のバージョン数: " + allVersions.length);
-      }
-    } else {
-      console.log("バージョン取得に失敗したため、バージョンクリーンアップはスキップされました。");
-    }
-    // --- END: Version Cleanup Logic ---
-
-    // --- START: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ --- (既存のデプロイメントクリーンアップ)
-    console.log("新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブする必要があるか確認中...");
-    const DEPLOYMENT_LIMIT = 20; // Google Apps Scriptのデプロイメント上限
-
-    const listDeploymentsUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
-    const listOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const listResponse = UrlFetchApp.fetch(listDeploymentsUrl, listOptions);
-    const listResponseBody = listResponse.getContentText();
-
-    if (listResponse.getResponseCode() !== 200) {
-      console.warn(`既存デプロイメントのリスト取得に失敗しましたが、新しいデプロイメントは続行されます。エラー: ${listResponseBody}`);
-    } else {
-      const allDeployments = JSON.parse(listResponseBody).deployments || [];
-      // Webアプリデプロイメントのみをフィルタリング
-      const webAppDeployments = allDeployments.filter(dep => 
-          dep.entryPoints && Array.isArray(dep.entryPoints) && 
-          dep.entryPoints.some(ep => ep.entryPointType === 'WEB_APP')
-      );
-      
-      console.log(`現在のウェブアプリデプロイメント数: ${webAppDeployments.length}`);
-
-      // 新しいデプロイメントのために空きを作るために削除する必要があるWebアプリデプロイメントの数を計算
-      // 目標は DEPLOYMENT_LIMIT - 1 にすることです。
-      const deploymentsToRemoveCount = webAppDeployments.length - (DEPLOYMENT_LIMIT - 1);
-
-      if (deploymentsToRemoveCount > 0) {
-        console.log(`ウェブアプリデプロイメント数が上限 (${DEPLOYMENT_LIMIT}) に近づいています (${webAppDeployments.length}個)。最も古い ${deploymentsToRemoveCount} 個のウェブアプリデプロイメントをアーカイブします。`);
-        
-        // 作成時間でソート（最も古いものが最初）
-        webAppDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
-
-        let removedCount = 0;
-        // 最も古い 'deploymentsToRemoveCount' 個のWebアプリデプロイメントを削除
-        for (let i = 0; i < deploymentsToRemoveCount && i < webAppDeployments.length; i++) {
-          const oldDeploymentToDelete = webAppDeployments[i];
-
-          console.log(`古いウェブアプリデプロイメントを削除中: ID = ${oldDeploymentToDelete.deploymentId}, 作成日時 = ${oldDeploymentToDelete.createTime}`);
-          const deleteDeploymentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments/${oldDeploymentToDelete.deploymentId}`;
-          const deleteOptions = { method: 'delete', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-          const deleteResponse = UrlFetchApp.fetch(deleteDeploymentUrl, deleteOptions);
-
-          if (deleteResponse.getResponseCode() !== 200) {
-            console.warn(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} の削除に失敗: ${deleteResponse.getContentText()}`);
-            if (deleteResponse.getContentText().includes("Read-only deployments may not be deleted.")) {
-                console.warn(`注: デプロイメント ${oldDeploymentToDelete.deploymentId} は読み取り専用のため削除できませんでした。`);
-            }
-          } else {
-            console.log(`古いデプロイメント ${oldDeploymentToDelete.deploymentId} を正常に削除しました。`);
-            removedCount++;
-          }
-        }
-        if (removedCount > 0) {
-          console.log(`${removedCount} 個の古いウェブアプリデプロイメントを削除しました。`);
-        } else {
-          console.log("削除可能な古いウェブアプリデプロイメントが見つからなかったか、全て削除に失敗しました。利用可能なデプロイメントはすべて読み取り専用である可能性があります。");
-        }
-      } else {
-        console.log(`ウェブアプリデプロイメント数が上限 (${DEPLOYMENT_LIMIT}) 未満のため、古いデプロイメントのアーカイブはスキップします。`);
-      }
-    }
-    // --- END: 新しいデプロイメントの前に、古いウェブアプリデプロイメントをアーカイブ ---
-
-    // 1. 新しいバージョンを作成する
-    console.log("新しいスクリプトバージョンを作成中...");
-    const createVersionPayload = { description: description };
-    console.log("バージョン作成リクエストペイロード:", JSON.stringify(createVersionPayload));
-
-    const createVersionOptions = {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      payload: JSON.stringify(createVersionPayload),
-      muteHttpExceptions: true
-    };
-    const createVersionResponse = UrlFetchApp.fetch(versionsApiBaseUrl, createVersionOptions);
-    const createVersionResponseCode = createVersionResponse.getResponseCode();
-    const createVersionResponseBody = createVersionResponse.getContentText();
-
-    console.log(`バージョン作成API応答 - ステータス: ${createVersionResponseCode}, ボディ: ${createVersionResponseBody}`);
-
-    if (createVersionResponseCode !== 200) {
-      throw new Error(`Version creation API error (Status: ${createVersionResponseCode}): ${createVersionResponseBody}`);
-    }
-    const versionResult = JSON.parse(createVersionResponseBody);
-    console.log("解析されたバージョン作成応答データ:", JSON.stringify(versionResult, null, 2));
+    // 1. Create a new version
+    console.log("Creating new script version...");
+    const versionResult = _createVersion(scriptId, accessToken, description);
     const versionNumber = versionResult.versionNumber;
-    console.log(`新しいバージョンが作成されました: Version ${versionNumber}`);
+    console.log(`New version created: Version ${versionNumber}`);
 
-    // 3. デプロイAPIのペイロードを正しく構築する
-    // ログのエラー「Unknown name "deploymentConfig": Cannot find field.」を解決するため、
-    // createDeployment APIのペイロードから"deploymentConfig"を削除し、直接プロパティを渡します。
-    const deploymentRequestBody = {
-      "versionNumber": versionNumber,
-      "manifestFileName": "appsscript",
-      "description": description
-    };
-    console.log("デプロイリクエストペイロード:", JSON.stringify(deploymentRequestBody));
+    // 2. Deploy the new version as a web app
+    console.log(`Deploying version ${versionNumber} as a web app...`);
+    const deploymentResult = _performDeployment(scriptId, accessToken, deploymentsApiUrl, versionNumber, description);
+    const newDeploymentId = deploymentResult.deploymentId;
 
-    const deployOptions = {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(deploymentRequestBody),
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      muteHttpExceptions: true
-    };
-
-    console.log(`スクリプトID ${scriptId} のバージョン ${versionNumber} をウェブアプリとしてデプロイ中...`);
-    const response = UrlFetchApp.fetch(deploymentsApiUrl, deployOptions);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
-
-    console.log(`デプロイAPI応答 - ステータス: ${responseCode}, ボディ: ${responseBody}`);
-
-    if (responseCode !== 200) {
-      throw new Error(`Deployment API error (Status: ${responseCode}): ${responseBody}`);
-    }
-
-    const deploymentResult = JSON.parse(responseBody);
-    console.log("デプロイ成功応答データ:", JSON.stringify(deploymentResult, null, 2));
-
-    const newDeploymentId = deploymentResult.deploymentId; // 新しく作成されたデプロイメントのIDを取得
-
-    // デプロイ結果からWebアプリURLを安全に抽出するように修正
-    let webappUrl;
+    let webappUrl = null;
     if (deploymentResult.entryPoints && Array.isArray(deploymentResult.entryPoints) && deploymentResult.entryPoints.length > 0) {
-      console.log("デプロイ応答のentryPointsプロパティ:", JSON.stringify(deploymentResult.entryPoints));
-      // WEB_APPタイプのエントリポイントを明示的に検索
       const webAppEntryPoint = deploymentResult.entryPoints.find(ep => ep.entryPointType === 'WEB_APP');
       if (webAppEntryPoint?.webApp?.url) {
         webappUrl = webAppEntryPoint.webApp.url;
-        console.log("WebアプリURLをentryPointから抽出しました:", webappUrl);
-      } else if (webAppEntryPoint?.webApp) {
-        console.warn("ウェブアプリのURLがデプロイ応答のwebAppオブジェクト内に見つかりませんでした。webAppオブジェクト:", JSON.stringify(webAppEntryPoint.webApp, null, 2));
+        console.log("Web App URL extracted from entryPoint:", webappUrl);
       } else {
-        console.warn("デプロイ応答のentryPointにwebAppオブジェクトが見つかりませんでした。entryPoint:", JSON.stringify(webAppEntryPoint, null, 2));
+        console.warn("Web App URL not found in deployment response entryPoints.", JSON.stringify(deploymentResult.entryPoints));
       }
-    }
-     else {
-      console.warn("デプロイ応答にentryPointsプロパティがないか、空の配列です。");
-    }
-
-    if (!webappUrl) {
-      console.warn("ウェブアプリのURLがデプロイ応答で見つかりませんでした。デプロイ結果全体:", JSON.stringify(deploymentResult, null, 2));
-      return {
-        status: 'success',
-        message: 'Deployment completed successfully, but the web app URL was not found. Please verify the deployment settings in appsscript.json.',
-        deploymentId: newDeploymentId,
-        webappUrl: null
-      };
+    } else {
+      console.warn("Deployment response has no entryPoints or an empty array.");
     }
 
     return {
@@ -538,9 +345,245 @@ function deployScript(scriptId, description = '') {
     };
 
   } catch (e) {
-    console.error("デプロイ中にエラーが発生しました:", e);
-    return { status: 'error', message: `Deployment error: ${e.message}` };
+    console.error("Error during deployment:", e);
+    return { status: 'error', message: `Deployment error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
   }
+}
+
+/**
+ * Internal helper to list all versions of a script, handling pagination.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @returns {Array<object>} List of all versions.
+ */
+function _listAllVersions(scriptId, accessToken) {
+  const versionsApiBaseUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
+  let allVersions = [];
+  let pageToken = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    let url = versionsApiBaseUrl + `?pageSize=200`;
+    if (pageToken) {
+      url += `&pageToken=${pageToken}`;
+    }
+    const response = _makeApiCall(url, 'get', accessToken, null, 'Failed to list script versions for cleanup');
+    const pageData = JSON.parse(response.getContentText());
+    allVersions = allVersions.concat(pageData.versions || []);
+    pageToken = pageData.nextPageToken;
+    hasMore = !!pageToken;
+  }
+  return allVersions;
+}
+
+/**
+ * Internal helper to list all deployments of a script, handling pagination.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @returns {Array<object>} List of all deployments.
+ */
+function _listAllDeployments(scriptId, accessToken) {
+  const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
+  let allDeployments = [];
+  let pageToken = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    let url = deploymentsApiUrl + `?pageSize=100`; // Deployments usually have a smaller limit
+    if (pageToken) {
+      url += `&pageToken=${pageToken}`;
+    }
+    const response = _makeApiCall(url, 'get', accessToken, null, 'Failed to list script deployments for cleanup');
+    const pageData = JSON.parse(response.getContentText());
+    allDeployments = allDeployments.concat(pageData.deployments || []);
+    pageToken = pageData.nextPageToken;
+    hasMore = !!pageToken;
+  }
+  return allDeployments;
+}
+
+/**
+ * Internal helper to delete a specific script version.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @param {number} versionNumber - The version number to delete.
+ */
+function _deleteVersion(scriptId, accessToken, versionNumber) {
+  const deleteVersionUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions/${versionNumber}`;
+  try {
+    _makeApiCall(deleteVersionUrl, 'delete', accessToken, null, `Failed to delete version ${versionNumber}`);
+    console.log(`Successfully deleted version ${versionNumber}.`);
+  } catch (e) {
+    console.warn(`Warning: Failed to delete version ${versionNumber}. Error: ${e.message}. This might be a deployed version.`);
+  }
+}
+
+/**
+ * Internal helper to delete a specific script deployment.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @param {string} deploymentId - The ID of the deployment to delete.
+ */
+function _deleteDeployment(scriptId, accessToken, deploymentId) {
+  const deleteDeploymentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments/${deploymentId}`;
+  try {
+    _makeApiCall(deleteDeploymentUrl, 'delete', accessToken, null, `Failed to delete deployment ${deploymentId}`);
+    console.log(`Successfully deleted deployment ${deploymentId}.`);
+  } catch (e) {
+    console.warn(`Warning: Failed to delete deployment ${deploymentId}. Error: ${e.message}. This might be a read-only deployment.`);
+  }
+}
+
+/**
+ * Internal helper to clean up old script versions.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @param {string} versionsApiBaseUrl - Base URL for versions API.
+ * @param {string} deploymentsApiUrl - URL for deployments API.
+ */
+function _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deploymentsApiUrl) {
+  console.log("Checking for old versions to clean up...");
+  const VERSION_CLEANUP_THRESHOLD = 195; // Retain latest N versions (Google Apps Script version limit is 200)
+
+  let allVersions = [];
+  try {
+    allVersions = _listAllVersions(scriptId, accessToken);
+  } catch (e) {
+    console.warn(`Failed to retrieve all versions for cleanup. Skipping version cleanup. Error: ${e.message}`);
+    return;
+  }
+
+  if (allVersions.length === 0) {
+    console.log("No versions found for cleanup.");
+    return;
+  }
+
+  allVersions.sort((a, b) => a.versionNumber - b.versionNumber); // Sort oldest first
+
+  const activeDeployedVersions = new Set();
+  try {
+    const allDeployments = _listAllDeployments(scriptId, accessToken);
+    allDeployments.forEach(d => {
+      if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
+        const isActiveEntryPoint = d.entryPoints?.some(ep => ep.entryPointType === 'WEB_APP' || ep.entryPointType === 'API_EXECUTABLE');
+        if (isActiveEntryPoint) {
+          activeDeployedVersions.add(d.deploymentConfig.versionNumber);
+        }
+      }
+    });
+  } catch (e) {
+    console.warn(`Failed to retrieve active deployments for version cleanup. Error: ${e.message}. Cleanup will proceed, but active versions might not be excluded.`);
+  }
+
+  console.log(`Current number of versions: ${allVersions.length}`);
+  console.log(`Versions linked to active deployments: ${Array.from(activeDeployedVersions).join(', ')}`);
+
+  let versionsToDelete = [];
+  if (allVersions.length > VERSION_CLEANUP_THRESHOLD) {
+    const numberOfVersionsToCull = allVersions.length - VERSION_CLEANUP_THRESHOLD;
+    for (let i = 0; i < numberOfVersionsToCull; i++) {
+      const version = allVersions[i];
+      if (!activeDeployedVersions.has(version.versionNumber)) {
+        versionsToDelete.push(version);
+      } else {
+        console.log(`Version ${version.versionNumber} (created: ${version.createTime}) is linked to an active deployment, retaining.`);
+      }
+    }
+  }
+
+  if (versionsToDelete.length > 0) {
+    console.log(`Deleting ${versionsToDelete.length} old versions.`);
+    let deletedCount = 0;
+    for (const version of versionsToDelete) {
+      _deleteVersion(scriptId, accessToken, version.versionNumber);
+      deletedCount++;
+    }
+    console.log(`${deletedCount} old versions deleted.`);
+  } else {
+    console.log("No old versions found for deletion or all are actively deployed. Current version count: " + allVersions.length);
+  }
+}
+
+/**
+ * Internal helper to clean up old web app deployments.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @param {string} deploymentsApiUrl - URL for deployments API.
+ */
+function _cleanupOldDeployments(scriptId, accessToken, deploymentsApiUrl) {
+  console.log("Checking for old web app deployments to archive...");
+  const DEPLOYMENT_LIMIT = 20; // Google Apps Script deployment limit
+
+  let allDeployments = [];
+  try {
+    allDeployments = _listAllDeployments(scriptId, accessToken);
+  } catch (e) {
+    console.warn(`Failed to retrieve existing deployments for cleanup. Skipping deployment cleanup. Error: ${e.message}`);
+    return;
+  }
+
+  const webAppDeployments = allDeployments.filter(dep => 
+    dep.entryPoints?.some(ep => ep.entryPointType === 'WEB_APP')
+  );
+  
+  console.log(`Current number of web app deployments: ${webAppDeployments.length}`);
+
+  const deploymentsToRemoveCount = webAppDeployments.length - (DEPLOYMENT_LIMIT - 1);
+
+  if (deploymentsToRemoveCount > 0) {
+    console.log(`Web app deployment count is near limit (${DEPLOYMENT_LIMIT}) - currently ${webAppDeployments.length}. Archiving oldest ${deploymentsToRemoveCount} web app deployments.`);
+    
+    webAppDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
+
+    let removedCount = 0;
+    for (let i = 0; i < deploymentsToRemoveCount && i < webAppDeployments.length; i++) {
+      const oldDeploymentToDelete = webAppDeployments[i];
+      _deleteDeployment(scriptId, accessToken, oldDeploymentToDelete.deploymentId);
+      removedCount++;
+    }
+    if (removedCount > 0) {
+      console.log(`${removedCount} old web app deployments archived.`);
+    } else {
+      console.log("No removable old web app deployments found or all deletion attempts failed.");
+    }
+  } else {
+    console.log(`Web app deployment count is below limit (${DEPLOYMENT_LIMIT}), skipping old deployment archiving.`);
+  }
+}
+
+/**
+ * Internal helper to create a new script version.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @param {string} description - Description for the new version.
+ * @returns {object} The created version object.
+ */
+function _createVersion(scriptId, accessToken, description) {
+  const versionsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions`;
+  const createVersionPayload = { description: description };
+  console.log("Version creation request payload:", JSON.stringify(createVersionPayload));
+  const response = _makeApiCall(versionsApiUrl, 'post', accessToken, JSON.stringify(createVersionPayload), 'Version creation API error');
+  return JSON.parse(response.getContentText());
+}
+
+/**
+ * Internal helper to perform the web app deployment.
+ * @param {string} scriptId - The ID of the script.
+ * @param {string} accessToken - OAuth token.
+ * @param {string} deploymentsApiUrl - URL for deployments API.
+ * @param {number} versionNumber - The version number to deploy.
+ * @param {string} description - Description for the deployment.
+ * @returns {object} The created deployment object.
+ */
+function _performDeployment(scriptId, accessToken, deploymentsApiUrl, versionNumber, description) {
+  const deploymentRequestBody = {
+    "versionNumber": versionNumber,
+    "manifestFileName": "appsscript",
+    "description": description
+  };
+  console.log("Deployment request payload:", JSON.stringify(deploymentRequestBody));
+  const response = _makeApiCall(deploymentsApiUrl, 'post', accessToken, JSON.stringify(deploymentRequestBody), 'Deployment API error');
+  return JSON.parse(response.getContentText());
 }
 
 /**
@@ -552,7 +595,7 @@ function listAppsScriptProjects() {
     // Using Drive API (Advanced Service) to list script files
     // Requires 'Drive API' to be enabled in Advanced Google Services (Resources > Advanced Google services...)
     // Requires 'https://www.googleapis.com/auth/drive.readonly' scope in appsscript.json
-    console.log("ドライブAPIを使用してApps Scriptプロジェクトをリスト中...");
+    console.log("Listing Apps Script projects using Drive API...");
     
     // Filter for Apps Script files that are not trashed
     const query = 'mimeType = "application/vnd.google-apps.script" and trashed = false';
@@ -560,25 +603,24 @@ function listAppsScriptProjects() {
     // Fetch files, limit to a reasonable number (e.g., 200)
     let response = Drive.Files.list({
       q: query,
-      fields: 'files(id, name)', // Changed from 'items(id,title)' for Drive API v3
-      maxResults: 200 // Limit the number of results to prevent excessive load
+      fields: 'files(id, name)',
+      maxResults: 200
     });
 
-    const projects = (response.files || []).map(file => ({ // Changed from response.items to response.files
-      id: file.id,       // For standalone scripts, file ID is the script ID. For bound scripts, this is the container ID.
-      title: file.name  // Changed from file.title to file.name for Drive API v3
+    const projects = (response.files || []).map(file => ({
+      id: file.id,
+      title: file.name
     }));
 
     return { status: 'success', projects: projects };
 
   } catch (e) {
-    console.error("ドライブAPIによるApps Scriptプロジェクトのリスト中にエラーが発生しました:", e);
+    console.error("Error listing Apps Script projects via Drive API:", e);
     let userMessage = `Apps Script project list error: ${e.message}`;
 
     if (e.name === 'ReferenceError' && e.message.includes("Drive is not defined")) {
       userMessage = `Failed to retrieve Apps Script projects. Drive API (Advanced Service) might not be enabled for this Apps Script project. Please enable 'Drive API' from 'Project settings' (gear icon) > 'Advanced Google Services' in the Apps Script editor and ensure it's linked to this project. Also, confirm that the appropriate OAuth scope (https://www.googleapis.com/auth/drive.readonly) is set in appsscript.json.`;
     } else if (e.message.includes("API call to drive.files.list failed with error")) {
-      // This is for cases where Drive is defined but the API call itself failed (e.g., permission issue)
       userMessage = `Failed to retrieve Apps Script projects. Please confirm that Drive API (Advanced Service) is enabled for this Apps Script project and that the appropriate OAuth scope (https://www.googleapis.com/auth/drive.readonly) is set in appsscript.json. Error: ${e.message}`;
     }
     return { status: 'error', message: userMessage };
@@ -586,128 +628,15 @@ function listAppsScriptProjects() {
 }
 
 /**
- * 指定されたApps Scriptの編集者URLを生成します。
- * @param {string} scriptId - 編集者URLを生成するApps ScriptのID
- * @returns {string} - Apps Scriptの編集者URL
+ * Generates the editor URL for a given Apps Script ID.
+ * @param {string} scriptId - The ID of the Apps Script.
+ * @returns {string} - The Apps Script editor URL.
  */
 function getScriptEditorUrl(scriptId) {
   if (!scriptId || scriptId.trim() === '') {
     return "Error: Script ID is not specified.";
   }
   return `https://script.google.com/d/${scriptId}/edit`;
-}
-
-/**
- * Adds a new Apps Script library dependency to the target script's appsscript.json.
- *
- * @param {string} targetScriptId - The ID of the script to modify.
- * @param {string} libraryScriptId - The Script ID of the library to add.
- * @param {string} libraryVersion - The version of the library (e.g., "1", "HEAD"). Can be an empty string for HEAD.
- * @returns {object} - Result object with status and message.
- */
-function addLibraryToProject(targetScriptId, libraryScriptId, libraryVersion) {
-  if (!targetScriptId || targetScriptId.trim() === '') {
-    return { status: 'error', message: 'Target script ID is not specified.' };
-  }
-  if (!libraryScriptId || libraryScriptId.trim() === '') {
-    return { status: 'error', message: 'Library Script ID is not specified.' };
-  }
-
-  // Default to 'HEAD' if version is empty or not provided
-  const effectiveVersion = libraryVersion.trim() === '' ? 'HEAD' : libraryVersion.trim();
-
-  try {
-    const accessToken = ScriptApp.getOAuthToken();
-    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
-
-    // 1. Get current appsscript.json content
-    console.log(`スクリプトID ${targetScriptId} の現在の内容を取得中...`);
-    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
-
-    if (getResponse.getResponseCode() !== 200) {
-      const errorDetails = JSON.parse(getResponse.getContentText() || '{}');
-      console.error("スクリプト内容の取得に失敗しました:", getResponse.getContentText());
-      return { status: 'error', message: `Failed to retrieve script content: ${errorDetails.error?.message || getResponse.getContentText()}` };
-    }
-    const projectContent = JSON.parse(getResponse.getContentText());
-
-    let appsscriptJsonFile = projectContent.files.find(file => file.name === 'appsscript' && file.type === 'JSON');
-
-    if (!appsscriptJsonFile) {
-      return { status: 'error', message: 'appsscript.json file not found in the target script.' };
-    }
-
-    let manifest = JSON.parse(appsscriptJsonFile.source);
-
-    // Ensure dependencies and dependencies.libraries exist
-    if (!manifest.dependencies) {
-      manifest.dependencies = {};
-    }
-    if (!manifest.dependencies.libraries) {
-      manifest.dependencies.libraries = [];
-    }
-
-    // Check for existing library to prevent duplicates
-    const existingLibraryIndex = manifest.dependencies.libraries.findIndex(
-      lib => lib.libraryId === libraryScriptId
-    );
-
-    if (existingLibraryIndex !== -1) {
-      // If found, update version if different, otherwise notify it already exists
-      const existingLib = manifest.dependencies.libraries[existingLibraryIndex];
-      if (existingLib.version !== effectiveVersion) {
-        existingLib.version = effectiveVersion;
-        appsscriptJsonFile.source = JSON.stringify(manifest, null, 2); // Prettify output
-        console.log(`既存のライブラリ '${libraryScriptId}' のバージョンを '${effectiveVersion}' に更新します。`);
-        // Proceed to update the project content
-      } else {
-        return { status: 'success', message: `Library '${libraryScriptId}' (Version: ${effectiveVersion}) is already added.` };
-      }
-    } else {
-      // Add new library
-      manifest.dependencies.libraries.push({
-        libraryId: libraryScriptId,
-        version: effectiveVersion,
-        userSymbol: 'lib_' + libraryScriptId.substring(0, 8) // Use first 8 chars for user symbol
-      });
-      appsscriptJsonFile.source = JSON.stringify(manifest, null, 2); // Prettify output
-      console.log(`新しいライブラリ '${libraryScriptId}' (バージョン: ${effectiveVersion}) を追加します。`);
-    }
-
-    // Prepare files array for updateContent - only include appsscript.json for modification
-    const filesToUpdate = projectContent.files.map(file => {
-      if (file.name === 'appsscript' && file.type === 'JSON') {
-        return appsscriptJsonFile; // Return the modified appsscript.json
-      }
-      return file; // Return other files as is (their source won't be changed)
-    });
-    
-    // Construct the payload for updateContent
-    const updatePayload = { files: filesToUpdate };
-
-    // 2. Update the project content (appsscript.json)
-    console.log(`スクリプトID ${targetScriptId} のappsscript.jsonを更新中...`);
-    const putOptions = { method: 'put', headers: { 'Authorization': `Bearer ${accessToken}` }, contentType: 'application/json', payload: JSON.stringify(updatePayload), muteHttpExceptions: true };
-    const putResponse = UrlFetchApp.fetch(contentUrl, putOptions);
-
-    if (putResponse.getResponseCode() !== 200) {
-      const errorDetails = JSON.parse(putResponse.getContentText() || '{}');
-      console.error("appsscript.jsonの更新に失敗しました:", putResponse.getContentText());
-      return { 
-        status: 'error', 
-        message: `Failed to update appsscript.json: ${errorDetails.error?.message || putResponse.getContentText()}`, 
-        apiErrorDetails: errorDetails,
-        fullErrorText: putResponse.getContentText()
-      };
-    }
-
-    return { status: 'success', message: `Library '${libraryScriptId}' (Version: ${effectiveVersion}) has been added to (or updated in) the target script.` };
-
-  } catch (error) {
-    console.error("ライブラリ追加中にエラーが発生しました:", error);
-    return { status: 'error', message: `Library addition error: ${error.message}` };
-  }
 }
 
 /**
@@ -727,89 +656,57 @@ function listScriptVersions(scriptId) {
     const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
     // 1. Fetch all versions with pagination
-    console.log(`スクリプトID ${scriptId} のバージョンをリスト中 (全ページ取得)...`);
+    console.log(`Listing versions for Script ID ${scriptId} (fetching all pages)...`);
     let allVersionsFromApi = [];
-    let pageToken = null;
-    let hasMore = true;
-
-    while (hasMore) {
-      let versionsApiUrlForPage = versionsApiBaseUrl + `?pageSize=200`; // 最大ページサイズをリクエスト
-      if (pageToken) {
-        versionsApiUrlForPage += `&pageToken=${pageToken}`;
-      }
-      
-      const versionOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-      const versionResponse = UrlFetchApp.fetch(versionsApiUrlForPage, versionOptions);
-      const versionResponseCode = versionResponse.getResponseCode();
-      const versionResponseBody = versionResponse.getContentText();
-
-      if (versionResponseCode !== 200) {
-        console.error(`バージョン取得APIエラー (ステータス: ${versionResponseCode}): ${versionResponseBody}`);
-        return { status: 'error', message: `Version retrieval error (HTTP ${versionResponseCode}): ${versionResponseBody}` };
-      }
-
-      const versionsData = JSON.parse(versionResponseBody);
-      allVersionsFromApi = allVersionsFromApi.concat(versionsData.versions || []);
-      pageToken = versionsData.nextPageToken;
-      hasMore = !!pageToken; // next page tokenがあれば続ける
+    try {
+      allVersionsFromApi = _listAllVersions(scriptId, accessToken);
+    } catch (e) {
+      return { status: 'error', message: `Version retrieval error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
     }
-
+    
     let versions = allVersionsFromApi.map(v => ({
       versionNumber: v.versionNumber,
       createTime: v.createTime,
-      description: v.description || '説明なし',
+      description: v.description || 'No description',
       webappUrl: null // Initialize webappUrl
     }));
 
     // 2. Fetch all deployments to find web app URLs
-    console.log(`デプロイメントAPI呼び出しURL: ${deploymentsApiUrl}`);
-    const deploymentOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const deploymentResponse = UrlFetchApp.fetch(deploymentsApiUrl, deploymentOptions);
-    const deploymentResponseCode = deploymentResponse.getResponseCode();
-    const deploymentResponseBody = deploymentResponse.getContentText();
-
-    console.log(`デプロイメント取得API応答 - ステータス: ${deploymentResponseCode}, ボディ: ${deploymentResponseBody}`);
-
-    if (deploymentResponseCode !== 200) {
-      console.warn(`デプロイメント取得APIエラー (ステータス: ${deploymentResponseCode})。ウェブアプリURLは取得できませんでした: ${deploymentResponseBody}`);
+    console.log(`Calling Deployments API URL: ${deploymentsApiUrl}`);
+    let allDeployments = [];
+    try {
+      allDeployments = _listAllDeployments(scriptId, accessToken);
+    } catch (e) {
+      console.warn(`Deployment retrieval API error during version listing. Web app URLs will not be available: ${e.message}`);
       // Continue without web app URLs if deployment fetch fails
-    } else {
-      const deploymentsData = JSON.parse(deploymentResponseBody);
-      console.log(`デプロイメントデータ解析成功。デプロイメント数: ${(deploymentsData.deployments || []).length}`);
-      
-      let allDeployments = deploymentsData.deployments || [];
-
-      // 作成時間で降順にソートして、各バージョンにつき最新のウェブアプリURLを確実にする
-      allDeployments.sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime());
-
-      const webAppUrlMap = {}; // versionNumber -> webAppUrl のマップを格納
-
-      allDeployments.forEach(d => {
-        // projects.deployments.list から取得したデプロイメントオブジェクトは versionNumber を deploymentConfig の下に持つ
-        if (d.deploymentConfig && d.deploymentConfig.versionNumber) { // 特定のバージョンに紐づくデプロイメントのみ処理
-          if (d.entryPoints && Array.isArray(d.entryPoints)) {
-            d.entryPoints.forEach(ep => {
-              if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
-                // まだ存在しない場合のみ追加し、ソート順により最新のものを取得する
-                if (!webAppUrlMap[d.deploymentConfig.versionNumber]) {
-                  webAppUrlMap[d.deploymentConfig.versionNumber] = ep.webApp.url;
-                  console.log(`バージョン ${d.deploymentConfig.versionNumber} の最新ウェブアプリURLをマップに登録: ${ep.webApp.url}`);
-                }
-              }
-            });
-          }
-        }
-      });
-
-      // 3. Enrich versions with web app URLs
-      versions = versions.map(v => {
-        if (webAppUrlMap[v.versionNumber]) {
-          v.webappUrl = webAppUrlMap[v.versionNumber];
-          console.log(`バージョン ${v.versionNumber} にウェブアプリURL ${v.webappUrl} を追加しました。`);
-        }
-        return v;
-      });
     }
+
+    const webAppUrlMap = {}; // versionNumber -> webAppUrl map
+
+    // Sort deployments by create time descending to get the latest web app URL for each version
+    allDeployments.sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime());
+
+    allDeployments.forEach(d => {
+      if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
+        d.entryPoints?.forEach(ep => {
+          if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
+            // Add only if not already mapped, ensuring latest deployment's URL
+            if (!webAppUrlMap[d.deploymentConfig.versionNumber]) {
+              webAppUrlMap[d.deploymentConfig.versionNumber] = ep.webApp.url;
+              console.log(`Mapped latest web app URL for version ${d.deploymentConfig.versionNumber}: ${ep.webApp.url}`);
+            }
+          }
+        });
+      }
+    });
+
+    // 3. Enrich versions with web app URLs
+    versions = versions.map(v => {
+      if (webAppUrlMap[v.versionNumber]) {
+        v.webappUrl = webAppUrlMap[v.versionNumber];
+      }
+      return v;
+    });
 
     // Sort versions by versionNumber descending (latest first)
     versions.sort((a, b) => b.versionNumber - a.versionNumber);
@@ -817,8 +714,8 @@ function listScriptVersions(scriptId) {
     return { status: 'success', versions: versions, message: 'Versions retrieved successfully.' };
 
   } catch (e) {
-    console.error("バージョン取得中にエラーが発生しました:", e);
-    return { status: 'error', message: `Version retrieval error: ${e.message}` };
+    console.error("Error during version retrieval:", e);
+    return { status: 'error', message: `Version retrieval error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
   }
 }
 
@@ -839,68 +736,40 @@ function revertToVersion(scriptId, versionNumber) {
 
   try {
     const accessToken = ScriptApp.getOAuthToken();
-    // 特定のバージョンのコンテンツを取得するためのエンドポイントを/versions/{versionNumber}から
-    // /content?versionNumber={versionNumber}に変更
     const getContentForVersionUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content?versionNumber=${versionNumber}`;
     const currentContentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
-    // 1. 指定されたバージョンのコンテンツを取得する
-    console.log(`バージョン ${versionNumber} のコンテンツを取得中...`);
-    const getVersionContentOptions = {
-      method: 'get',
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      muteHttpExceptions: true
-    };
-    const getVersionContentResponse = UrlFetchApp.fetch(getContentForVersionUrl, getVersionContentOptions);
-    const getVersionContentCode = getVersionContentResponse.getResponseCode();
-    const getVersionContentBody = getVersionContentResponse.getContentText();
-
-    if (getVersionContentCode !== 200) {
-      console.error(`指定バージョンコンテンツ取得APIエラー (ステータス: ${getVersionContentCode}): ${getVersionContentBody}`);
-      return { status: 'error', message: `Failed to retrieve content for version ${versionNumber} (HTTP ${getVersionContentCode}): ${getVersionContentBody}` };
-    }
-    const versionContent = JSON.parse(getVersionContentBody);
-    // Modified: Check if 'files' property is missing or empty, and return a more specific error.
+    // 1. Retrieve content of the specified version
+    console.log(`Retrieving content for version ${versionNumber}...`);
+    const getVersionContentResponse = _makeApiCall(getContentForVersionUrl, 'get', accessToken, null, `Failed to retrieve content for version ${versionNumber}`);
+    const versionContent = JSON.parse(getVersionContentResponse.getContentText());
+    
     if (!versionContent.files || !Array.isArray(versionContent.files) || versionContent.files.length === 0) {
-      console.error(`バージョン ${versionNumber} のコンテンツにファイルデータが見つからないか、空でした。受信した応答ボディ: ${getVersionContentBody}`);
+      console.error(`Content for version ${versionNumber} contains no file data or is malformed. Response:`, getVersionContentResponse.getContentText());
       return {
         status: 'error',
         message: `Version ${versionNumber} content is empty or malformed (no files data). This version cannot be reverted to. Please check the Apps Script project's version history in the editor for details.`,
-        apiResponse: getVersionContentBody
+        apiResponse: getVersionContentResponse.getContentText()
       };
     }
 
-    // 2. 取得したファイルコンテンツで現在のHEADを更新する (PUT)
-    console.log(`現在のスクリプトをバージョン ${versionNumber} の内容で更新中...`);
+    // 2. Update current HEAD with the retrieved version content (PUT)
+    console.log(`Updating current script with content from version ${versionNumber}...`);
     const putContentPayload = { files: versionContent.files };
-    const putContentOptions = {
-      method: 'put',
-      contentType: 'application/json',
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      payload: JSON.stringify(putContentPayload),
-      muteHttpExceptions: true
-    };
-    const putContentResponse = UrlFetchApp.fetch(currentContentUrl, putContentOptions);
-    const putContentCode = putContentResponse.getResponseCode();
-    const putContentBody = putContentResponse.getContentText();
-
-    if (putContentCode !== 200) {
-      console.error(`スクリプト更新APIエラー (ステータス: ${putContentCode}): ${putContentBody}`);
-      return { status: 'error', message: `Error reverting script to version ${versionNumber} (HTTP ${putContentCode}): ${putContentBody}` };
-    }
+    _makeApiCall(currentContentUrl, 'put', accessToken, JSON.stringify(putContentPayload), `Error reverting script to version ${versionNumber}`);
 
     return { status: 'success', message: `Script successfully reverted to version ${versionNumber}.` };
 
   } catch (e) {
-    console.error("バージョンへの復元中にエラーが発生しました:", e);
-    return { status: 'error', message: `Version reversion error: ${e.message}` };
+    console.error("Error during version reversion:", e);
+    return { status: 'error', message: `Version reversion error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
   }
 }
 
 /**
- * 指定されたApps Scriptのファイル一覧（ファイル名とタイプ）を取得します。
- * @param {string} scriptId - ファイル一覧を取得するApps ScriptのID
- * @returns {object} - 処理結果 (成功/失敗) とファイル一覧 (成功時) を示すオブジェクト
+ * Retrieves a list of files (name and type) for the specified Apps Script project.
+ * @param {string} scriptId - The ID of the Apps Script to retrieve files for.
+ * @returns {object} - Object indicating status and file list (on success).
  */
 function listTargetScriptFiles(scriptId) {
   if (!scriptId || scriptId.trim() === '') {
@@ -911,20 +780,11 @@ function listTargetScriptFiles(scriptId) {
     const accessToken = ScriptApp.getOAuthToken();
     const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
 
-    console.log(`スクリプトID ${scriptId} のファイル内容を取得中...`);
-    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
-    const responseCode = getResponse.getResponseCode();
-    const responseBody = getResponse.getContentText();
-
-    if (responseCode !== 200) {
-        console.error(`Apps Script APIエラー (ファイル内容取得) - ステータス: ${responseCode}, ボディ: ${responseBody}`);
-        return { status: 'error', message: `Failed to retrieve script content: ${responseBody}`, apiErrorDetails: JSON.parse(responseBody || '{}') };
-    }
+    console.log(`Retrieving file content for Script ID: ${scriptId}...`);
+    const response = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content');
     
-    const projectContent = JSON.parse(responseBody);
+    const projectContent = JSON.parse(response.getContentText());
     
-    // 必要な情報（nameとtype）のみを抽出して返す
     const filesList = (projectContent.files || []).map(file => ({
       name: file.name,
       type: file.type
@@ -933,76 +793,7 @@ function listTargetScriptFiles(scriptId) {
     return { status: 'success', files: filesList, message: `Successfully retrieved ${filesList.length} files.` };
 
   } catch (error) {
-    console.error("ファイル一覧取得中にエラーが発生しました:", error);
-    return { status: 'error', message: `File list retrieval error: ${error.message}` };
-  }
-}
-
-/**
- * 指定されたApps ScriptのプロジェクトからOAuthスコープを取得します。
- * @param {string} scriptId - OAuthスコープを取得するApps ScriptのID
- * @returns {object} - 処理結果 (成功/失敗) とOAuthスコープの配列 (成功時) を示すオブジェクト
- */
-function getProjectOAuthScopes(scriptId) {
-  if (!scriptId || scriptId.trim() === '') {
-    return { status: 'error', message: 'Script ID is not specified.' };
-  }
-
-  try {
-    const accessToken = ScriptApp.getOAuthToken();
-    const contentUrl = `https://script.googleapis.com/v1/projects/${scriptId}/content`;
-
-    console.log(`スクリプトID ${scriptId} の appsscript.json を取得中...`);
-    const getOptions = { method: 'get', headers: { 'Authorization': `Bearer ${accessToken}` }, muteHttpExceptions: true };
-    const getResponse = UrlFetchApp.fetch(contentUrl, getOptions);
-    const responseCode = getResponse.getResponseCode();
-    const responseBody = getResponse.getContentText();
-
-    if (responseCode !== 200) {
-        console.error(`Apps Script APIエラー (appsscript.json取得) - ステータス: ${responseCode}, ボディ: ${responseBody}`);
-        return { 
-            status: 'error', 
-            message: `Failed to retrieve script content (HTTP ${responseCode}). Please ensure the Script ID is correct and you have permission to access the project content.`, 
-            apiErrorDetails: JSON.parse(responseBody || '{}') 
-        };
-    }
-    
-    let projectContent;
-    try {
-        projectContent = JSON.parse(responseBody);
-    } catch (e) {
-        console.error(`Apps Script API応答のJSON解析に失敗しました: ${e.message}. 受信したボディ: ${responseBody}`);
-        return { 
-            status: 'error', 
-            message: `Failed to parse API response for script content. The response was not valid JSON.`, 
-            apiErrorDetails: { originalResponse: responseBody.substring(0, 500) + (responseBody.length > 500 ? '...' : ''), parseError: e.message }
-        };
-    }
-    
-    const appsscriptJsonFile = projectContent.files.find(file => file.name === 'appsscript' && file.type === 'JSON');
-
-    if (!appsscriptJsonFile) {
-      return { status: 'error', message: 'appsscript.json not found in the target script content. Please ensure the project has a valid appsscript.json file.' };
-    }
-
-    let manifest;
-    try {
-        manifest = JSON.parse(appsscriptJsonFile.source);
-    } catch (e) {
-        console.error(`appsscript.jsonの内容解析に失敗しました: ${e.message}. ファイル内容: ${appsscriptJsonFile.source}`);
-        return { 
-            status: 'error', 
-            message: `Failed to parse appsscript.json. Its content might be malformed JSON. Error: ${e.message}`, 
-            apiErrorDetails: { fileName: appsscriptJsonFile.name, fileType: appsscriptJsonFile.type, parseError: e.message, fileContentSnippet: appsscriptJsonFile.source.substring(0, 500) + (appsscriptJsonFile.source.length > 500 ? '...' : '') }
-        };
-    }
-    
-    const oauthScopes = manifest.oauthScopes || [];
-
-    return { status: 'success', scopes: oauthScopes, message: `Successfully retrieved ${oauthScopes.length} OAuth scopes.` };
-
-  } catch (error) {
-    console.error("OAuthスコープ取得中に予期せぬエラーが発生しました:", error);
-    return { status: 'error', message: `An unexpected error occurred during OAuth scope retrieval: ${error.message}` };
+    console.error("Error retrieving file list:", error);
+    return { status: 'error', message: `File list retrieval error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null, fullErrorText: error.fullErrorText || null };
   }
 }
