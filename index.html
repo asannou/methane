@@ -203,22 +203,26 @@
         <h2 class="title is-4 mt-5">Version Control</h2>
         <div class="box">
           <p class="content">View script version history and revert to a specific past version.</p>
-          <div class="field is-grouped">
-            <div class="control">
-              <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
-            </div>
-            <div class="control is-expanded">
-              <div class="select is-fullwidth">
-                <select id="versionSelect">
-                  <option value="">-- Select a version --</option>
-                </select>
+          <div class="field">
+            <div class="field is-grouped mb-3">
+              <div class="control">
+                <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
               </div>
-            </div><br>
-            <div class="control">
-              <button type="button" id="openWebAppButton" class="button is-link" disabled>Open Web App</button><span id="openWebAppMessage" class="ml-2 is-size-7 has-text-grey"></span>
+              <div class="control is-expanded">
+                <div class="select is-fullwidth">
+                  <select id="versionSelect">
+                    <option value="">-- Select a version --</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div class="control">
-              <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
+            <div class="field is-grouped">
+              <div class="control">
+                <button type="button" id="openWebAppButton" class="button is-link" disabled>Open Web App</button><span id="openWebAppMessage" class="ml-2 is-size-7 has-text-grey"></span>
+              </div>
+              <div class="control">
+                <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
+              </div>
             </div>
           </div>
           <div id="version-result-container" class="box mt-4" style="display:none;">
