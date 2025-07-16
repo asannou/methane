@@ -92,7 +92,8 @@
 
         // Register event listeners
         UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
-        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList); /* NEW: Automatically get files on script ID change */
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList);
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetOAuthScopes); /* NEW: Automatically get OAuth scopes on script ID change */
         UI.get('prompt').addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
@@ -112,8 +113,8 @@
         UI.get('cancelFixErrorsButton').addEventListener('click', Handlers.handleCancelAiOperation);
         UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
         
-        UI.get('proposeBrowserErrorLoggingButton').addEventListener('click', Handlers.handleProposeBrowserErrorLogging); // NEW
-        UI.get('getOAuthScopesButton').addEventListener('click', Handlers.handleGetOAuthScopes); // NEW
+        UI.get('proposeBrowserErrorLoggingButton').addEventListener('click', Handlers.handleProposeBrowserErrorLogging);
+        UI.get('getOAuthScopesButton').addEventListener('click', Handlers.handleGetOAuthScopes);
 
         UI.get('saveGcpProjectIdButton').addEventListener('click', Handlers.handleSaveGcpProjectId);
         UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);
