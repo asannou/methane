@@ -1436,14 +1436,14 @@
             const resultDisplay = UI.get('oauth-scopes-result');
 
             UI.showSpinnerInButton(getScopesButton, 'Getting Scopes...');
-            // UIポリシー: 初期フィードバック強化のため、即座にローディングメッセージを表示
-            UI.setHtml(resultDisplay, '<p>OAuthスコープ取得中...</p>');
             UI.show(resultContainer);
+            UI.setHtml(resultDisplay, '<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>OAuthスコープ取得中...</p>'); // Initial loading message
 
             if (!scriptId) {
                 UI.hideSpinnerInButton(getScopesButton);
-                UI.setHtml(resultDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
-                return; // Script IDがない場合はサーバーコールをしない
+                UI.setHtml(resultDisplay, ''); // Clear loading message
+                UI.appendNotification(resultDisplay, 'is-danger', 'エラー: スクリプトIDを選択または入力してください。');
+                return;
             }
 
             Utils.saveScriptIdToLocalStorage(scriptId);
@@ -1451,29 +1451,17 @@
             google.script.run
                 .withSuccessHandler(function(response) {
                     UI.hideSpinnerInButton(getScopesButton);
-
                     if (response.status === 'success') {
-                        if (response.scopes && response.scopes.length > 0) {
-                            let scopesHtml = '<ul>';
-                            response.scopes.forEach(scope => {
-                                scopesHtml += `<li><code>${Utils.escapeHtml(scope)}</code></li>`;
-                            });
-                            scopesHtml += '</ul>';
-                            UI.setHtml(resultDisplay, scopesHtml);
-                        } else {
-                            UI.setHtml(resultDisplay, '<p>No OAuth scopes found in <code>appsscript.json</code> for this script.</p>');
-                        }
+                        UI.displayOAuthScopes(response.scopes, resultDisplay); // Call the new function
                     } else {
-                        // UIポリシー: エラーハンドリングと詳細情報の表示改善
-                        UI.setHtml(resultDisplay, `<p class="has-text-danger">Error retrieving scopes: ${Utils.escapeHtml(response.message)}</p>`);
-                        if (response.apiErrorDetails) {
-                            UI.setHtml(resultDisplay, UI.get('oauth-scopes-result').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
-                        }
+                        UI.setHtml(resultDisplay, ''); // Clear loading message before appending error
+                        UI.appendNotification(resultDisplay, 'is-danger', `OAuthスコープの取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
                     }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(getScopesButton);
-                    UI.setHtml(resultDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                    UI.setHtml(resultDisplay, ''); // Clear loading message
+                    UI.appendNotification(resultDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
                 })
                 .getProjectOAuthScopes(scriptId);
         }
