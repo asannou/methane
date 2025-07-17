@@ -40,13 +40,26 @@
             if (targetTab) {
                 targetTab.click(); // Activate the tab
 
-                // Small delay to ensure tab content is visible before scrolling
-                setTimeout(() => {
+                const maxAttempts = 10; // Maximum number of attempts to find and scroll to the element
+                let attempts = 0;
+                const checkAndScroll = () => {
                     const targetElement = UI.get(targetElementId);
-                    if (targetElement) {
+                    // Check if element exists and is visible (has width/height)
+                    if (targetElement && targetElement.offsetWidth > 0 && targetElement.offsetHeight > 0) {
                         targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        requestAnimationFrame(checkAndScroll); // Try again on next animation frame
+                    } else {
+                        console.warn(`_switchToTabAndScroll: Target element "${targetElementId}" not found or not visible after ${maxAttempts} attempts. Falling back to tab content scroll.`);
+                        // Fallback: If element is still not visible after max attempts, try a simple scroll to the tab content parent
+                        const tabContent = UI.get(tabContentId);
+                        if (tabContent) {
+                            tabContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
                     }
-                }, 100); // 100ms delay should be sufficient
+                };
+                requestAnimationFrame(checkAndScroll); // Start checking on next animation frame
             }
         },
 
@@ -175,7 +188,7 @@
                         AppState.currentPolicyData = response;
                         UI.setHtml('ai-policy', marked.parse(response.policy));
                         UI.show('policy-container');
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'policy-container'); // Add this line
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'policy-container');
                         UI.show('acceptPolicyButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -303,7 +316,7 @@
 
                         Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
@@ -416,7 +429,7 @@
                         AppState.currentPolicyData = response;
                         UI.setHtml('ai-policy', marked.parse(response.policy));
                         UI.show('policy-container');
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'policy-container'); // Add this line
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'policy-container');
                         UI.show('acceptPolicyButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -662,7 +675,7 @@
 
                         Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
@@ -769,7 +782,7 @@
 
                         Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
@@ -878,7 +891,7 @@
 
                         Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container');
                         UI.show('applyChangesNoDeployButton');
                         UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
@@ -966,7 +979,7 @@
                         // Switch to AI Operations tab and display the proposal
                         // const aiOperationsTab = document.querySelector('.tabs li[data-tab-content-id="ai-operations-tab"]');
                         // if (aiOperationsTab) aiOperationsTab.click();
-                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Use the new helper
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container');
 
                         UI.setText('proposal-purpose', response.purpose || 'No description provided.');
                         
@@ -1077,13 +1090,15 @@
             google.script.run
                 .withSuccessHandler(function(response) {
                     UI.hideSpinnerInButton(submitButton);
-                    UI.displayLogs(response); // Use the new UI.displayLogs function
+                    UI.displayLogs(response);
                     UI.show('log-result-container');
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'log-result-container');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
-                    UI.setHtml('log-result', `<p class="has-text-danger">Error: ${Utils.escapeHtml(error.message)}</p>`); // Use setHtml for error messages
+                    UI.setHtml('log-result', `<p class="has-text-danger">Error: ${Utils.escapeHtml(error.message)}</p>`);
                     UI.show('log-result-container');
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'log-result-container');
                 })
                 .getScriptLogs(scriptId);
         },
@@ -1119,11 +1134,13 @@
                     } else {
                         UI.setText('deploy-result', `Error: ${response.message}`);
                     }
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'deploy-result-container');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
                     UI.show('deploy-result-container');
                     UI.setText('deploy-result', `Error deploying script: ${error.message}`);
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'deploy-result-container');
                 })
                 .deployScript(scriptId, description);
         },
@@ -1172,11 +1189,13 @@
                     } else {
                         UI.setText('add-library-result', `Error: ${response.message}`);
                     }
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'add-library-form');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
                     UI.show('add-library-result-container');
                     UI.setText('add-library-result', `Error adding library: ${error.message}`);
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'add-library-form');
                 })
                 .addLibraryToProject(targetScriptId, libraryScriptId, effectiveVersion);
         },
@@ -1242,6 +1261,7 @@
                         UI.setText('openWebAppMessage', '');
                     }
                     UI.show('version-result-container');
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(getVersionsButton);
@@ -1252,6 +1272,7 @@
                     UI.setHtml('versionSelect', '<option value="">-- Error loading versions --</option>');
                     UI.setText('version-result', `Error getting versions: ${error.message}`);
                     UI.show('version-result-container');
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
                 })
                 .listScriptVersions(scriptId);
         },
@@ -1348,6 +1369,7 @@
                         UI.disable('openWebAppButton');
                         UI.setText('openWebAppMessage', '');
                     }
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(revertButton);
@@ -1356,6 +1378,7 @@
                     UI.disable('openWebAppButton');
                     UI.setText('openWebAppMessage', '');
                     UI.setText('version-result', `Error reverting to version: ${error.message}`);
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
                 })
                 .revertToVersion(scriptId, parseInt(selectedVersion));
         },
@@ -1444,12 +1467,14 @@
                             UI.setHtml('filesListDisplay', UI.get('filesListDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
                         }
                     }
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'filesListContainer');
                 })
                 .withFailureHandler(function(error) {
                     if (isManualButtonClick) {
                         UI.hideSpinnerInButton(getFilesListButton);
                     }
                     UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'filesListContainer');
                 })
                 .listTargetScriptFiles(scriptId);
         },
@@ -1484,11 +1509,13 @@
                         UI.setHtml(resultDisplay, ''); // Clear loading message before appending error
                         UI.appendNotification(resultDisplay, 'is-danger', `OAuthスコープの取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
                     }
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'oauth-scopes-result-container');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(getScopesButton);
                     UI.setHtml(resultDisplay, ''); // Clear loading message
                     UI.appendNotification(resultDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
+                    Handlers._switchToTabAndScroll('management-tools-tab', 'oauth-scopes-result-container');
                 })
                 .getProjectOAuthScopes(scriptId);
         }
