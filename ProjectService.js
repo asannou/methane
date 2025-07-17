@@ -218,7 +218,7 @@ function setGcpProjectId(gcpProjectId) {
 
 /**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
- * @param {string} targetScriptId - ログを取得し、修正を提案するApps ScriptのID
+ * @param {string} targetScriptId - ログ取得のコンテキストに使用されるApps ScriptのID（ログフィルタリングには使用されません）。
  * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
  */
 function getScriptLogs(targetScriptId) {
@@ -257,21 +257,19 @@ function getScriptLogs(targetScriptId) {
       "resourceNames": [
         `projects/${gcpProjectId}`
       ],
-      // Policy change: Filter specifically for the targetScriptId
-      "filter": `resource.type="cloud_function" AND resource.labels.function_name="${targetScriptId}"`, 
       "orderBy": "timestamp desc",
       "pageSize": 50
     };
 
-    console.log(`Retrieving logs for Script ID ${targetScriptId} from GCP project ${gcpProjectId}...`);
+    console.log(`Retrieving logs from GCP project ${gcpProjectId}...`);
     const response = _makeApiCall(loggingApiUrl, 'post', accessToken, JSON.stringify(requestBody), 'Cloud Logging API error');
     
     const logsData = JSON.parse(response.getContentText());
     if (!logsData.entries || logsData.entries.length === 0) {
-      return `No Apps Script logs found for Script ID: ${targetScriptId} in GCP project: ${gcpProjectId}.\n`;
+      return `No Apps Script logs found in GCP project: ${gcpProjectId} for the current filters.\n`;
     }
 
-    let formattedLogs = `--- Latest Logs for Script ID: ${targetScriptId} ---\n`;
+    let formattedLogs = `--- Latest Logs for GCP Project: ${gcpProjectId} ---\n`;
     logsData.entries.forEach(entry => {
       const timestamp = new Date(entry.timestamp).toLocaleString();
       let logPayload = '';
