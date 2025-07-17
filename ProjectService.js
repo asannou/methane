@@ -483,6 +483,8 @@ function _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deployme
   const activeDeployedVersions = new Set();
   try {
     const allDeployments = _listAllDeployments(scriptId, accessToken);
+    // Sort deployments by createTime in ascending order (oldest first)
+    allDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
     allDeployments.forEach(d => {
       if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
         const isActiveEntryPoint = d.entryPoints?.some(ep => ep.entryPointType === 'WEB_APP' || ep.entryPointType === 'API_EXECUTABLE');
