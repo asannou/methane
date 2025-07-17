@@ -57,6 +57,7 @@ aiPrompt += "## あなたのタスク\n上記指示に対する変更方針をJS
   };
 
   console.log("Gemini APIに方針生成リクエストを送信します...");
+  console.log("リクエストペイロード（抜粋）:\n" + options.payload.substring(0, 2000) + (options.payload.length > 2000 ? "... (後略)" : "")); 
   const response = UrlFetchApp.fetch(API_URL, options);
   const responseCode = response.getResponseCode();
   const responseBody = response.getContentText();

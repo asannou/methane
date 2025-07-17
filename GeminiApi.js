@@ -133,6 +133,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   };
 
   console.log("Gemini APIにリクエストを送信します...");
+  console.log("リクエストペイロード（抜粋）:\n" + options.payload.substring(0, 2000) + (options.payload.length > 2000 ? "... (後略)" : "")); 
   const response = UrlFetchApp.fetch(API_URL, options);
   const responseCode = response.getResponseCode();
   const responseBody = response.getContentText();
