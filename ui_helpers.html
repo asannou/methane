@@ -184,7 +184,7 @@
             // Add a header for better context
             const header = document.createElement('div');
             header.className = 'log-header notification is-info is-light is-size-7 mb-2';
-            header.textContent = `--- 最新ログ (Total: ${logs.length}) ---`;
+            header.textContent = `--- Latest Logs (Total: ${logs.length}) ---`;
             logResultDiv.appendChild(header);
 
             logs.forEach(log => {
@@ -216,35 +216,35 @@
 
         // New constant for OAuth scope descriptions
         OAUTH_SCOPE_DESCRIPTIONS: {
-            "https://www.googleapis.com/auth/script.projects": "Google Apps Scriptプロジェクトのメタデータと内容へのアクセス。AIがコードを読み書きするために必要です。",
-            "https://www.googleapis.com/auth/script.external_request": "スクリプトが外部HTTP/HTTPSサービスに接続できるようにします。API呼び出しに必要です。",
-            "https://www.googleapis.com/auth/logging.read": "Google Cloud Loggingのログエントリを読み取ることを許可します。AIによるエラー修正機能に必要です。",
-            "https://www.googleapis.com/auth/script.deployments": "Google Apps Scriptのデプロイを管理（作成、更新、削除）できるようにします。Webアプリのデプロイ機能に必要です。",
-            "https://www.googleapis.com/auth/drive.readonly": "Google Drive上のファイル（Google Apps Scriptプロジェクトを含む）を読み取ることを許可します。プロジェクトリストの取得に必要です。",
-            "https://www.googleapis.com/auth/logging.write": "Google Cloud Loggingにログエントリを書き込むことを許可します。ブラウザエラーのロギング機能に必要です。",
-            "https://www.googleapis.com/auth/forms": "Google Formsのフォームへの完全なアクセス。",
-            "https://www.googleapis.com/auth/forms.currentonly": "スクリプトがバインドされているGoogle Formsのフォームへのアクセス。",
-            "https://www.googleapis.com/auth/documents": "Google Docsのドキュメントへの完全なアクセス。",
-            "https://www.googleapis.com/auth/documents.currentonly": "スクリプトがバインドされているGoogle Docsのドキュメントへのアクセス。",
-            "https://www.googleapis.com/auth/spreadsheets": "Google Sheetsのシートへの完全なアクセス。",
-            "https://www.googleapis.com/auth/spreadsheets.currentonly": "スクリプトがバインドされているGoogle Sheetsのシートへのアクセス。",
-            "https://www.googleapis.com/auth/presentations": "Google Slidesのプレゼンテーションへの完全なアクセス。",
-            "https://www.googleapis.com/auth/gmail.send": "Gmail経由でメールを送信することを許可します。",
-            "https://www.googleapis.com/auth/gmail.readonly": "Gmailメールボックスの読み取りアクセス。",
-            "https://www.googleapis.com/auth/calendar": "Google Calendarイベントへの完全なアクセス。",
-            "https://www.googleapis.com/auth/contacts": "Google Contactsへの完全なアクセス。",
-            "https://www.googleapis.com/auth/userinfo.email": "ユーザーのメールアドレスへのアクセス。",
-            "https://www.googleapis.com/auth/userinfo.profile": "ユーザーの基本プロフィール情報（名前、写真）へのアクセス。",
-            "https://www.googleapis.com/auth/bigquery": "Google BigQueryデータへのアクセス。",
-            "https://www.googleapis.com/auth/cloud-platform": "Google Cloud Platformリソースへの広範なアクセス。",
-            "https://www.googleapis.com/auth/devstorage.full_control": "Google Cloud Storageへの完全なアクセス。",
-            "https://www.googleapis.com/auth/firebase.database": "Firebase Realtime Databaseへのアクセス。",
-            "https://www.googleapis.com/auth/script.container.ui": "スクリプトがGoogleアプリケーション（スプレッドシート、ドキュメントなど）のUIを作成できるようにします。",
-            "https://www.googleapis.com/auth/script.external_request": "外部URLへのリクエストを許可します。",
-            "https://www.googleapis.com/auth/script.send_mail": "スクリプトがメールを送信できるようにします。",
-            "https://www.googleapis.com/auth/script.urlfetch": "UrlFetchサービスを使用してウェブからリソースを取得できるようにします。",
-            "https://www.googleapis.com/auth/tasks": "Google Tasksへの完全なアクセス。",
-            "https://www.googleapis.com/auth/admin.directory.user.readonly": "Google Workspaceディレクトリユーザーの読み取りアクセス。"
+            "https://www.googleapis.com/auth/script.projects": "Access to Google Apps Script project metadata and content. Required for the AI to read and write code.",
+            "https://www.googleapis.com/auth/script.external_request": "Allows the script to connect to external HTTP/HTTPS services. Required for API calls.",
+            "https://www.googleapis.com/auth/logging.read": "Allows reading log entries from Google Cloud Logging. Required for AI error fixing features.",
+            "https://www.googleapis.com/auth/script.deployments": "Allows managing (creating, updating, deleting) Google Apps Script deployments. Required for web app deployment features.",
+            "https://www.googleapis.com/auth/drive.readonly": "Allows reading files (including Google Apps Script projects) on Google Drive. Required for fetching project lists.",
+            "https://www.googleapis.com/auth/logging.write": "Allows writing log entries to Google Cloud Logging. Required for browser error logging features.",
+            "https://www.googleapis.com/auth/forms": "Full access to Google Forms forms.",
+            "https://www.googleapis.com/auth/forms.currentonly": "Access to the Google Forms form the script is bound to.",
+            "https://www.googleapis.com/auth/documents": "Full access to Google Docs documents.",
+            "https://www.googleapis.com/auth/documents.currentonly": "Access to the Google Docs document the script is bound to.",
+            "https://www.googleapis.com/auth/spreadsheets": "Full access to Google Sheets spreadsheets.",
+            "https://www.googleapis.com/auth/spreadsheets.currentonly": "Access to the Google Sheets spreadsheet the script is bound to.",
+            "https://www.googleapis.com/auth/presentations": "Full access to Google Slides presentations.",
+            "https://www.googleapis.com/auth/gmail.send": "Allows sending emails via Gmail.",
+            "https://www.googleapis.com/auth/gmail.readonly": "Read access to Gmail mailboxes.",
+            "https://www.googleapis.com/auth/calendar": "Full access to Google Calendar events.",
+            "https://www.googleapis.com/auth/contacts": "Full access to Google Contacts.",
+            "https://www.googleapis.com/auth/userinfo.email": "Access to the user's email address.",
+            "https://www.googleapis.com/auth/userinfo.profile": "Access to the user's basic profile information (name, picture).",
+            "https://www.googleapis.com/auth/bigquery": "Access to Google BigQuery data.",
+            "https://www.googleapis.com/auth/cloud-platform": "Broad access to Google Cloud Platform resources.",
+            "https://www.googleapis.com/auth/devstorage.full_control": "Full access to Google Cloud Storage.",
+            "https://www.googleapis.com/auth/firebase.database": "Access to Firebase Realtime Database.",
+            "https://www.googleapis.com/auth/script.container.ui": "Allows scripts to create UI in Google applications (spreadsheets, documents, etc.).",
+            "https://www.googleapis.com/auth/script.external_request": "Allows requests to external URLs.",
+            "https://www.googleapis.com/auth/script.send_mail": "Allows scripts to send email.",
+            "https://www.googleapis.com/auth/script.urlfetch": "Allows fetching resources from the web using the UrlFetch service.",
+            "https://www.googleapis.com/auth/tasks": "Full access to Google Tasks.",
+            "https://www.googleapis.com/auth/admin.directory.user.readonly": "Read access to Google Workspace directory users."
         },
 
         /**
@@ -258,14 +258,14 @@
             if (!Array.isArray(scopes) || scopes.length === 0) {
                 const noScopesMessage = document.createElement('div');
                 noScopesMessage.className = 'notification is-info is-light';
-                noScopesMessage.innerHTML = '<code>appsscript.json</code>にOAuthスコープが定義されていません。<br>スクリプトが特定のGoogleサービスと連携する場合、ここにスコープがリストされます。';
+                noScopesMessage.innerHTML = 'No OAuth scopes are defined in <code>appsscript.json</code>.<br>Scopes will be listed here if your script interacts with specific Google services.';
                 displayElement.appendChild(noScopesMessage);
                 return;
             }
 
             const header = document.createElement('p');
             header.className = 'content is-small has-text-grey mb-3';
-            header.textContent = 'これらのOAuthスコープは、このApps Scriptプロジェクトがアクセスを要求するGoogleサービスを定義します。';
+            header.textContent = 'These OAuth scopes define the Google services that this Apps Script project requests access to.';
             displayElement.appendChild(header);
 
             const scopesList = document.createElement('ul');
@@ -273,7 +273,7 @@
 
             scopes.forEach(scope => {
                 const listItem = document.createElement('li');
-                const description = UI.OAUTH_SCOPE_DESCRIPTIONS[scope] || 'このスコープの一般的な説明は利用できません。';
+                const description = UI.OAUTH_SCOPE_DESCRIPTIONS[scope] || 'No general description available for this scope.';
                 
                 listItem.innerHTML = `
                     <code class="scope-url">${Utils.escapeHtml(scope)}</code>
