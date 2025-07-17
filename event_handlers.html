@@ -210,6 +210,7 @@
                     UI.hideSpinnerInButton(UI.get('generatePolicyButton'));
                     UI.enable('prompt');
                     UI.hide('cancelAiOperationButton');
+
                     UI.setText('ai-policy', 'Error generating policy: ' + error.message);
                     UI.show('policy-container');
                     UI.show('generatePolicyButton');
@@ -322,7 +323,7 @@
                         UI.show('regenerateProposalButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
-                    } else if (response.status === 'error') {
+                    }. else if (response.status === 'error') {
                         UI.appendNotification('apply-result-content', 'is-danger', 'Failed to generate proposal.', response.message);
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
@@ -1092,13 +1093,17 @@
                     UI.hideSpinnerInButton(submitButton);
                     UI.displayLogs(response);
                     UI.show('log-result-container');
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'log-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'log-result-container');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
                     UI.setHtml('log-result', `<p class="has-text-danger">Error: ${Utils.escapeHtml(error.message)}</p>`);
                     UI.show('log-result-container');
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'log-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'log-result-container');
+                    }
                 })
                 .getScriptLogs(scriptId);
         },
@@ -1134,13 +1139,17 @@
                     } else {
                         UI.setText('deploy-result', `Error: ${response.message}`);
                     }
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'deploy-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'deploy-result-container');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
                     UI.show('deploy-result-container');
                     UI.setText('deploy-result', `Error deploying script: ${error.message}`);
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'deploy-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'deploy-result-container');
+                    }
                 })
                 .deployScript(scriptId, description);
         },
@@ -1189,13 +1198,17 @@
                     } else {
                         UI.setText('add-library-result', `Error: ${response.message}`);
                     }
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'add-library-form');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'add-library-form');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
                     UI.show('add-library-result-container');
                     UI.setText('add-library-result', `Error adding library: ${error.message}`);
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'add-library-form');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'add-library-form');
+                    }
                 })
                 .addLibraryToProject(targetScriptId, libraryScriptId, effectiveVersion);
         },
@@ -1261,7 +1274,9 @@
                         UI.setText('openWebAppMessage', '');
                     }
                     UI.show('version-result-container');
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(getVersionsButton);
@@ -1272,7 +1287,9 @@
                     UI.setHtml('versionSelect', '<option value="">-- Error loading versions --</option>');
                     UI.setText('version-result', `Error getting versions: ${error.message}`);
                     UI.show('version-result-container');
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    }
                 })
                 .listScriptVersions(scriptId);
         },
@@ -1369,7 +1386,9 @@
                         UI.disable('openWebAppButton');
                         UI.setText('openWebAppMessage', '');
                     }
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(revertButton);
@@ -1378,7 +1397,9 @@
                     UI.disable('openWebAppButton');
                     UI.setText('openWebAppMessage', '');
                     UI.setText('version-result', `Error reverting to version: ${error.message}`);
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'version-result-container');
+                    }
                 })
                 .revertToVersion(scriptId, parseInt(selectedVersion));
         },
@@ -1467,14 +1488,18 @@
                             UI.setHtml('filesListDisplay', UI.get('filesListDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
                         }
                     }
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'filesListContainer');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'filesListContainer');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     if (isManualButtonClick) {
                         UI.hideSpinnerInButton(getFilesListButton);
                     }
                     UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'filesListContainer');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'filesListContainer');
+                    }
                 })
                 .listTargetScriptFiles(scriptId);
         },
@@ -1509,13 +1534,17 @@
                         UI.setHtml(resultDisplay, ''); // Clear loading message before appending error
                         UI.appendNotification(resultDisplay, 'is-danger', `OAuthスコープの取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
                     }
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'oauth-scopes-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'oauth-scopes-result-container');
+                    }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(getScopesButton);
                     UI.setHtml(resultDisplay, ''); // Clear loading message
                     UI.appendNotification(resultDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
-                    Handlers._switchToTabAndScroll('management-tools-tab', 'oauth-scopes-result-container');
+                    if (!AppState.isInitialScriptIdLoad) {
+                        Handlers._switchToTabAndScroll('management-tools-tab', 'oauth-scopes-result-container');
+                    }
                 })
                 .getProjectOAuthScopes(scriptId);
         }
