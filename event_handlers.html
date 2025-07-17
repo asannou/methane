@@ -79,8 +79,6 @@
             UI.setHtml('html-validation-warnings', '');
             UI.hide('propose-browser-error-logging-result-container');
             UI.setHtml('propose-browser-error-logging-result', '');
-            UI.hide('oauth-scopes-result-container');
-            UI.setHtml('oauth-scopes-result', '');
             UI.setHtml('log-result', ''); // Clear structured log display
 
 
@@ -99,6 +97,23 @@
             UI.hide('policyEditor');
             UI.setText('togglePolicyEditButton', 'Edit Policy');
             AppState.isPolicyEditing = false;
+
+            // Clear summary details if a script is no longer selected or for a new selection
+            const scriptId = Utils.getEffectiveScriptId();
+            if (!scriptId) {
+                UI.setHtml(UI.get('editorUrlDisplay'), 'Apps Script Editor URL: (Script ID needed)');
+                UI.setHtml(UI.get('summaryFilesDisplay'), '<p class="has-text-grey">No script selected.</p>');
+                UI.setHtml(UI.get('summaryOAuthScopesDisplay'), '<p class="has-text-grey">No script selected.</p>');
+                UI.setHtml(UI.get('summaryVersionsDisplay'), '<p class="has-text-grey">No script selected.</p>');
+                UI.disable(UI.get('summaryOpenWebAppButton'));
+                UI.disable(UI.get('summaryRevertVersionButton'));
+                UI.setText(UI.get('summaryOpenWebAppMessage'), '');
+                UI.setHtml(UI.get('summaryVersionSelect'), '<option value="">-- Select a Script ID first --</option>');
+                UI.hide(UI.get('scriptDetailsSummaryContainer'));
+            } else {
+                // If a script is selected, just trigger a refresh of summary details
+                Handlers.loadScriptDetailsSummary();
+            }
         },
 
         /**
@@ -335,6 +350,246 @@
                     UI.hide('generatePolicyButton');
                 })
                 .processPrompt(formData);
+        },
+
+        /**
+         * Handle canceling any active AI operation.
+         */
+        handleCancelAiOperation: () => {
+            Handlers.resetAiOperationUI();
+            alert('AI operation canceled by user.');
+        },
+
+        /**
+         * Handle regenerating the AI policy.
+         */
+        handleRegeneratePolicy: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const promptText = UI.get('prompt').value;
+
+            if (!scriptId) {
+                alert('Please select or enter a Script ID.');
+                return;
+            }
+            if (!promptText.trim()) {
+                alert('Prompt cannot be empty.');
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            UI.showSpinnerInButton(UI.get('regeneratePolicyButton'), 'Regenerating Policy...');
+            UI.hide('generatePolicyButton');
+            UI.hide('acceptPolicyButton');
+            
+            UI.disable('prompt');
+            UI.show('cancelAiOperationButton');
+
+            UI.hide('policy-container');
+            UI.hide('proposal-container');
+            UI.hide('applyChangesNoDeployButton');
+            UI.hide('applyAndDeployButton');
+            UI.hide('regenerateProposalButton');
+            UI.hide('apply-result-container');
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('proposed-files-display', '');
+            UI.setHtml('ai-policy', '');
+            UI.setText('proposal-purpose', '');
+            UI.hide('html-validation-warnings');
+            UI.setHtml('html-validation-warnings', '');
+            UI.hide('policyEditor');
+            UI.setText('togglePolicyEditButton', 'Edit Policy');
+            AppState.isPolicyEditing = false;
+            UI.setHtml('apply-result-content', '');
+            UI.hide('propose-browser-error-logging-result-container');
+            UI.setHtml('propose-browser-error-logging-result', '');
+
+
+            AppState.currentPolicyData = null;
+            AppState.currentProposal = null;
+
+            const formData = { scriptId: scriptId, prompt: promptText };
+
+            const requestId = Date.now();
+            AppState.activeRequestId = requestId;
+
+            console.log('Regenerating policy...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale success response for regeneratePolicy.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('regeneratePolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
+
+                    if (response.status === 'policy') {
+                        AppState.currentPolicyData = response;
+                        UI.setHtml('ai-policy', marked.parse(response.policy));
+                        UI.show('policy-container');
+                        Handlers._switchToTabAndScroll('ai-operations-tab', 'policy-container'); // Add this line
+                        UI.show('acceptPolicyButton');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    } else if (response.status === 'error') {
+                        UI.setText('ai-policy', 'Error: ' + response.message);
+                        UI.show('policy-container');
+                        UI.show('regeneratePolicyButton');
+                        UI.hide('generatePolicyButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    if (AppState.activeRequestId !== requestId) {
+                        console.log('Ignoring stale failure response for regeneratePolicy.');
+                        return;
+                    }
+                    AppState.activeRequestId = null;
+                    UI.hideSpinnerInButton(UI.get('regeneratePolicyButton'));
+                    UI.enable('prompt');
+                    UI.hide('cancelAiOperationButton');
+
+                    UI.setText('ai-policy', 'Error regenerating policy: ' + error.message);
+                    UI.show('policy-container');
+                    UI.show('regeneratePolicyButton');
+                    UI.hide('generatePolicyButton');
+                })
+                .generateProposalPolicy(formData);
+        },
+
+        /**
+         * Handle applying proposed changes to the script.
+         * @param {boolean} autoDeploy - Whether to automatically deploy after applying changes.
+         * @param {HTMLElement} clickedButton - The button element that was clicked.
+         */
+        handleApplyChanges: (autoDeploy, clickedButton) => {
+            if (!AppState.currentProposal) {
+                UI.appendNotification('apply-result-content', 'is-danger', 'No proposal to apply.');
+                UI.show('apply-result-container');
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(AppState.currentProposal.scriptId);
+
+            UI.showSpinnerInButton(clickedButton, autoDeploy ? 'Applying & Deploying...' : 'Applying Changes...');
+            
+            // Disable other related buttons
+            if (clickedButton.id === 'applyChangesNoDeployButton') {
+                UI.disable('applyAndDeployButton');
+            } else {
+                UI.disable('applyChangesNoDeployButton');
+            }
+            UI.disable('regenerateProposalButton');
+            UI.disable('fixApplyErrorsButton');
+            UI.disable('proposeBrowserErrorLoggingButton');
+
+            UI.hide('fixApplyErrorsButton');
+            UI.setHtml('apply-result-content', `
+                <div class="notification is-info is-light">
+                <p>Applying changes...</p>
+                ${autoDeploy ? '<p>Auto-deploying...</p>' : ''}
+                </div>
+            `);
+            UI.show('apply-result-container');
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(clickedButton);
+                    UI.enable('applyChangesNoDeployButton');
+                    UI.enable('applyAndDeployButton');
+                    UI.enable('regenerateProposalButton');
+                    UI.enable('fixApplyErrorsButton');
+                    UI.enable('proposeBrowserErrorLoggingButton');
+                    UI.setHtml('apply-result-content', '');
+
+                    if (response.status === 'success') {
+                        UI.appendNotification('apply-result-content', 'is-success', Utils.escapeHtml(response.message));
+
+                        if (autoDeploy) {
+                            const deployMessageContainer = document.createElement('article');
+                            deployMessageContainer.className = 'message mt-3';
+
+                            let headerText = 'Auto-deploy Result';
+                            let messageBodyContent = '';
+                            let messageClass = '';
+
+                            if (response.deploymentStatus === 'success') {
+                                messageClass = 'is-success';
+                                headerText += ' (Success)';
+                                messageBodyContent += `
+                                    <ul>
+                                    <li><strong>Status:</strong> Success</li>
+                                    <li><strong>Message:</strong> ${Utils.escapeHtml(response.deploymentMessage)}</li>
+                                `;
+                                if (response.deploymentId) {
+                                    messageBodyContent += `<li><strong>Deployment ID:</strong> ${Utils.escapeHtml(response.deploymentId)}</li>`;
+                                }
+                                if (response.webappUrl && response.webappUrl !== 'null') {
+                                    messageBodyContent += `<li><strong>Web App URL:</strong> <a href="${Utils.escapeHtml(response.webappUrl)}" target="_blank">${Utils.escapeHtml(response.webappUrl)}</a></li>`;
+                                } else if (response.webappUrl === null) {
+                                    messageBodyContent += `<li><strong>Web App URL:</strong> Not found in deployment response.</li>`;
+                                }
+                                messageBodyContent += `</ul>`;
+                            } else if (response.deploymentStatus === 'error') {
+                                messageClass = 'is-danger';
+                                headerText += ' (Error)';
+                                messageBodyContent += `
+                                    <ul>
+                                    <li><strong>Status:</strong> Error</li>
+                                    <li><strong>Message:</strong> ${Utils.escapeHtml(response.deploymentMessage)}</li>
+                                `;
+                                if (response.deploymentId) {
+                                    messageBodyContent += `<li><strong>Deployment ID:</strong> ${Utils.escapeHtml(response.deploymentId)}</li>`;
+                                }
+                                messageBodyContent += `</ul>`;
+                            } else {
+                                messageClass = 'is-warning';
+                                headerText += ' (Unknown Status)';
+                                messageBodyContent += `
+                                    <ul>
+                                    <li><strong>Status:</strong> Unknown</li>
+                                    <li><strong>Message:</strong> ${Utils.escapeHtml(response.deploymentMessage)}</li>
+                                    </ul>
+                                `;
+                            }
+                            
+                            deployMessageContainer.classList.add(messageClass);
+                            deployMessageContainer.innerHTML = `
+                                <div class="message-header">
+                                <p>${headerText}</p>
+                                </div>
+                                <div class="message-body">
+                                ${messageBodyContent}
+                                </div>
+                            `;
+                            UI.get('apply-result-content').appendChild(deployMessageContainer);
+                        }
+
+                        AppState.currentProposal = null;
+                        UI.hide('applyChangesNoDeployButton');
+                        UI.hide('applyAndDeployButton');
+                        UI.hide('regenerateProposalButton');
+                        UI.setHtml('proposed-files-display', '<p>Changes applied successfully. You can propose new changes or check logs.</p>');
+                        UI.hide('html-validation-warnings');
+                        UI.setHtml('html-validation-warnings', '');
+                        UI.hide('fixApplyErrorsButton');
+                    } else {
+                        UI.appendNotification('apply-result-content', 'is-danger', `Failed to Apply Changes: ${Utils.escapeHtml(response.message)}`, response.apiErrorDetails || response.fullErrorText);
+                        UI.show('fixApplyErrorsButton');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(clickedButton);
+                    UI.enable('applyChangesNoDeployButton');
+                    UI.enable('applyAndDeployButton');
+                    UI.enable('regenerateProposalButton');
+                    UI.enable('fixApplyErrorsButton');
+                    UI.enable('proposeBrowserErrorLoggingButton');
+                    UI.appendNotification('apply-result-content', 'is-danger', 'Error applying changes (Uncaught):', error.message);
+                    UI.show('fixApplyErrorsButton');
+                })
+                .applyProposedChanges(AppState.currentProposal.scriptId, AppState.currentProposal.proposedFiles, AppState.currentProposal.deletedFileNames, autoDeploy, AppState.currentProposal.purpose);
         },
 
         /**
@@ -1023,7 +1278,6 @@
                 })
                 .proposeBrowserErrorLoggingChanges(scriptId);
         },
-        // ... (rest of the handlers remain unchanged)
         /**
          * Handle saving the GCP Project ID.
          */
@@ -1194,7 +1448,7 @@
             const summaryRevertVersionButton = UI.get('summaryRevertVersionButton');
             const summaryOpenWebAppMessage = UI.get('summaryOpenWebAppMessage');
 
-            UI.hide(summaryContainer);
+            UI.hide(summaryContainer); // Hide initially to show loading state cleanly
             if (!scriptId) {
                 UI.setHtml(editorUrlDisplay, 'Apps Script Editor URL: (Script ID needed)');
                 UI.setHtml(summaryFilesDisplay, '<p class="has-text-grey">No script selected.</p>');

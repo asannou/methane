@@ -63,8 +63,8 @@
         }
 
         // Initialize UI components (hide all result containers by default)
-        UI.hide('policyContainer');
-        UI.hide('proposalContainer');
+        UI.hide('policy-container');
+        UI.hide('proposal-container');
         UI.hide('applyChangesNoDeployButton');
         UI.hide('applyAndDeployButton');
         UI.hide('regenerateProposalButton');
@@ -117,5 +117,8 @@
         UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);
         UI.get('deploy-form').addEventListener('submit', Handlers.handleDeployFormSubmit);
         UI.get('add-library-form').addEventListener('submit', Handlers.handleAddLibraryFormSubmit);
+
+        // Load projects into the dropdown on initial page load
+        Utils.loadProjectsIntoDropdown(savedScriptId); 
     });
 </script>
