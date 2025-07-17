@@ -61,8 +61,6 @@
             // and load files, OAuth scopes, and versions
             UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
         }
-        // Set initial load flag to false after the initial script ID processing
-        AppState.isInitialScriptIdLoad = false; 
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
         if (savedGcpProjectId) {
             UI.get('gcpProjectId').value = savedGcpProjectId;
