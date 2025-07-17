@@ -688,4 +688,18 @@
   visibility: visible;
 }
 
+.notification.is-loading-state,
+.notification.is-error-state,
+.notification.is-info-state {
+  text-align: center; /* Center the message within these specific notifications */
+}
+
+.notification.is-loading-state .spinner {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+    width: 16px;
+    height: 16px;
+    border-width: 2px !important;
+}
 </style>

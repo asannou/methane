@@ -34,46 +34,50 @@
         </div>
 
         <!-- NEW CENTRALIZED SCRIPT DETAILS SUMMARY -->
-        <div id="script-details-summary-container" class="box is-shadowless is-flex is-flex-direction-column" style="display:none; border: none; padding: 0;">
-          <h3 class="title is-5 mt-2 mb-3">Selected Script Details:</h3>
+        <div class="card mb-5" id="script-details-summary-container" style="display:none;">
+          <header class="card-header">
+              <p class="card-header-title is-size-5 has-text-weight-semibold">Selected Script Details</p>
+          </header>
+          <div class="card-content">
+            <!-- Editor URL -->
+            <div id="editor-url-display" class="notification is-light is-info is-small mb-4"></div>
 
-          <!-- Editor URL -->
-          <div id="editor-url-display" class="notification is-light is-info is-small mb-3" style="margin: 0 !important;"></div>
-
-          <!-- Files List -->
-          <div id="summary-files-container" class="box is-shadowless" style="border: none; padding: 0 0 1rem 0;">
-            <h4 class="title is-6 mb-2">File List:</h4>
-            <div id="summary-files-display" class="files-grid">
-              <p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>
-            </div>
-          </div>
-
-          <!-- OAuth Scopes -->
-          <div id="summary-oauth-scopes-container" class="box is-shadowless" style="border: none; padding: 1rem 0;">
-            <h4 class="title is-6 mb-2">OAuth Scopes:</h4>
-            <div id="summary-oauth-scopes-display" class="oauth-scopes-display-container">
-              <p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading OAuth scopes...</p>
-            </div>
-          </div>
-
-          <!-- Version Info -->
-          <div id="summary-versions-container" class="box is-shadowless" style="border: none; padding: 1rem 0 0 0;">
-            <h4 class="title is-6 mb-2">Versions:</h4>
-            <div id="summary-versions-display">
-              <p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading versions...</p>
-            </div>
-            <div class="field is-grouped mt-3">
-              <div class="control">
-                <button type="button" id="summaryOpenWebAppButton" class="button is-small is-link" disabled>Open Web App</button><span id="summaryOpenWebAppMessage" class="ml-2 is-size-7 has-text-grey"></span>
+            <!-- Files List -->
+            <div class="box p-4 mb-4 has-background-white-ter">
+              <h4 class="title is-6 mb-3">File List</h4>
+              <div id="summary-files-display" class="files-grid">
+                <!-- Loading/Error/Content will be rendered here by JS -->
               </div>
-              <div class="control">
-                <button type="button" id="summaryRevertVersionButton" class="button is-small is-danger" disabled>Revert</button>
+            </div>
+
+            <!-- OAuth Scopes -->
+            <div class="box p-4 mb-4 has-background-white-ter">
+              <h4 class="title is-6 mb-3">OAuth Scopes</h4>
+              <div id="summary-oauth-scopes-display" class="oauth-scopes-display-container">
+                <!-- Loading/Error/Content will be rendered here by JS -->
               </div>
-              <div class="control is-expanded">
-                <div class="select is-small is-fullwidth">
-                  <select id="summaryVersionSelect">
-                    <option value="">-- Select a version --</option>
-                  </select>
+            </div>
+
+            <!-- Version Info -->
+            <div class="box p-4 has-background-white-ter">
+              <h4 class="title is-6 mb-3">Versions</h4>
+              <div id="summary-versions-display">
+                <!-- Loading/Error/Content will be rendered here by JS -->
+              </div>
+              <div class="field is-grouped mt-4 is-align-items-center">
+                <div class="control">
+                  <button type="button" id="summaryOpenWebAppButton" class="button is-small is-link" disabled>Open Web App</button>
+                  <span id="summaryOpenWebAppMessage" class="ml-2 is-size-7 has-text-grey-dark"></span>
+                </div>
+                <div class="control">
+                  <button type="button" id="summaryRevertVersionButton" class="button is-small is-danger" disabled>Revert</button>
+                </div>
+                <div class="control is-expanded">
+                  <div class="select is-small is-fullwidth">
+                    <select id="summaryVersionSelect">
+                      <option value="">-- Select a version --</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

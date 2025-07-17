@@ -166,6 +166,53 @@
         },
 
         /**
+         * Creates HTML for a standardized loading message.
+         * @param {string} message - The loading message.
+         * @returns {string} HTML string.
+         */
+        createLoadingMessage: (message) => {
+            return `
+                <div class="notification is-info is-light is-loading-state">
+                    <p class="has-text-centered"><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>${Utils.escapeHtml(message)}</p>
+                </div>
+            `;
+        },
+
+        /**
+         * Creates HTML for a standardized error message.
+         * @param {string} title - The main error title.
+         * @param {string} message - The detailed error message.
+         * @param {object} [details=null] - Optional detailed error object.
+         * @returns {string} HTML string.
+         */
+        createErrorMessage: (title, message, details = null) => {
+            let contentHtml = `<p><strong>${Utils.escapeHtml(title)}</strong></p><p>${Utils.escapeHtml(message)}</p>`;
+            if (details) {
+                let detailsString;
+                try {
+                    detailsString = JSON.stringify(details, Object.getOwnPropertyNames(details), 2);
+                } catch (e) {
+                    detailsString = String(details);
+                }
+                contentHtml += `<h4 class="mt-2">Details:</h4><pre class="has-text-danger-dark is-size-7 mt-1">${Utils.escapeHtml(detailsString)}</pre>`;
+            }
+            return `<div class="notification is-danger is-light is-error-state">${contentHtml}</div>`;
+        },
+
+        /**
+         * Creates HTML for a standardized info message.
+         * @param {string} message - The info message.
+         * @returns {string} HTML string.
+         */
+        createInfoMessage: (message) => {
+            return `
+                <div class="notification is-info is-light is-info-state has-text-centered">
+                    <p>${Utils.escapeHtml(message)}</p>
+                </div>
+            `;
+        },
+
+        /**
          * Displays an array of structured log entries in the log-result container.
          * @param {Array<object>} logs - An array of log objects, each with timestamp, severity, and message.
          */
@@ -256,10 +303,7 @@
             displayElement.innerHTML = ''; // Clear previous content
 
             if (!Array.isArray(scopes) || scopes.length === 0) {
-                const noScopesMessage = document.createElement('div');
-                noScopesMessage.className = 'notification is-info is-light';
-                noScopesMessage.innerHTML = `No OAuth scopes are defined in <code>appsscript.json</code>.<br>Scopes will be listed here if your script interacts with specific Google services.`;
-                displayElement.appendChild(noScopesMessage);
+                UI.setHtml(displayElement, UI.createInfoMessage('No OAuth scopes are defined in <code>appsscript.json</code>.<br>Scopes will be listed here if your script interacts with specific Google services.'));
                 return;
             }
 

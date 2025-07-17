@@ -101,10 +101,10 @@
             // Clear summary details if a script is no longer selected or for a new selection
             const scriptId = Utils.getEffectiveScriptId();
             if (!scriptId) {
-                UI.setHtml(UI.get('editorUrlDisplay'), 'Apps Script Editor URL: (Script ID needed)');
-                UI.setHtml(UI.get('summaryFilesDisplay'), '<p class="has-text-grey">No script selected.</p>');
-                UI.setHtml(UI.get('summaryOAuthScopesDisplay'), '<p class="has-text-grey">No script selected.</p>');
-                UI.setHtml(UI.get('summaryVersionsDisplay'), '<p class="has-text-grey">No script selected.</p>');
+                UI.setHtml(UI.get('editorUrlDisplay'), UI.createInfoMessage('Apps Script Editor URL: (Script ID needed)'));
+                UI.setHtml(UI.get('summaryFilesDisplay'), UI.createInfoMessage('No script selected.'));
+                UI.setHtml(UI.get('summaryOAuthScopesDisplay'), UI.createInfoMessage('No script selected.'));
+                UI.setHtml(UI.get('summaryVersionsDisplay'), UI.createInfoMessage('No script selected.'));
                 UI.disable(UI.get('summaryOpenWebAppButton'));
                 UI.disable(UI.get('summaryRevertVersionButton'));
                 UI.setText(UI.get('summaryOpenWebAppMessage'), '');
@@ -957,7 +957,7 @@
         handleFixApplyErrors: () => {
             const scriptId = Utils.getEffectiveScriptId();
             if (!scriptId) {
-                UI.appendNotification('apply-result-content', 'is-danger', 'Script ID is required to fix errors.');
+                UI.setHtml('apply-result-content', UI.createErrorMessage('Error', 'Script ID is required to fix errors.'));
                 UI.show('apply-result-container');
                 return;
             }
@@ -1030,7 +1030,7 @@
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
                     } else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message);
+                        UI.setHtml('apply-result-content', UI.createErrorMessage('Failed to get error fix proposal.', response.message));
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -1047,7 +1047,7 @@
                     UI.hide('cancelFixErrorsButton');
                     UI.enable('proposeBrowserErrorLoggingButton');
 
-                    UI.appendNotification('apply-result-content', 'is-danger', 'Error calling AI for fix:', error.message);
+                    UI.setHtml('apply-result-content', UI.createErrorMessage('Error calling AI for fix:', error.message));
                     UI.show('apply-result-container');
                     UI.show('regeneratePolicyButton');
                     UI.hide('generatePolicyButton');
@@ -1064,7 +1064,7 @@
 
             const scriptId = Utils.getEffectiveScriptId();
             if (!scriptId) {
-                UI.appendNotification('apply-result-content', 'is-danger', 'Script ID is required to fix errors.');
+                UI.setHtml('apply-result-content', UI.createErrorMessage('Error', 'Script ID is required to fix errors.'));
                 UI.show('apply-result-container');
                 return;
             }
@@ -1139,7 +1139,7 @@
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
                     } else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message);
+                        UI.setHtml('apply-result-content', UI.createErrorMessage('Failed to get error fix proposal.', response.message));
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -1156,7 +1156,7 @@
                     UI.hide('cancelFixErrorsButton');
                     UI.enable('proposeBrowserErrorLoggingButton');
 
-                    UI.appendNotification('apply-result-content', 'is-danger', 'Error calling AI for fix:', error.message);
+                    UI.setHtml('apply-result-content', UI.createErrorMessage('Error calling AI for fix:', error.message));
                     UI.show('apply-result-container');
                     UI.show('regeneratePolicyButton');
                     UI.hide('generatePolicyButton');
@@ -1450,10 +1450,10 @@
 
             UI.hide(summaryContainer); // Hide initially to show loading state cleanly
             if (!scriptId) {
-                UI.setHtml(editorUrlDisplay, 'Apps Script Editor URL: (Script ID needed)');
-                UI.setHtml(summaryFilesDisplay, '<p class="has-text-grey">No script selected.</p>');
-                UI.setHtml(summaryOAuthScopesDisplay, '<p class="has-text-grey">No script selected.</p>');
-                UI.setHtml(summaryVersionsDisplay, '<p class="has-text-grey">No script selected.</p>');
+                UI.setHtml(editorUrlDisplay, UI.createInfoMessage('Apps Script Editor URL: (Script ID needed)'));
+                UI.setHtml(summaryFilesDisplay, UI.createInfoMessage('No script selected.'));
+                UI.setHtml(summaryOAuthScopesDisplay, UI.createInfoMessage('No script selected.'));
+                UI.setHtml(summaryVersionsDisplay, UI.createInfoMessage('No script selected.'));
                 UI.disable(summaryOpenWebAppButton);
                 UI.disable(summaryRevertVersionButton);
                 UI.setText(summaryOpenWebAppMessage, '');
@@ -1465,22 +1465,22 @@
             Utils.saveScriptIdToLocalStorage(scriptId);
 
             // 1. Editor URL
-            UI.setHtml(editorUrlDisplay, 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
+            UI.setHtml(editorUrlDisplay, UI.createLoadingMessage('Loading Editor URL...'));
             google.script.run
                 .withSuccessHandler(function(url) {
                     if (url.startsWith("Error:")) {
-                        UI.setText(editorUrlDisplay, `Apps Script Editor URL: ${url}`);
+                        UI.setHtml(editorUrlDisplay, UI.createErrorMessage('Error retrieving URL', url.replace('Error: ', '')));
                     } else {
-                        UI.setHtml(editorUrlDisplay, `Apps Script Editor URL: <a href="${url}" target="_blank">${url}</a>`);
+                        UI.setHtml(editorUrlDisplay, `<div class="notification is-light is-info is-small mb-4">Apps Script Editor URL: <a href="${url}" target="_blank">${url}</a></div>`);
                     }
                 })
                 .withFailureHandler(function(error) {
-                    UI.setText(editorUrlDisplay, `Apps Script Editor URL: Error - ${Utils.escapeHtml(error.message)}`);
+                    UI.setHtml(editorUrlDisplay, UI.createErrorMessage('Error retrieving Editor URL', error.message));
                 })
                 .getScriptEditorUrl(scriptId);
 
             // 2. Files List
-            UI.setHtml(summaryFilesDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>`);
+            UI.setHtml(summaryFilesDisplay, UI.createLoadingMessage('Loading files...'));
             google.script.run
                 .withSuccessHandler(function(response) {
                     if (response.status === 'success') {
@@ -1509,39 +1509,34 @@
                                 summaryFilesDisplay.appendChild(fileItem);
                             });
                         } else {
-                            UI.setHtml(summaryFilesDisplay, '<p>No files found in this script.</p>');
+                            UI.setHtml(summaryFilesDisplay, UI.createInfoMessage('No files found in this script.'));
                         }
                     } else {
-                        UI.setHtml(summaryFilesDisplay, `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
-                        if (response.apiErrorDetails) {
-                            UI.setHtml(summaryFilesDisplay, UI.get('summaryFilesDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
-                        }
+                        UI.setHtml(summaryFilesDisplay, UI.createErrorMessage('Error retrieving files', response.message, response.apiErrorDetails));
                     }
                 })
                 .withFailureHandler(function(error) {
-                    UI.setHtml(summaryFilesDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                    UI.setHtml(summaryFilesDisplay, UI.createErrorMessage('Error retrieving files', error.message));
                 })
                 .listTargetScriptFiles(scriptId);
 
             // 3. OAuth Scopes
-            UI.setHtml(summaryOAuthScopesDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading OAuth scopes...</p>`);
+            UI.setHtml(summaryOAuthScopesDisplay, UI.createLoadingMessage('Loading OAuth scopes...'));
             google.script.run
                 .withSuccessHandler(function(response) {
                     if (response.status === 'success') {
                         UI.displayOAuthScopes(response.scopes, summaryOAuthScopesDisplay);
                     } else {
-                        UI.setHtml(summaryOAuthScopesDisplay, ''); // Clear loading message before appending error
-                        UI.appendNotification(summaryOAuthScopesDisplay, 'is-danger', `OAuthスコープの取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
+                        UI.setHtml(summaryOAuthScopesDisplay, UI.createErrorMessage('Error retrieving OAuth scopes', response.message, response.apiErrorDetails));
                     }
                 })
                 .withFailureHandler(function(error) {
-                    UI.setHtml(summaryOAuthScopesDisplay, ''); // Clear loading message
-                    UI.appendNotification(summaryOAuthScopesDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
+                    UI.setHtml(summaryOAuthScopesDisplay, UI.createErrorMessage('Error retrieving OAuth scopes', error.message));
                 })
                 .getProjectOAuthScopes(scriptId);
 
             // 4. Version Info
-            UI.setHtml(summaryVersionsDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading versions...</p>`);
+            UI.setHtml(summaryVersionsDisplay, UI.createLoadingMessage('Loading versions...'));
             UI.disable(summaryVersionSelect);
             UI.disable(summaryRevertVersionButton);
             UI.disable(summaryOpenWebAppButton);
@@ -1567,13 +1562,14 @@
                             });
                         } else {
                             UI.setHtml(summaryVersionSelect, '<option value="">-- No versions found --</option>');
+                            UI.setHtml(summaryVersionsDisplay, UI.createInfoMessage('No versions found for this script.'));
                         }
                         // Manually trigger change event for the summary version select to update buttons
                         summaryVersionSelect.dispatchEvent(new Event('change'));
                     }
                     else {
                         UI.setHtml(summaryVersionSelect, '<option value="">-- Error loading versions --</option>');
-                        UI.appendNotification(summaryVersionsDisplay, 'is-danger', `バージョン情報の取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
+                        UI.setHtml(summaryVersionsDisplay, UI.createErrorMessage('Error retrieving versions', response.message, response.apiErrorDetails));
                         UI.disable(summaryOpenWebAppButton);
                         UI.disable(summaryRevertVersionButton);
                         UI.setText(summaryOpenWebAppMessage, '');
@@ -1581,9 +1577,8 @@
                 })
                 .withFailureHandler(function(error) {
                     UI.enable(summaryVersionSelect);
-                    UI.setHtml(summaryVersionsDisplay, ''); // Clear spinner message
+                    UI.setHtml(summaryVersionsDisplay, UI.createErrorMessage('Error retrieving versions', error.message));
                     UI.setHtml(summaryVersionSelect, '<option value="">-- Error loading versions --</option>');
-                    UI.appendNotification(summaryVersionsDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
                     UI.disable(summaryOpenWebAppButton);
                     UI.disable(summaryRevertVersionButton);
                     UI.setText(summaryOpenWebAppMessage, '');
@@ -1644,11 +1639,11 @@
             const summaryOpenWebAppMessage = UI.get('summaryOpenWebAppMessage');
             
             if (!scriptId) {
-                UI.appendNotification(summaryVersionsDisplay, 'is-danger', 'エラー: スクリプトIDを選択または入力してください。');
+                UI.setHtml(summaryVersionsDisplay, UI.createErrorMessage('Error', 'スクリプトIDを選択または入力してください。'));
                 return;
             }
             if (!selectedVersion) {
-                UI.appendNotification(summaryVersionsDisplay, 'is-danger', 'エラー: リバートするバージョンを選択してください。');
+                UI.setHtml(summaryVersionsDisplay, UI.createErrorMessage('Error', 'リバートするバージョンを選択してください。'));
                 return;
             }
 
@@ -1660,7 +1655,7 @@
             UI.disable(versionSelect);
             UI.disable(summaryOpenWebAppButton);
             UI.setText(summaryOpenWebAppMessage, '');
-            UI.setHtml(summaryVersionsDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Reverting script to version ${selectedVersion}...</p>`);
+            UI.setHtml(summaryVersionsDisplay, UI.createLoadingMessage(`Reverting script to version ${selectedVersion}...`));
 
             Utils.saveScriptIdToLocalStorage(scriptId);
 
@@ -1675,7 +1670,7 @@
                         // After revert, refresh the summary details
                         Handlers.loadScriptDetailsSummary();
                     } else {
-                        UI.appendNotification(summaryVersionsDisplay, 'is-danger', `エラー: ${response.message}`, response.apiErrorDetails);
+                        UI.setHtml(summaryVersionsDisplay, UI.createErrorMessage('Error', response.message, response.apiErrorDetails));
                         UI.disable(summaryOpenWebAppButton);
                         UI.setText(summaryOpenWebAppMessage, '');
                     }
@@ -1685,8 +1680,7 @@
                     UI.enable(versionSelect);
                     UI.disable(summaryOpenWebAppButton);
                     UI.setText(summaryOpenWebAppMessage, '');
-                    UI.setHtml(summaryVersionsDisplay, ''); // Clear loading message
-                    UI.appendNotification(summaryVersionsDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
+                    UI.setHtml(summaryVersionsDisplay, UI.createErrorMessage('サーバー関数呼び出し中にエラーが発生しました', error.message));
                 })
                 .revertToVersion(scriptId, parseInt(selectedVersion));
         }
