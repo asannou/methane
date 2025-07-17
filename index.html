@@ -32,7 +32,53 @@
             </div>
           </div>
         </div>
-        <div id="editor-url-display" class="notification is-light is-info is-small mb-0"></div>
+
+        <!-- NEW CENTRALIZED SCRIPT DETAILS SUMMARY -->
+        <div id="script-details-summary-container" class="box is-shadowless is-flex is-flex-direction-column" style="display:none; border: none; padding: 0;">
+          <h3 class="title is-5 mt-2 mb-3">Selected Script Details:</h3>
+
+          <!-- Editor URL -->
+          <div id="editor-url-display" class="notification is-light is-info is-small mb-3" style="margin: 0 !important;"></div>
+
+          <!-- Files List -->
+          <div id="summary-files-container" class="box is-shadowless" style="border: none; padding: 0 0 1rem 0;">
+            <h4 class="title is-6 mb-2">File List:</h4>
+            <div id="summary-files-display" class="files-grid">
+              <p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>
+            </div>
+          </div>
+
+          <!-- OAuth Scopes -->
+          <div id="summary-oauth-scopes-container" class="box is-shadowless" style="border: none; padding: 1rem 0;">
+            <h4 class="title is-6 mb-2">OAuth Scopes:</h4>
+            <div id="summary-oauth-scopes-display" class="oauth-scopes-display-container">
+              <p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading OAuth scopes...</p>
+            </div>
+          </div>
+
+          <!-- Version Info -->
+          <div id="summary-versions-container" class="box is-shadowless" style="border: none; padding: 1rem 0 0 0;">
+            <h4 class="title is-6 mb-2">Versions:</h4>
+            <div id="summary-versions-display">
+              <p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading versions...</p>
+            </div>
+            <div class="field is-grouped mt-3">
+              <div class="control">
+                <button type="button" id="summaryOpenWebAppButton" class="button is-small is-link" disabled>Open Web App</button><span id="summaryOpenWebAppMessage" class="ml-2 is-size-7 has-text-grey"></span>
+              </div>
+              <div class="control">
+                <button type="button" id="summaryRevertVersionButton" class="button is-small is-danger" disabled>Revert</button>
+              </div>
+              <div class="control is-expanded">
+                <div class="select is-small is-fullwidth">
+                  <select id="summaryVersionSelect">
+                    <option value="">-- Select a version --</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="tabs is-boxed is-centered">
@@ -99,7 +145,7 @@
             </div>
             <div class="control">
               <button type="button" id="regenerateProposalButton" class="button is-info is-light" style="display:none;">Regenerate Proposal</button>
-            </div>
+            }
           </div>
           <div id="apply-result-container" class="box mt-4" style="display:none;">
             <h3 class="title is-5">Apply Result:</h3>
@@ -147,18 +193,6 @@
           </div>
         </div>
 
-        <h2 class="title is-4 mt-5">OAuth Scopes</h2>
-        <div class="box">
-          <p class="content">Displays the OAuth scopes defined in the selected Apps Script project's <code>appsscript.json</code> manifest file.</p>
-          <div class="control">
-            <button type="button" id="getOAuthScopesButton" class="button is-info">Get OAuth Scopes</button>
-          </div>
-          <div id="oauth-scopes-result-container" class="box mt-4" style="display:none;">
-            <h3 class="title is-5">OAuth Scopes:</h3>
-            <div id="oauth-scopes-result" class="content oauth-scopes-display-container"></div>
-          </div>
-        </div>
-
         <h2 class="title is-4 mt-5">Deploy Script</h2>
         <form id="deploy-form" class="box">
           <div class="field">
@@ -189,7 +223,7 @@
             <label class="label" for="libraryVersion">Library Version (Optional, defaults to HEAD):</label>
             <div class="control">
               <input type="text" id="libraryVersion" name="libraryVersion" placeholder="e.g., 1, 2, 3 or HEAD" class="input">
-            </div>
+            }
           </div>
           <div class="control mt-3">
             <button type="submit" id="addLibraryButton" class="button is-success">Add Library</button>
@@ -198,51 +232,6 @@
         <div id="add-library-result-container" class="box mt-4" style="display:none;">
           <h3 class="title is-5">Add Library Result:</h3>
           <pre id="add-library-result" class="content"></pre>
-        </div>
-
-        <h2 class="title is-4 mt-5">Version Control</h2>
-        <div class="box">
-          <p class="content">View script version history and revert to a specific past version.</p>
-          <div class="field">
-            <div class="field is-grouped mb-3">
-              <div class="control">
-                <button type="button" id="getVersionsButton" class="button is-info">Get Versions</button>
-              </div>
-              <div class="control is-expanded">
-                <div class="select is-fullwidth">
-                  <select id="versionSelect">
-                    <option value="">-- Select a version --</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div class="field is-grouped">
-              <div class="control">
-                <button type="button" id="openWebAppButton" class="button is-link" disabled>Open Web App</button><span id="openWebAppMessage" class="ml-2 is-size-7 has-text-grey"></span>
-              </div>
-              <div class="control">
-                <button type="button" id="revertVersionButton" class="button is-danger" disabled>Revert to Selected Version</button>
-              </div>
-            </div>
-          </div>
-          <div id="version-result-container" class="box mt-4" style="display:none;">
-            <h3 class="title is-5">Version Operation Result:</h3>
-            <pre id="version-result" class="content"></pre>
-          </div>
-        </div>
-
-        <h2 class="title is-4 mt-5">Target Script Files</h2>
-        <div class="box">
-          <p class="content">View the list of files within the selected Target Script ID.</p>
-          <div class="field">
-            <div class="control">
-              <button type="button" id="getFilesListButton" class="button is-link">Get Files List</button>
-            </div>
-          </div>
-          <div id="filesListContainer" class="box mt-4" style="display:none;">
-            <h3 class="title is-5">Files in Script:</h3>
-            <div id="filesListDisplay" class="files-grid"></div>
-          </div>
         </div>
       </div>
 
@@ -254,7 +243,7 @@
             <label class="label" for="gcpProjectId">GCP Project ID:</label>
             <div class="control">
               <input type="text" id="gcpProjectId" name="gcpProjectId" class="input">
-            </div>
+            }
           </div>
           <div class="control mt-3">
             <button type="button" id="saveGcpProjectIdButton" class="button is-info">Save GCP Project ID</button>

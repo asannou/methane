@@ -64,7 +64,6 @@
             UI.hideSpinnerInButton(UI.get('fixApplyErrorsButton'));
             UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
             UI.hideSpinnerInButton(UI.get('proposeBrowserErrorLoggingButton'));
-            UI.hideSpinnerInButton(UI.get('getOAuthScopesButton'));
 
             UI.enable('prompt');
             UI.hide('cancelAiOperationButton');
@@ -146,7 +145,6 @@
             UI.setHtml('ai-policy', '');
             UI.hide('html-validation-warnings');
             UI.setHtml('html-validation-warnings', '');
-            UI.hide('version-result-container');
             UI.hide('policyEditor');
             UI.setText('togglePolicyEditButton', 'Edit Policy');
             AppState.isPolicyEditing = false;
@@ -1182,39 +1180,125 @@
         },
 
         /**
-         * Handle getting script versions.
+         * Loads and displays comprehensive script details (URL, files, scopes, versions) in the summary section.
          */
-        handleGetVersions: () => {
+        loadScriptDetailsSummary: () => {
             const scriptId = Utils.getEffectiveScriptId();
-            const versionsSelect = UI.get('versionSelect');
-            const getVersionsButton = UI.get('getVersionsButton');
-            
-            UI.setHtml('versionSelect', '<option value="">-- Loading versions --</option>');
-            UI.disable('versionSelect');
-            UI.showSpinnerInButton(getVersionsButton, 'Getting Versions...');
-            UI.disable('revertVersionButton');
-            UI.disable('openWebAppButton');
-            UI.setText('openWebAppMessage', '');
-            UI.hide('version-result-container');
+            const summaryContainer = UI.get('scriptDetailsSummaryContainer');
+            const editorUrlDisplay = UI.get('editorUrlDisplay');
+            const summaryFilesDisplay = UI.get('summaryFilesDisplay');
+            const summaryOAuthScopesDisplay = UI.get('summaryOAuthScopesDisplay');
+            const summaryVersionsDisplay = UI.get('summaryVersionsDisplay');
+            const summaryVersionSelect = UI.get('summaryVersionSelect');
+            const summaryOpenWebAppButton = UI.get('summaryOpenWebAppButton');
+            const summaryRevertVersionButton = UI.get('summaryRevertVersionButton');
+            const summaryOpenWebAppMessage = UI.get('summaryOpenWebAppMessage');
 
+            UI.hide(summaryContainer);
             if (!scriptId) {
-                UI.setHtml('versionSelect', '<option value="">-- Select a Script ID first --</option>');
-                UI.setText('version-result', 'Error: Please select or enter a Script ID to get versions.');
-                UI.show('version-result-container');
-                UI.enable('versionSelect');
-                UI.hideSpinnerInButton(getVersionsButton);
+                UI.setHtml(editorUrlDisplay, 'Apps Script Editor URL: (Script ID needed)');
+                UI.setHtml(summaryFilesDisplay, '<p class="has-text-grey">No script selected.</p>');
+                UI.setHtml(summaryOAuthScopesDisplay, '<p class="has-text-grey">No script selected.</p>');
+                UI.setHtml(summaryVersionsDisplay, '<p class="has-text-grey">No script selected.</p>');
+                UI.disable(summaryOpenWebAppButton);
+                UI.disable(summaryRevertVersionButton);
+                UI.setText(summaryOpenWebAppMessage, '');
+                UI.setHtml(summaryVersionSelect, '<option value="">-- Select a Script ID first --</option>');
                 return;
             }
 
+            UI.show(summaryContainer);
             Utils.saveScriptIdToLocalStorage(scriptId);
 
+            // 1. Editor URL
+            UI.setHtml(editorUrlDisplay, 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
+            google.script.run
+                .withSuccessHandler(function(url) {
+                    if (url.startsWith("Error:")) {
+                        UI.setText(editorUrlDisplay, `Apps Script Editor URL: ${url}`);
+                    } else {
+                        UI.setHtml(editorUrlDisplay, `Apps Script Editor URL: <a href="${url}" target="_blank">${url}</a>`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setText(editorUrlDisplay, `Apps Script Editor URL: Error - ${Utils.escapeHtml(error.message)}`);
+                })
+                .getScriptEditorUrl(scriptId);
+
+            // 2. Files List
+            UI.setHtml(summaryFilesDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>`);
             google.script.run
                 .withSuccessHandler(function(response) {
-                    UI.hideSpinnerInButton(getVersionsButton);
-                    UI.enable('versionSelect');
+                    if (response.status === 'success') {
+                        if (response.files && response.files.length > 0) {
+                            UI.setHtml(summaryFilesDisplay, '');
+                            response.files.forEach(file => {
+                                const fileItem = document.createElement('div');
+                                fileItem.className = 'file-item';
+
+                                let typeClass = '';
+                                let typeText = '';
+
+                                switch (file.type) {
+                                    case 'SERVER_JS': typeClass = 'is-server-js'; typeText = 'JS'; break;
+                                    case 'JSON': typeClass = 'is-json'; typeText = 'JSON'; break;
+                                    case 'HTML': typeClass = 'is-html'; typeText = 'HTML'; break;
+                                    default: typeClass = 'is-unknown'; typeText = 'UNKNOWN';
+                                }
+                                
+                                fileItem.classList.add(typeClass);
+
+                                fileItem.innerHTML = `
+                                    <div class="file-type-badge">${typeText}</div>
+                                    <div class="file-name">${Utils.escapeHtml(file.name)}.${Utils.getFileExtension(file.type)}</div>
+                                `;
+                                summaryFilesDisplay.appendChild(fileItem);
+                            });
+                        } else {
+                            UI.setHtml(summaryFilesDisplay, '<p>No files found in this script.</p>');
+                        }
+                    } else {
+                        UI.setHtml(summaryFilesDisplay, `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
+                        if (response.apiErrorDetails) {
+                            UI.setHtml(summaryFilesDisplay, UI.get('summaryFilesDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setHtml(summaryFilesDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
+                })
+                .listTargetScriptFiles(scriptId);
+
+            // 3. OAuth Scopes
+            UI.setHtml(summaryOAuthScopesDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading OAuth scopes...</p>`);
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.status === 'success') {
+                        UI.displayOAuthScopes(response.scopes, summaryOAuthScopesDisplay);
+                    } else {
+                        UI.setHtml(summaryOAuthScopesDisplay, ''); // Clear loading message before appending error
+                        UI.appendNotification(summaryOAuthScopesDisplay, 'is-danger', `OAuthスコープの取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setHtml(summaryOAuthScopesDisplay, ''); // Clear loading message
+                    UI.appendNotification(summaryOAuthScopesDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
+                })
+                .getProjectOAuthScopes(scriptId);
+
+            // 4. Version Info
+            UI.setHtml(summaryVersionsDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading versions...</p>`);
+            UI.disable(summaryVersionSelect);
+            UI.disable(summaryRevertVersionButton);
+            UI.disable(summaryOpenWebAppButton);
+            UI.setText(summaryOpenWebAppMessage, '');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.enable(summaryVersionSelect);
+                    UI.setHtml(summaryVersionsDisplay, ''); // Clear spinner message
 
                     if (response.status === 'success') {
-                        UI.setHtml('versionSelect', '<option value="">-- Select a version --</option>');
+                        UI.setHtml(summaryVersionSelect, '<option value="">-- Select a version --</option>');
                         if (response.versions && response.versions.length > 0) {
                             response.versions.forEach(version => {
                                 const option = document.createElement('option');
@@ -1225,67 +1309,64 @@
                                 } else {
                                     option.dataset.webappUrl = 'null';
                                 }
-                                versionsSelect.appendChild(option);
+                                summaryVersionSelect.appendChild(option);
                             });
-                            UI.setText('version-result', `Versions found: ${response.versions.length} items`);
                         } else {
-                            UI.setHtml('versionSelect', '<option value="">-- No versions found --</option>');
-                            UI.setText('version-result', response.message);
+                            UI.setHtml(summaryVersionSelect, '<option value="">-- No versions found --</option>');
                         }
-                        versionsSelect.dispatchEvent(new Event('change'));
+                        // Manually trigger change event for the summary version select to update buttons
+                        summaryVersionSelect.dispatchEvent(new Event('change'));
                     }
                     else {
-                        UI.setHtml('versionSelect', '<option value="">-- Error loading versions --</option>');
-                        UI.setText('version-result', `Error: ${response.message}`);
-                        UI.disable('openWebAppButton');
-                        UI.disable('revertVersionButton');
-                        UI.setText('openWebAppMessage', '');
+                        UI.setHtml(summaryVersionSelect, '<option value="">-- Error loading versions --</option>');
+                        UI.appendNotification(summaryVersionsDisplay, 'is-danger', `バージョン情報の取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
+                        UI.disable(summaryOpenWebAppButton);
+                        UI.disable(summaryRevertVersionButton);
+                        UI.setText(summaryOpenWebAppMessage, '');
                     }
-                    UI.show('version-result-container');
                 })
                 .withFailureHandler(function(error) {
-                    UI.hideSpinnerInButton(getVersionsButton);
-                    UI.enable('versionSelect');
-                    UI.disable('revertVersionButton');
-                    UI.disable('openWebAppButton');
-                    UI.setText('openWebAppMessage', '');
-                    UI.setHtml('versionSelect', '<option value="">-- Error loading versions --</option>');
-                    UI.setText('version-result', `Error getting versions: ${error.message}`);
-                    UI.show('version-result-container');
+                    UI.enable(summaryVersionSelect);
+                    UI.setHtml(summaryVersionsDisplay, ''); // Clear spinner message
+                    UI.setHtml(summaryVersionSelect, '<option value="">-- Error loading versions --</option>');
+                    UI.appendNotification(summaryVersionsDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
+                    UI.disable(summaryOpenWebAppButton);
+                    UI.disable(summaryRevertVersionButton);
+                    UI.setText(summaryOpenWebAppMessage, '');
                 })
                 .listScriptVersions(scriptId);
         },
 
         /**
-         * Handle change event for the version select dropdown.
+         * Handle change event for the summary version select dropdown.
          */
-        handleVersionSelectChange: () => {
-            const versionsSelect = UI.get('versionSelect');
+        handleSummaryVersionSelectChange: () => {
+            const versionsSelect = UI.get('summaryVersionSelect');
             const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
 
             // Enable/disable revert button based on selection
-            UI.get('revertVersionButton').disabled = !selectedOption.value;
+            UI.get('summaryRevertVersionButton').disabled = !selectedOption.value;
 
             // Enable/disable open web app button based on webappUrl in dataset
             const webappUrl = selectedOption.dataset.webappUrl;
 
             if (selectedOption.value && webappUrl && webappUrl !== 'null') {
-                UI.enable('openWebAppButton');
-                UI.setText('openWebAppMessage', '');
+                UI.enable('summaryOpenWebAppButton');
+                UI.setText('summaryOpenWebAppMessage', '');
             } else if (selectedOption.value && (webappUrl === 'null' || !webappUrl)) {
-                UI.disable('openWebAppButton');
-                UI.setText('openWebAppMessage', 'No web app URL for this version.');
+                UI.disable('summaryOpenWebAppButton');
+                UI.setText('summaryOpenWebAppMessage', 'No web app URL for this version.');
             } else {
-                UI.disable('openWebAppButton');
-                UI.setText('openWebAppMessage', '');
+                UI.disable('summaryOpenWebAppButton');
+                UI.setText('summaryOpenWebAppMessage', '');
             }
         },
 
         /**
-         * Handle opening the web app URL for the selected version.
+         * Handle opening the web app URL for the selected version from summary.
          */
-        handleOpenWebApp: () => {
-            const versionsSelect = UI.get('versionSelect');
+        handleSummaryOpenWebApp: () => {
+            const versionsSelect = UI.get('summaryVersionSelect');
             const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
             const webappUrl = selectedOption.dataset.webappUrl;
 
@@ -1297,200 +1378,63 @@
         },
 
         /**
-         * Handle reverting to a specific script version.
+         * Handle reverting to a specific script version from summary.
          */
-        handleRevertVersion: () => {
+        handleSummaryRevertVersion: () => {
             const scriptId = Utils.getEffectiveScriptId();
-            const versionSelect = UI.get('versionSelect');
+            const versionSelect = UI.get('summaryVersionSelect');
             const selectedVersion = versionSelect.value;
-            const revertButton = UI.get('revertVersionButton');
-            const getVersionsButton = UI.get('getVersionsButton');
+            const revertButton = UI.get('summaryRevertVersionButton');
+            const summaryVersionsDisplay = UI.get('summaryVersionsDisplay');
+            const summaryOpenWebAppButton = UI.get('summaryOpenWebAppButton');
+            const summaryOpenWebAppMessage = UI.get('summaryOpenWebAppMessage');
             
             if (!scriptId) {
-                UI.setText('version-result', 'Error: Please select or enter a Script ID.');
-                UI.show('version-result-container');
+                UI.appendNotification(summaryVersionsDisplay, 'is-danger', 'エラー: スクリプトIDを選択または入力してください。');
                 return;
             }
             if (!selectedVersion) {
-                UI.setText('version-result', 'Error: Please select a version to revert to.');
-                UI.show('version-result-container');
+                UI.appendNotification(summaryVersionsDisplay, 'is-danger', 'エラー: リバートするバージョンを選択してください。');
                 return;
             }
 
-            if (!confirm(`Reverting script ID ${scriptId} to version ${selectedVersion}. This cannot be undone. Do you wish to continue?`)) {
+            if (!confirm(`スクリプトID ${scriptId} をバージョン ${selectedVersion} にリバートします。この操作は元に戻せません。続行しますか？`)) {
                 return;
             }
 
             UI.showSpinnerInButton(revertButton, 'Reverting...');
-            UI.disable('getVersionsButton');
-            UI.disable('versionSelect');
-            UI.disable('openWebAppButton');
-            UI.setText('openWebAppMessage', '');
-            UI.show('version-result-container');
-            UI.setText('version-result', `Reverting script to version ${selectedVersion}...`);
+            UI.disable(versionSelect);
+            UI.disable(summaryOpenWebAppButton);
+            UI.setText(summaryOpenWebAppMessage, '');
+            UI.setHtml(summaryVersionsDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Reverting script to version ${selectedVersion}...</p>`);
 
             Utils.saveScriptIdToLocalStorage(scriptId);
 
             google.script.run
                 .withSuccessHandler(function(response) {
                     UI.hideSpinnerInButton(revertButton);
-                    UI.enable('getVersionsButton');
-                    UI.enable('versionSelect');
+                    UI.enable(versionSelect);
+                    UI.setHtml(summaryVersionsDisplay, ''); // Clear loading message
 
                     if (response.status === 'success') {
-                        UI.setText('version-result', response.message);
-                        UI.setHtml('versionSelect', '<option value="">-- Select a version --</option>');
-                        UI.disable('revertVersionButton');
-                        UI.disable('openWebAppButton');
-                        UI.setText('openWebAppMessage', '');
+                        UI.appendNotification(summaryVersionsDisplay, 'is-success', response.message);
+                        // After revert, refresh the summary details
+                        Handlers.loadScriptDetailsSummary();
                     } else {
-                        UI.setText('version-result', `Error: ${response.message}`);
-                        UI.disable('openWebAppButton');
-                        UI.setText('openWebAppMessage', '');
+                        UI.appendNotification(summaryVersionsDisplay, 'is-danger', `エラー: ${response.message}`, response.apiErrorDetails);
+                        UI.disable(summaryOpenWebAppButton);
+                        UI.setText(summaryOpenWebAppMessage, '');
                     }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(revertButton);
-                    UI.enable('getVersionsButton');
-                    UI.enable('versionSelect');
-                    UI.disable('openWebAppButton');
-                    UI.setText('openWebAppMessage', '');
-                    UI.setText('version-result', `Error reverting to version: ${error.message}`);
+                    UI.enable(versionSelect);
+                    UI.disable(summaryOpenWebAppButton);
+                    UI.setText(summaryOpenWebAppMessage, '');
+                    UI.setHtml(summaryVersionsDisplay, ''); // Clear loading message
+                    UI.appendNotification(summaryVersionsDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
                 })
                 .revertToVersion(scriptId, parseInt(selectedVersion));
-        },
-
-        /**
-         * Handle getting the list of files for the target script.
-         */
-        handleGetFilesList: (event) => { /* Added event parameter */
-            const scriptId = Utils.getEffectiveScriptId();
-            const filesListDisplay = UI.get('filesListDisplay');
-            const getFilesListButton = UI.get('getFilesListButton');
-
-            UI.show('filesListContainer');
-
-            // Determine if the call is from the explicit button click or an automatic change event
-            const isManualButtonClick = event && event.type === 'click' && event.currentTarget.id === 'getFilesListButton';
-
-            if (isManualButtonClick) {
-                UI.showSpinnerInButton(getFilesListButton, 'Getting Files...');
-                UI.setHtml(filesListDisplay, ''); // Clear previous results immediately for manual trigger
-            } else {
-                // For automatic trigger (e.g., dropdown change), show spinner directly in the display area
-                UI.setHtml(filesListDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>`);
-            }
-
-            if (!scriptId) {
-                if (isManualButtonClick) {
-                    UI.hideSpinnerInButton(getFilesListButton);
-                }
-                UI.setHtml(filesListDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
-                return;
-            }
-
-            Utils.saveScriptIdToLocalStorage(scriptId);
-
-            google.script.run
-                .withSuccessHandler(function(response) {
-                    if (isManualButtonClick) {
-                        UI.hideSpinnerInButton(getFilesListButton);
-                    }
-                    UI.setHtml(filesListDisplay, ''); // Clear loading message
-
-                    if (response.status === 'success') {
-                        if (response.files && response.files.length > 0) {
-                            UI.setHtml('filesListDisplay', '');
-                            response.files.forEach(file => {
-                                const fileItem = document.createElement('div');
-                                fileItem.className = 'file-item';
-
-                                let typeClass = '';
-                                let typeText = '';
-
-                                switch (file.type) {
-                                    case 'SERVER_JS':
-                                        typeClass = 'is-server-js';
-                                        typeText = 'JS';
-                                        break;
-                                    case 'JSON':
-                                        typeClass = 'is-json';
-                                        typeText = 'JSON';
-                                        break;
-                                    case 'HTML':
-                                        typeClass = 'is-html';
-                                        typeText = 'HTML';
-                                        break;
-                                    default:
-                                        typeClass = 'is-unknown';
-                                        typeText = 'UNKNOWN';
-                                }
-                                
-                                fileItem.classList.add(typeClass);
-
-                                fileItem.innerHTML = `
-                                    <div class="file-type-badge">${typeText}</div>
-                                    <div class="file-name">${Utils.escapeHtml(file.name)}.${Utils.getFileExtension(file.type)}</div>
-                                `;
-
-                                filesListDisplay.appendChild(fileItem);
-                            });
-                        } else {
-                            UI.setHtml(filesListDisplay, '<p>No files found in this script.</p>');
-                        }
-                    } else {
-                        UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
-                        if (response.apiErrorDetails) {
-                            UI.setHtml('filesListDisplay', UI.get('filesListDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
-                        }
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    if (isManualButtonClick) {
-                        UI.hideSpinnerInButton(getFilesListButton);
-                    }
-                    UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error calling server function: ${Utils.escapeHtml(error.message)}</p>`);
-                })
-                .listTargetScriptFiles(scriptId);
-        },
-        /**
-         * Handle getting OAuth scopes for the target script.
-         */
-        handleGetOAuthScopes: () => {
-            const scriptId = Utils.getEffectiveScriptId();
-            const getScopesButton = UI.get('getOAuthScopesButton');
-            const resultContainer = UI.get('oauth-scopes-result-container');
-            const resultDisplay = UI.get('oauth-scopes-result');
-
-            UI.showSpinnerInButton(getScopesButton, 'Getting Scopes...');
-            UI.show(resultContainer);
-            UI.setHtml(resultDisplay, '<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>OAuthスコープ取得中...</p>'); // Initial loading message
-
-            if (!scriptId) {
-                UI.hideSpinnerInButton(getScopesButton);
-                UI.setHtml(resultDisplay, ''); // Clear loading message
-                UI.appendNotification(resultDisplay, 'is-danger', 'エラー: スクリプトIDを選択または入力してください。');
-                return;
-            }
-
-            Utils.saveScriptIdToLocalStorage(scriptId);
-
-            google.script.run
-                .withSuccessHandler(function(response) {
-                    UI.hideSpinnerInButton(getScopesButton);
-                    if (response.status === 'success') {
-                        UI.displayOAuthScopes(response.scopes, resultDisplay); // Call the new function
-                    } else {
-                        UI.setHtml(resultDisplay, ''); // Clear loading message before appending error
-                        UI.appendNotification(resultDisplay, 'is-danger', `OAuthスコープの取得中にエラーが発生しました: ${response.message}`, response.apiErrorDetails);
-                    }
-                })
-                .withFailureHandler(function(error) {
-                    UI.hideSpinnerInButton(getScopesButton);
-                    UI.setHtml(resultDisplay, ''); // Clear loading message
-                    UI.appendNotification(resultDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
-                })
-                .getProjectOAuthScopes(scriptId);
         }
     };
 </script>
