@@ -20,14 +20,14 @@ function _generatePolicyFromGemini(projectContent, userInstructionForPolicy, err
     aiPrompt += "```\n" + file.source + "\n```\n\n";
   });
   
-  aiPrompt += `## 指示\n${userInstructionForPolicy}\n\n`;
+aiPrompt += `## 指示\n${userInstructionForPolicy}\n\n`;
   
   if (errorLogs) {
     aiPrompt += `## エラーログ\n\n${errorLogs}\n\n`;
     aiPrompt += `上記のログを解決するための変更方針を策定してください。\n`;
   }
   
-  aiPrompt += "## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n";
+aiPrompt += "## あなたのタスク\n上記指示に対する変更方針をJSON形式で返してください。JSONには'policy'フィールドに方針の文字列を含めてください。\n";
   aiPrompt += `レスポンス形式の例:\n` + `{"policy": "...変更方針のテキスト..."}\n`;
 
   const requestBody = {
@@ -186,7 +186,18 @@ function fixErrorsFromLogs(targetScriptId) {
   try {
     // 1. ログを取得
     const logs = getScriptLogs(targetScriptId);
-    if (logs.startsWith("Log retrieval error:") || logs.startsWith("No Apps Script logs found for the specified Script ID")) {
+    let logsForAiPrompt;
+
+    if (Array.isArray(logs)) {
+        if (logs.length === 0) {
+            logsForAiPrompt = `No Apps Script logs found for the specified Script ID: ${targetScriptId}.\n`;
+        } else {
+            // Convert structured logs back to a simple string for the AI prompt
+            // Assuming `getScriptLogs` now returns [{timestamp: string, severity: string, message: string}, ...]
+            logsForAiPrompt = `--- Latest Logs for GCP Project: ${PropertiesService.getScriptProperties().getProperty('GCP_PROJECT_ID') || 'Unknown Project'} ---\n`; // Add project ID context
+            logsForAiPrompt += logs.map(log => `[${log.timestamp}] ${log.severity}: ${log.message}`).join('\n');
+        }
+    } else { // It's an error message string returned by getScriptLogs
         return { status: 'error', message: logs};
     }
 
@@ -203,12 +214,12 @@ function fixErrorsFromLogs(targetScriptId) {
     // 3. AIに渡す方針生成用のプロンプトを生成し、方針を取得
     // Automated Error Fix のためのポリシー生成指示
     const policyInstruction = `提供されたエラーログと既存のファイルに基づいて、これらのエラーを修正するための変更方針を策定してください。`;
-    const policyText = _generatePolicyFromGemini(projectContent, policyInstruction, logs);
+    const policyText = _generatePolicyFromGemini(projectContent, policyInstruction, logsForAiPrompt);
 
     // 4. コード生成用のプロンプトを生成
     let aiPromptForCode = `以下のGoogle Apps Scriptのログに示されたエラーを解決するために、提供された既存のファイル群を修正してください。\n`;
     aiPromptForCode += `修正は、エラーを解消し、既存の機能性を損なわないように、可能な限り最小限にしてください。\n\n`;
-    aiPromptForCode += `## エラーログ\n\n${logs}\n\n`;
+    aiPromptForCode += `## エラーログ\n\n${logsForAiPrompt}\n\n`;
     aiPromptForCode += `## あなたのタスク\n上記指示とエラーログに基づいて、エラーを修正するための新しいファイル内容を提案してください。\n`;
     aiPromptForCode += `提案は必ずJSON形式で、修正が必要なファイルのみを含めてください。\n`;
     aiPromptForCode += `ファイル名、タイプ、ソースを正確に指定してください。\n`;

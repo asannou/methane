@@ -62,6 +62,7 @@
             UI.setHtml('propose-browser-error-logging-result', '');
             UI.hide('oauth-scopes-result-container');
             UI.setHtml('oauth-scopes-result', '');
+            UI.setHtml('log-result', ''); // Clear structured log display
 
 
             UI.hide('policy-container');
@@ -1041,7 +1042,7 @@
 
             UI.showSpinnerInButton(submitButton, 'Getting Logs...');
             UI.hide('log-result-container');
-            UI.setText('log-result', '');
+            UI.setHtml('log-result', ''); // Use setHtml to clear for structured logs
 
             const scriptId = Utils.getEffectiveScriptId();
             Utils.saveScriptIdToLocalStorage(scriptId);
@@ -1049,12 +1050,12 @@
             google.script.run
                 .withSuccessHandler(function(response) {
                     UI.hideSpinnerInButton(submitButton);
-                    UI.setText('log-result', response);
+                    UI.displayLogs(response); // Use the new UI.displayLogs function
                     UI.show('log-result-container');
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
-                    UI.setText('log-result', 'Error: ' + error.message);
+                    UI.setHtml('log-result', `<p class="has-text-danger">Error: ${Utils.escapeHtml(error.message)}</p>`); // Use setHtml for error messages
                     UI.show('log-result-container');
                 })
                 .getScriptLogs(scriptId);

@@ -219,7 +219,7 @@ function setGcpProjectId(gcpProjectId) {
 /**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
  * @param {string} targetScriptId - ログ取得のコンテキストに使用されるApps ScriptのID（ログフィルタリングには使用されません）。
- * @returns {string} - フォーマットされたログ文字列、またはエラーメッセージ
+ * @returns {Array<object>|string} - フォーマットされたログオブジェクトの配列、またはエラーメッセージ
  */
 function getScriptLogs(targetScriptId) {
   const accessToken = ScriptApp.getOAuthToken();
@@ -266,10 +266,10 @@ function getScriptLogs(targetScriptId) {
     
     const logsData = JSON.parse(response.getContentText());
     if (!logsData.entries || logsData.entries.length === 0) {
-      return `No Apps Script logs found in GCP project: ${gcpProjectId} for the current filters.\n`;
+      return []; // Return empty array if no logs are found
     }
 
-    let formattedLogs = `--- Latest Logs for GCP Project: ${gcpProjectId} ---\n`;
+    const logEntries = [];
     logsData.entries.forEach(entry => {
       const timestamp = new Date(entry.timestamp).toLocaleString();
       let logPayload = '';
@@ -280,10 +280,14 @@ function getScriptLogs(targetScriptId) {
       } else if (entry.protoPayload) {
         logPayload = JSON.stringify(entry.protoPayload, null, 2);
       }
-      formattedLogs += `[${timestamp}] ${entry.severity || 'INFO'}: ${logPayload}\n`;
+      logEntries.push({
+        timestamp: timestamp,
+        severity: entry.severity || 'INFO',
+        message: logPayload
+      });
     });
 
-    return formattedLogs;
+    return logEntries;
 
   } catch (e) {
     console.error("Error retrieving logs:", e);
