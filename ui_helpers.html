@@ -213,52 +213,24 @@
         },
 
         /**
-         * Displays an array of structured log entries in the log-result container.
-         * @param {Array<object>} logs - An array of log objects, each with timestamp, severity, and message.
+         * Updates the display of the Apps Script Editor URL.
+         * @param {string} [scriptId=null] - The ID of the Apps Script. If null/empty, displays a placeholder.
          */
-        displayLogs: (logs) => {
-            const logResultDiv = UI.get('log-result');
-            logResultDiv.innerHTML = ''; // Clear previous logs
+        updateEditorUrlDisplay: (scriptId = null) => {
+            const editorUrlLink = UI.get('editorUrlLink');
+            const editorUrlPlaceholder = UI.get('editorUrlPlaceholder');
+            const url = Utils.generateEditorUrl(scriptId);
 
-            if (!Array.isArray(logs) || logs.length === 0) {
-                const noLogsMessage = document.createElement('div');
-                noLogsMessage.className = 'notification is-info is-light';
-                noLogsMessage.textContent = 'No Apps Script logs found for the selected script, or logs are not available.';
-                logResultDiv.appendChild(noLogsMessage);
-                return;
+            if (url) {
+                editorUrlLink.href = url;
+                UI.show(editorUrlLink);
+                UI.hide(editorUrlPlaceholder);
+            } else {
+                editorUrlLink.href = '#';
+                UI.hide(editorUrlLink);
+                UI.show(editorUrlPlaceholder);
+                editorUrlPlaceholder.textContent = 'No Script ID selected.';
             }
-
-            // Add a header for better context
-            const header = document.createElement('div');
-            header.className = 'log-header notification is-info is-light is-size-7 mb-2';
-            header.textContent = `--- Latest Logs (Total: ${logs.length}) ---`;
-            logResultDiv.appendChild(header);
-
-            logs.forEach(log => {
-                const logEntryDiv = document.createElement('div');
-                logEntryDiv.className = 'log-entry';
-
-                const timestampSpan = document.createElement('span');
-                timestampSpan.className = 'log-timestamp';
-                timestampSpan.textContent = `[${log.timestamp}]`;
-                logEntryDiv.appendChild(timestampSpan);
-
-                const levelSpan = document.createElement('span');
-                // Ensure severity is a string before calling toUpperCase()
-                const logLevelClass = `log-level-${(log.severity || 'INFO').toUpperCase()}`;
-                levelSpan.className = `log-level ${logLevelClass}`;
-                levelSpan.textContent = log.severity || 'INFO';
-                logEntryDiv.appendChild(levelSpan);
-
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'log-message';
-                // Use pre tag inside div to preserve formatting for multi-line messages, especially JSON payloads.
-                // Use Utils.escapeHtml to prevent XSS if log messages contain user-controlled content.
-                messageDiv.innerHTML = `<pre>${Utils.escapeHtml(log.message)}</pre>`;
-                logEntryDiv.appendChild(messageDiv);
-
-                logResultDiv.appendChild(logEntryDiv);
-            });
         },
 
         // New constant for OAuth scope descriptions

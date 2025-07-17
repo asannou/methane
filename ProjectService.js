@@ -650,18 +650,6 @@ function listAppsScriptProjects() {
 }
 
 /**
- * Generates the editor URL for a given Apps Script ID.
- * @param {string} scriptId - The ID of the Apps Script.
- * @returns {string} - The Apps Script editor URL.
- */
-function getScriptEditorUrl(scriptId) {
-  if (!scriptId || scriptId.trim() === '') {
-    return "Error: Script ID is not specified.";
-  }
-  return `https://script.google.com/d/${scriptId}/edit`;
-}
-
-/**
  * Lists all script versions for a given Apps Script project,
  * and also includes associated web app deployment URLs.
  * @param {string} scriptId - The ID of the Apps Script project.

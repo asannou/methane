@@ -41,7 +41,8 @@
 
         // NEW Elements for Centralized Script Details
         AppState.domElements.scriptDetailsSummaryContainer = document.getElementById('script-details-summary-container');
-        AppState.domElements.editorUrlDisplay = document.getElementById('editor-url-display');
+        AppState.domElements.editorUrlLink = document.getElementById('editorUrlLink');
+        AppState.domElements.editorUrlPlaceholder = document.getElementById('editorUrlPlaceholder');
         AppState.domElements.summaryFilesDisplay = document.getElementById('summary-files-display');
         AppState.domElements.summaryOAuthScopesDisplay = document.getElementById('summary-oauth-scopes-display');
         AppState.domElements.summaryVersionsDisplay = document.getElementById('summary-versions-display');
@@ -79,6 +80,9 @@
         UI.hide('proposeBrowserErrorLoggingResultContainer');
         // Hide the new summary container until a script is selected
         UI.hide('scriptDetailsSummaryContainer');
+        // Initialize the new editor URL display elements
+        UI.hide('editorUrlLink');
+        UI.show('editorUrlPlaceholder');
 
         Handlers.initTabNavigation();
 

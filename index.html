@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 <?!= include('style'); ?>
 </head>
 <body>
@@ -40,7 +41,16 @@
           </header>
           <div class="card-content">
             <!-- Editor URL -->
-            <div id="editor-url-display" class="notification is-light is-info is-small mb-4"></div>
+            <div class="field is-grouped is-align-items-center mb-4 editor-url-field">
+                <label class="label mb-0 mr-2">Apps Script Editor:</label>
+                <div class="control">
+                    <a id="editorUrlLink" href="#" target="_blank" class="button is-small is-link is-outlined">
+                        <span class="icon is-small"><i class="fas fa-external-link-alt"></i></span>
+                        <span>Open Editor</span>
+                    </a>
+                    <span id="editorUrlPlaceholder" class="has-text-grey is-size-7 ml-2">No Script ID selected.</span>
+                </div>
+            </div>
 
             <!-- Files List -->
             <div class="box p-4 mb-4 has-background-white-ter">

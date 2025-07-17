@@ -129,7 +129,7 @@
                     } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                         j++;
-                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (originalFoundInProposedAhead - i))) {
+                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (originalFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                         i++;
                     } else if (i < originalLines.length) {
@@ -455,6 +455,18 @@
             const div = document.createElement('div');
             div.appendChild(document.createTextNode(text));
             return div.innerHTML;
+        },
+
+        /**
+         * Generates the editor URL for a given Apps Script ID.
+         * @param {string} scriptId - The ID of the Apps Script.
+         * @returns {string} - The Apps Script editor URL.
+         */
+        generateEditorUrl: (scriptId) => {
+            if (!scriptId || scriptId.trim() === '') {
+                return null; // Return null if invalid, UI will handle
+            }
+            return `https://script.google.com/d/${scriptId}/edit`;
         }
     };
 </script>
