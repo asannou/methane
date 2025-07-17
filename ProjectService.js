@@ -276,9 +276,27 @@ function getScriptLogs(targetScriptId) {
       if (entry.textPayload) {
         logPayload = entry.textPayload;
       } else if (entry.jsonPayload) {
-        logPayload = JSON.stringify(entry.jsonPayload, null, 2);
+        let payload = entry.jsonPayload;
+        if (payload && typeof payload.message !== 'undefined') {
+          logPayload = typeof payload.message === 'object' ? JSON.stringify(payload.message, null, 2) : String(payload.message);
+        } else {
+          let tempPayload = { ...payload };
+          if (tempPayload.serviceContext) {
+            delete tempPayload.serviceContext;
+          }
+          logPayload = JSON.stringify(tempPayload, null, 2);
+        }
       } else if (entry.protoPayload) {
-        logPayload = JSON.stringify(entry.protoPayload, null, 2);
+        let payload = entry.protoPayload;
+        if (payload && typeof payload.message !== 'undefined') {
+          logPayload = typeof payload.message === 'object' ? JSON.stringify(payload.message, null, 2) : String(payload.message);
+        } else {
+          let tempPayload = { ...payload };
+          if (tempPayload.serviceContext) {
+            delete tempPayload.serviceContext;
+          }
+          logPayload = JSON.stringify(tempPayload, null, 2);
+        }
       }
       logEntries.push({
         timestamp: timestamp,
