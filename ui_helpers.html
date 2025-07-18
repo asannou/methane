@@ -301,6 +301,57 @@
             });
 
             displayElement.appendChild(scopesList);
+        },
+
+        /**
+         * Displays Apps Script logs in a structured format or an error message.
+         * @param {Array<object>|string} logs - An array of log entries ({timestamp, severity, message}) or an error message string.
+         */
+        displayLogs: (logs) => {
+            const logResultElement = UI.get('log-result');
+            UI.setHtml(logResultElement, ''); // Clear previous content
+
+            if (Array.isArray(logs)) {
+                if (logs.length === 0) {
+                    UI.setHtml(logResultElement, UI.createInfoMessage('No logs found for the selected script.'));
+                    return;
+                }
+
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'log-header';
+                headerDiv.textContent = 'Latest Apps Script Logs:';
+                logResultElement.appendChild(headerDiv);
+
+                logs.forEach(log => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'log-entry';
+
+                    const timestampSpan = document.createElement('span');
+                    timestampSpan.className = 'log-timestamp';
+                    timestampSpan.textContent = Utils.escapeHtml(log.timestamp);
+
+                    const levelSpan = document.createElement('span');
+                    levelSpan.className = `log-level log-level-${Utils.escapeHtml(log.severity).toUpperCase()}`;
+                    levelSpan.textContent = Utils.escapeHtml(log.severity);
+
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'log-message';
+                    // Since logPayload can be multi-line or JSON, wrap in <pre>
+                    messageDiv.innerHTML = `<pre>${Utils.escapeHtml(log.message)}</pre>`;
+
+                    entryDiv.appendChild(timestampSpan);
+                    entryDiv.appendChild(levelSpan);
+                    entryDiv.appendChild(messageDiv);
+
+                    logResultElement.appendChild(entryDiv);
+                });
+            } else if (typeof logs === 'string') {
+                // This handles cases where getScriptLogs returns an error string
+                UI.setHtml(logResultElement, UI.createErrorMessage('Log Retrieval Error', logs));
+            } else {
+                // Fallback for unexpected data types
+                UI.setHtml(logResultElement, UI.createErrorMessage('Unexpected Log Data', 'Received unexpected data format for logs. Please check server logs.'));
+            }
         }
     };
 </script>
