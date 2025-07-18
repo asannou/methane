@@ -166,71 +166,52 @@
         },
 
         /**
-         * Creates HTML for a standardized loading message.
-         * @param {string} message - The loading message.
-         * @returns {string} HTML string.
+         * Displays an array of structured log entries in the log-result container.
+         * @param {Array<object>} logs - An array of log objects, each with timestamp, severity, and message.
          */
-        createLoadingMessage: (message) => {
-            return `
-                <div class="notification is-info is-light is-loading-state">
-                    <p class="has-text-centered"><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>${Utils.escapeHtml(message)}</p>
-                </div>
-            `;
-        },
+        displayLogs: (logs) => {
+            const logResultDiv = UI.get('log-result');
+            logResultDiv.innerHTML = ''; // Clear previous logs
 
-        /**
-         * Creates HTML for a standardized error message.
-         * @param {string} title - The main error title.
-         * @param {string} message - The detailed error message.
-         * @param {object} [details=null] - Optional detailed error object.
-         * @returns {string} HTML string.
-         */
-        createErrorMessage: (title, message, details = null) => {
-            let contentHtml = `<p><strong>${Utils.escapeHtml(title)}</strong></p><p>${Utils.escapeHtml(message)}</p>`;
-            if (details) {
-                let detailsString;
-                try {
-                    detailsString = JSON.stringify(details, Object.getOwnPropertyNames(details), 2);
-                } catch (e) {
-                    detailsString = String(details);
-                }
-                contentHtml += `<h4 class="mt-2">Details:</h4><pre class="has-text-danger-dark is-size-7 mt-1">${Utils.escapeHtml(detailsString)}</pre>`;
+            if (!Array.isArray(logs) || logs.length === 0) {
+                const noLogsMessage = document.createElement('div');
+                noLogsMessage.className = 'notification is-info is-light';
+                noLogsMessage.textContent = 'No Apps Script logs found for the selected script, or logs are not available.';
+                logResultDiv.appendChild(noLogsMessage);
+                return;
             }
-            return `<div class="notification is-danger is-light is-error-state">${contentHtml}</div>`;
-        },
 
-        /**
-         * Creates HTML for a standardized info message.
-         * @param {string} message - The info message.
-         * @returns {string} HTML string.
-         */
-        createInfoMessage: (message) => {
-            return `
-                <div class="notification is-info is-light is-info-state has-text-centered">
-                    <p>${Utils.escapeHtml(message)}</p>
-                </div>
-            `;
-        },
+            // Add a header for better context
+            const header = document.createElement('div');
+            header.className = 'log-header notification is-info is-light is-size-7 mb-2';
+            header.textContent = `--- Latest Logs (Total: ${logs.length}) ---`;
+            logResultDiv.appendChild(header);
 
-        /**
-         * Updates the display of the Apps Script Editor URL.
-         * @param {string} [scriptId=null] - The ID of the Apps Script. If null/empty, displays a placeholder.
-         */
-        updateEditorUrlDisplay: (scriptId = null) => {
-            const editorUrlLink = UI.get('editorUrlLink');
-            const editorUrlPlaceholder = UI.get('editorUrlPlaceholder');
-            const url = Utils.generateEditorUrl(scriptId);
+            logs.forEach(log => {
+                const logEntryDiv = document.createElement('div');
+                logEntryDiv.className = 'log-entry';
 
-            if (url) {
-                editorUrlLink.href = url;
-                UI.show(editorUrlLink);
-                UI.hide(editorUrlPlaceholder);
-            } else {
-                editorUrlLink.href = '#';
-                UI.hide(editorUrlLink);
-                UI.show(editorUrlPlaceholder);
-                editorUrlPlaceholder.textContent = 'No Script ID selected.';
-            }
+                const timestampSpan = document.createElement('span');
+                timestampSpan.className = 'log-timestamp';
+                timestampSpan.textContent = `[${log.timestamp}]`;
+                logEntryDiv.appendChild(timestampSpan);
+
+                const levelSpan = document.createElement('span');
+                // Ensure severity is a string before calling toUpperCase()
+                const logLevelClass = `log-level-${(log.severity || 'INFO').toUpperCase()}`;
+                levelSpan.className = `log-level ${logLevelClass}`;
+                levelSpan.textContent = log.severity || 'INFO';
+                logEntryDiv.appendChild(levelSpan);
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'log-message';
+                // Use pre tag inside div to preserve formatting for multi-line messages, especially JSON payloads.
+                // Use Utils.escapeHtml to prevent XSS if log messages contain user-controlled content.
+                messageDiv.innerHTML = `<pre>${Utils.escapeHtml(log.message)}</pre>`;
+                logEntryDiv.appendChild(messageDiv);
+
+                logResultDiv.appendChild(logEntryDiv);
+            });
         },
 
         // New constant for OAuth scope descriptions
@@ -275,7 +256,10 @@
             displayElement.innerHTML = ''; // Clear previous content
 
             if (!Array.isArray(scopes) || scopes.length === 0) {
-                UI.setHtml(displayElement, UI.createInfoMessage('No OAuth scopes are defined in <code>appsscript.json</code>.<br>Scopes will be listed here if your script interacts with specific Google services.'));
+                const noScopesMessage = document.createElement('div');
+                noScopesMessage.className = 'notification is-info is-light';
+                noScopesMessage.innerHTML = `No OAuth scopes are defined in <code>appsscript.json</code>.<br>Scopes will be listed here if your script interacts with specific Google services.`;
+                displayElement.appendChild(noScopesMessage);
                 return;
             }
 
@@ -301,57 +285,6 @@
             });
 
             displayElement.appendChild(scopesList);
-        },
-
-        /**
-         * Displays Apps Script logs in a structured format or an error message.
-         * @param {Array<object>|string} logs - An array of log entries ({timestamp, severity, message}) or an error message string.
-         */
-        displayLogs: (logs) => {
-            const logResultElement = UI.get('log-result');
-            UI.setHtml(logResultElement, ''); // Clear previous content
-
-            if (Array.isArray(logs)) {
-                if (logs.length === 0) {
-                    UI.setHtml(logResultElement, UI.createInfoMessage('No logs found for the selected script.'));
-                    return;
-                }
-
-                const headerDiv = document.createElement('div');
-                headerDiv.className = 'log-header';
-                headerDiv.textContent = 'Latest Apps Script Logs:';
-                logResultElement.appendChild(headerDiv);
-
-                logs.forEach(log => {
-                    const entryDiv = document.createElement('div');
-                    entryDiv.className = 'log-entry';
-
-                    const timestampSpan = document.createElement('span');
-                    timestampSpan.className = 'log-timestamp';
-                    timestampSpan.textContent = Utils.escapeHtml(log.timestamp);
-
-                    const levelSpan = document.createElement('span');
-                    levelSpan.className = `log-level log-level-${Utils.escapeHtml(log.severity).toUpperCase()}`;
-                    levelSpan.textContent = Utils.escapeHtml(log.severity);
-
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'log-message';
-                    // Since logPayload can be multi-line or JSON, wrap in <pre>
-                    messageDiv.innerHTML = `<pre>${Utils.escapeHtml(log.message)}</pre>`;
-
-                    entryDiv.appendChild(timestampSpan);
-                    entryDiv.appendChild(levelSpan);
-                    entryDiv.appendChild(messageDiv);
-
-                    logResultElement.appendChild(entryDiv);
-                });
-            } else if (typeof logs === 'string') {
-                // This handles cases where getScriptLogs returns an error string
-                UI.setHtml(logResultElement, UI.createErrorMessage('Log Retrieval Error', logs));
-            } else {
-                // Fallback for unexpected data types
-                UI.setHtml(logResultElement, UI.createErrorMessage('Unexpected Log Data', 'Received unexpected data format for logs. Please check server logs.'));
-            }
         }
     };
 </script>

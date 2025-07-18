@@ -48,7 +48,7 @@
                         });
                         if (selectedId) {
                             scriptIdSelect.value = selectedId;
-                            // Explicitly trigger change event to update editor URL display and other summary details
+                            // Explicitly trigger change event to update editor URL display
                             scriptIdSelect.dispatchEvent(new Event('change'));
                         }
                     } else {
@@ -59,6 +59,38 @@
                     alert('Error loading Apps Script projects: ' + error.message);
                 })
                 .listAppsScriptProjects();
+        },
+
+        /**
+         * Update the display for the Apps Script Editor URL.
+         */
+        updateEditorUrlDisplay: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const editorUrlDisplayDiv = UI.get('editor-url-display');
+            
+            UI.setHtml('editor-url-display', '');
+
+            if (!scriptId) {
+                UI.setText('editor-url-display', 'Apps Script Editor URL: (Script ID needed)');
+                return;
+            }
+
+            UI.setHtml('editor-url-display', 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.startsWith("Error:")) {
+                        UI.setText('editor-url-display', `Apps Script Editor URL: ${response}`);
+                    } else {
+                        UI.setHtml('editor-url-display', `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setText('editor-url-display', `Apps Script Editor URL: Error - ${error.message}`);
+                })
+                .getScriptEditorUrl(scriptId);
         },
 
         /**
@@ -129,7 +161,7 @@
                     } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                         j++;
-                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (originalFoundInOriginalAhead - i))) {
+                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                         i++;
                     } else if (i < originalLines.length) {
@@ -455,18 +487,6 @@
             const div = document.createElement('div');
             div.appendChild(document.createTextNode(text));
             return div.innerHTML;
-        },
-
-        /**
-         * Generates the editor URL for a given Apps Script ID.
-         * @param {string} scriptId - The ID of the Apps Script.
-         * @returns {string} - The Apps Script editor URL.
-         */
-        generateEditorUrl: (scriptId) => {
-            if (!scriptId || scriptId.trim() === '') {
-                return null; // Return null if invalid, UI will handle
-            }
-            return `https://script.google.com/d/${scriptId}/edit`;
         }
     };
 </script>

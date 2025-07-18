@@ -3,6 +3,8 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Cache DOM elements for frequent access
         AppState.domElements.gcpProjectId = document.getElementById('gcpProjectId');
+        AppState.domElements.openWebAppButton = document.getElementById('openWebAppButton');
+        AppState.domElements.openWebAppMessage = document.getElementById('openWebAppMessage');
         AppState.domElements.policyContainer = document.getElementById('policy-container');
         AppState.domElements.proposalContainer = document.getElementById('proposal-container');
         AppState.domElements.applyChangesNoDeployButton = document.getElementById('applyChangesNoDeployButton');
@@ -22,6 +24,10 @@
         AppState.domElements.htmlValidationWarnings = document.getElementById('html-validation-warnings');
         AppState.domElements.proposedFilesDisplay = document.getElementById('proposed-files-display');
         AppState.domElements.applyResultContent = document.getElementById('apply-result-content');
+        AppState.domElements.versionResultContainer = document.getElementById('version-result-container');
+        AppState.domElements.filesListContainer = document.getElementById('filesListContainer');
+        AppState.domElements.versionSelect = document.getElementById('versionSelect');
+        AppState.domElements.getFilesListButton = document.getElementById('getFilesListButton');
         AppState.domElements.logResultContainer = document.getElementById('log-result-container');
         AppState.domElements.logResult = document.getElementById('log-result');
         AppState.domElements.deployResultContainer = document.getElementById('deploy-result-container');
@@ -32,30 +38,27 @@
         AppState.domElements.gcpSaveResult = document.getElementById('gcp-save-result');
         AppState.domElements.fixErrorsButton = document.getElementById('fixErrorsButton');
         AppState.domElements.cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
+        AppState.domElements.revertVersionButton = document.getElementById('revertVersionButton');
+        AppState.domElements.getVersionsButton = document.getElementById('getVersionsButton');
         AppState.domElements.libraryScriptId = document.getElementById('libraryScriptId');
         AppState.domElements.libraryVersion = document.getElementById('libraryVersion');
         AppState.domElements.deploymentDescription = document.getElementById('deploymentDescription');
+        // NEW Elements
         AppState.domElements.proposeBrowserErrorLoggingButton = document.getElementById('proposeBrowserErrorLoggingButton');
         AppState.domElements.proposeBrowserErrorLoggingResultContainer = document.getElementById('propose-browser-error-logging-result-container');
         AppState.domElements.proposeBrowserErrorLoggingResult = document.getElementById('propose-browser-error-logging-result');
+        // NEW Elements for OAuth Scopes
+        AppState.domElements.getOAuthScopesButton = document.getElementById('getOAuthScopesButton');
+        AppState.domElements.oauthScopesResultContainer = document.getElementById('oauth-scopes-result-container');
+        AppState.domElements.oauthScopesResult = document.getElementById('oauth-scopes-result');
 
-        // NEW Elements for Centralized Script Details
-        AppState.domElements.scriptDetailsSummaryContainer = document.getElementById('script-details-summary-container');
-        AppState.domElements.editorUrlLink = document.getElementById('editorUrlLink');
-        AppState.domElements.editorUrlPlaceholder = document.getElementById('editorUrlPlaceholder');
-        AppState.domElements.summaryFilesDisplay = document.getElementById('summary-files-display');
-        AppState.domElements.summaryOAuthScopesDisplay = document.getElementById('summary-oauth-scopes-display');
-        AppState.domElements.summaryVersionsDisplay = document.getElementById('summary-versions-display');
-        AppState.domElements.summaryVersionSelect = document.getElementById('summaryVersionSelect');
-        AppState.domElements.summaryOpenWebAppButton = document.getElementById('summaryOpenWebAppButton');
-        AppState.domElements.summaryRevertVersionButton = document.getElementById('summaryRevertVersionButton');
-        AppState.domElements.summaryOpenWebAppMessage = document.getElementById('summaryOpenWebAppMessage');
 
         // Load initial state from localStorage
         const savedScriptId = localStorage.getItem('targetScriptId');
         if (savedScriptId) {
             UI.get('scriptIdSelect').value = savedScriptId;
-            // Explicitly trigger change event to update summary details
+            // Explicitly trigger change event to update editor URL display
+            // and load files, OAuth scopes, and versions
             UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
         }
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
@@ -63,9 +66,10 @@
             UI.get('gcpProjectId').value = savedGcpProjectId;
         }
 
-        // Initialize UI components (hide all result containers by default)
-        UI.hide('policy-container');
-        UI.hide('proposal-container');
+        // Initialize UI components
+        Utils.loadProjectsIntoDropdown(savedScriptId);
+        UI.hide('policyContainer');
+        UI.hide('proposalContainer');
         UI.hide('applyChangesNoDeployButton');
         UI.hide('applyAndDeployButton');
         UI.hide('regenerateProposalButton');
@@ -73,29 +77,25 @@
         UI.hide('fixApplyErrorsButton');
         UI.show('generatePolicyButton');
         UI.hide('regeneratePolicyButton');
+        UI.hide('versionResultContainer');
+        UI.hide('filesListContainer');
+        UI.disable('openWebAppButton');
+        UI.setText('openWebAppMessage', '');
         UI.hide('logResultContainer');
         UI.hide('deployResultContainer');
         UI.hide('addLibraryResultContainer');
         UI.hide('gcpSaveResultContainer');
-        UI.hide('proposeBrowserErrorLoggingResultContainer');
-        // Hide the new summary container until a script is selected
-        UI.hide('scriptDetailsSummaryContainer');
-        // Initialize the new editor URL display elements
-        UI.hide('editorUrlLink');
-        UI.show('editorUrlPlaceholder');
+        UI.hide('proposeBrowserErrorLoggingResultContainer'); // NEW
+        UI.hide('oauthScopesResultContainer'); // NEW
+
 
         Handlers.initTabNavigation();
 
         // Register event listeners
-        // When scriptIdSelect changes, load all summary details
-        UI.get('scriptIdSelect').addEventListener('change', Handlers.loadScriptDetailsSummary);
-        UI.get('scriptIdSelect').addEventListener('change', Handlers.resetAiOperationUI); // Also reset AI ops when script changes
-
-        // Listeners for summary version controls
-        UI.get('summaryVersionSelect').addEventListener('change', Handlers.handleSummaryVersionSelectChange);
-        UI.get('summaryOpenWebAppButton').addEventListener('click', Handlers.handleSummaryOpenWebApp);
-        UI.get('summaryRevertVersionButton').addEventListener('click', Handlers.handleSummaryRevertVersion);
-
+        UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList);
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetOAuthScopes);
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetVersions); /* NEW: Automatically get versions on script ID change */
         UI.get('prompt').addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
@@ -116,13 +116,18 @@
         UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
         
         UI.get('proposeBrowserErrorLoggingButton').addEventListener('click', Handlers.handleProposeBrowserErrorLogging);
+        UI.get('getOAuthScopesButton').addEventListener('click', Handlers.handleGetOAuthScopes);
 
         UI.get('saveGcpProjectIdButton').addEventListener('click', Handlers.handleSaveGcpProjectId);
         UI.get('log-form').addEventListener('submit', Handlers.handleLogFormSubmit);
         UI.get('deploy-form').addEventListener('submit', Handlers.handleDeployFormSubmit);
         UI.get('add-library-form').addEventListener('submit', Handlers.handleAddLibraryFormSubmit);
 
-        // Load projects into the dropdown on initial page load
-        Utils.loadProjectsIntoDropdown(savedScriptId); 
+        UI.get('getVersionsButton').addEventListener('click', Handlers.handleGetVersions);
+        UI.get('versionSelect').addEventListener('change', Handlers.handleVersionSelectChange);
+        UI.get('openWebAppButton').addEventListener('click', Handlers.handleOpenWebApp);
+        UI.get('revertVersionButton').addEventListener('click', Handlers.handleRevertVersion);
+
+        UI.get('getFilesListButton').addEventListener('click', Handlers.handleGetFilesList);
     });
 </script>
