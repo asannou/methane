@@ -215,37 +215,8 @@
         },
 
         // New constant for OAuth scope descriptions
-        OAUTH_SCOPE_DESCRIPTIONS: {
-            "https://www.googleapis.com/auth/script.projects": `Access to Google Apps Script project metadata and content. Required for the AI to read and write code.`,
-            "https://www.googleapis.com/auth/script.external_request": `Allows the script to connect to external HTTP/HTTPS services. Required for API calls.`,
-            "https://www.googleapis.com/auth/logging.read": `Allows reading log entries from Google Cloud Logging. Required for AI error fixing features.`,
-            "https://www.googleapis.com/auth/script.deployments": `Allows managing (creating, updating, deleting) Google Apps Script deployments. Required for web app deployment features.`,
-            "https://www.googleapis.com/auth/drive.readonly": `Allows reading files (including Google Apps Script projects) on Google Drive. Required for fetching project lists.`,
-            "https://www.googleapis.com/auth/logging.write": `Allows writing log entries to Google Cloud Logging. Required for browser error logging features.`,
-            "https://www.googleapis.com/auth/forms": `Full access to Google Forms forms.`,
-            "https://www.googleapis.com/auth/forms.currentonly": `Access to the Google Forms form the script is bound to.`,
-            "https://www.googleapis.com/auth/documents": `Full access to Google Docs documents.`,
-            "https://www.googleapis.com/auth/documents.currentonly": `Access to the Google Docs document the script is bound to.`,
-            "https://www.googleapis.com/auth/spreadsheets": `Full access to Google Sheets spreadsheets.`,
-            "https://www.googleapis.com/auth/spreadsheets.currentonly": `Access to the Google Sheets spreadsheet the script is bound to.`,
-            "https://www.googleapis.com/auth/presentations": `Full access to Google Slides presentations.`,
-            "https://www.googleapis.com/auth/gmail.send": `Allows sending emails via Gmail.`,
-            "https://www.googleapis.com/auth/gmail.readonly": `Read access to Gmail mailboxes.`,
-            "https://www.googleapis.com/auth/calendar": `Full access to Google Calendar events.`,
-            "https://www.googleapis.com/auth/contacts": `Full access to Google Contacts.`,
-            "https://www.googleapis.com/auth/userinfo.email": `Access to the user's email address.`,
-            "https://www.googleapis.com/auth/userinfo.profile": `Access to the user's basic profile information (name, picture).`,
-            "https://www.googleapis.com/auth/bigquery": `Access to Google BigQuery data.`,
-            "https://www.googleapis.com/auth/cloud-platform": `Broad access to Google Cloud Platform resources.`,
-            "https://www.googleapis.com/auth/devstorage.full_control": `Full access to Google Cloud Storage.`,
-            "https://www.googleapis.com/auth/firebase.database": `Access to Firebase Realtime Database.`,
-            "https://www.googleapis.com/auth/script.container.ui": `Allows scripts to create UI in Google applications (spreadsheets, documents, etc.).`,
-            "https://www.googleapis.com/auth/script.external_request": `Allows requests to external URLs.`,
-            "https://www.googleapis.com/auth/script.send_mail": `Allows scripts to send email.`,
-            "https://www.googleapis.com/auth/script.urlfetch": `Allows fetching resources from the web using the UrlFetch service.`,
-            "https://www.googleapis.com/auth/tasks": `Full access to Google Tasks.`,
-            "https://www.googleapis.com/auth/admin.directory.user.readonly": `Read access to Google Workspace directory users.`
-        },
+        OAUTH_SCOPE_DESCRIPTIONS: {},
+
 
         /**
          * Displays an array of OAuth scopes in a structured list with descriptions.
@@ -263,24 +234,16 @@
                 return;
             }
 
-            const header = document.createElement('p');
-            header.className = 'content is-small has-text-grey mb-3';
-            header.textContent = `These OAuth scopes define the Google services that this Apps Script project requests access to.`;
-            displayElement.appendChild(header);
-
             const scopesList = document.createElement('ul');
             scopesList.className = 'oauth-scopes-list';
 
             scopes.forEach(scope => {
                 const listItem = document.createElement('li');
-                const description = UI.OAUTH_SCOPE_DESCRIPTIONS[scope] || `No general description available for this scope.`;
                 
                 listItem.innerHTML = `
                     <code class="scope-url">${Utils.escapeHtml(scope)}</code>
-                    <span class="scope-description">${Utils.escapeHtml(description)}</span>
                 `;
-                // Add a data-tooltip attribute for potential CSS tooltips or more info on hover
-                listItem.setAttribute('data-tooltip', description);
+                // No tooltip or description needed as per new policy
                 scopesList.appendChild(listItem);
             });
 
