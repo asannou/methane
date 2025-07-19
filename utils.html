@@ -68,20 +68,29 @@
             const scriptId = Utils.getEffectiveScriptId();
             const editorUrlDisplayDiv = UI.get('editor-url-display');
             
-            // Clear any previous content
-            UI.setHtml(editorUrlDisplayDiv, '');
+            UI.setHtml('editor-url-display', '');
 
             if (!scriptId) {
-                UI.setText(editorUrlDisplayDiv, 'Apps Script Editor URL: (Script ID needed)');
+                UI.setText('editor-url-display', 'Apps Script Editor URL: (Script ID needed)');
                 return;
             }
 
-            // Generate URL immediately client-side
-            const editorUrl = `https://script.google.com/d/${scriptId}/edit`;
-            UI.setHtml(editorUrlDisplayDiv, `Apps Script Editor URL: <a href="${Utils.escapeHtml(editorUrl)}" target="_blank">${Utils.escapeHtml(editorUrl)}</a>`);
+            UI.setHtml('editor-url-display', 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
 
-            // Save the script ID to local storage (existing logic)
             Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.startsWith("Error:")) {
+                        UI.setText('editor-url-display', `Apps Script Editor URL: ${response}`);
+                    } else {
+                        UI.setHtml('editor-url-display', `Apps Script Editor URL: <a href="${response}" target="_blank">${response}</a>`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.setText('editor-url-display', `Apps Script Editor URL: Error - ${error.message}`);
+                })
+                .getScriptEditorUrl(scriptId);
         },
 
         /**
