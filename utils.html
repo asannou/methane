@@ -283,76 +283,23 @@
             const displayArea = UI.get('proposedFilesDisplay');
             UI.setHtml('proposedFilesDisplay', '');
 
+            const proposedFilesMap = new Map();
+            proposedFiles.forEach(f => proposedFilesMap.set(f.name, f));
             const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
-            const finalProposedFilesForDisplay = new Map(); // Will store processed SOURCE type files for display
-            const replaceOperationsGrouped = new Map(); // Will store arrays of REPLACE ops per file
 
-            // First pass: Separate SOURCE and REPLACE operations
-            proposedFiles.forEach(propFile => {
-                if (propFile.type === 'REPLACE') {
-                    if (!replaceOperationsGrouped.has(propFile.name)) {
-                        replaceOperationsGrouped.set(propFile.name, []);
-                    }
-                    replaceOperationsGrouped.get(propFile.name).push(propFile);
-                } else {
-                    // Directly add SOURCE type files (new or full updates)
-                    finalProposedFilesForDisplay.set(propFile.name, propFile);
-                }
-            });
-
-            // Second pass: Apply REPLACE operations and consolidate
-            replaceOperationsGrouped.forEach((replaceOps, fileName) => {
-                const originalFile = originalFilesMap.get(fileName);
-                if (!originalFile) {
-                    console.warn(`Skipping REPLACE operations for file '${fileName}': original file not found.`);
-                    return;
-                }
-
-                let currentSource = originalFile.source;
-                let replacementPerformed = false; // Track if any replacement actually modified the source
-
-                replaceOps.forEach(op => {
-                    if (typeof op.old_string !== 'string' || typeof op.new_string !== 'string') {
-                        console.warn(`REPLACE operation for '${op.name}' has malformed old_string or new_string. Skipping.`);
-                        return;
-                    }
-                    if (op.isGlobalReplace === true) {
-                        if (currentSource.includes(op.old_string)) {
-                            currentSource = currentSource.replaceAll(op.old_string, op.new_string);
-                            replacementPerformed = true;
-                        }
+            const explicitDeletedFiles = [];
+            if (deletedFileNames && Array.isArray(deletedFileNames)) {
+                deletedFileNames.forEach(deletedName => {
+                    const fileToDelete = originalFilesMap.get(deletedName);
+                    if (fileToDelete) {
+                        explicitDeletedFiles.push(fileToDelete);
                     } else {
-                        if (currentSource.includes(op.old_string)) {
-                            currentSource = currentSource.replace(op.old_string, op.new_string);
-                            replacementPerformed = true;
-                        }
+                        console.warn(`File '${deletedName}' was marked for deletion but not found in original project content. It might already be gone or name is incorrect.`);
                     }
                 });
+            }
 
-                // Only add to finalProposedFilesForDisplay if actual changes occurred or if the REPLACE ops were meant for an existing file
-                // and it wasn't already fully updated by a 'source' type proposal. Priority given to REPLACE if both exist.
-                if (replacementPerformed || currentSource !== originalFile.source || replaceOps.length > 0) { // Add || replaceOps.length > 0 to ensure if no change occurred but ops were proposed, it's still shown
-                    finalProposedFilesForDisplay.set(fileName, {
-                        name: fileName,
-                        type: originalFile.type,
-                        source: currentSource,
-                        isConsolidatedReplace: true,
-                        originalReplaceOps: replaceOps
-                    });
-                } else {
-                    console.log(`No actual changes from REPLACE operations for file '${fileName}'. Not adding to proposed files for display.`);
-                }
-            });
-
-            // Filter out deleted files from the finalProposedFilesForDisplay map
-            deletedFileNames.forEach(deletedName => {
-                finalProposedFilesForDisplay.delete(deletedName);
-            });
-
-            const filesToDisplay = Array.from(finalProposedFilesForDisplay.values());
-            filesToDisplay.sort((a, b) => a.name.localeCompare(b.name)); // Sort for consistent display
-
-            if (deletedFileNames.length === 0 && filesToDisplay.length === 0) {
+            if (explicitDeletedFiles.length === 0 && proposedFiles.length === 0) {
                 UI.setHtml('proposedFilesDisplay', '<p>AI did not propose any changes (no files added, updated, or deleted).</p>');
                 return;
             }
@@ -388,45 +335,62 @@
                 displayArea.appendChild(fileComparisonDiv);
             });
 
-            filesToDisplay.forEach(proposedFile => {
+            proposedFiles.forEach(proposedFile => {
+                if (explicitDeletedFiles.some(f => f.name === proposedFile.name)) {
+                    return;
+                }
+
                 const name = proposedFile.name;
                 const fileType = proposedFile.type;
                 
                 const fileComparisonDiv = document.createElement('div');
                 fileComparisonDiv.className = 'file-comparison';
 
-                const originalFile = originalFilesMap.get(name);
-                const originalSourceForDiff = originalFile ? originalFile.source : '';
-                const proposedSourceForDiff = proposedFile.source;
+                let originalSourceForDiff;
+                let proposedSourceForDiff;
                 let statusLabel;
-                let additionalMessageHtml = '';
+                let additionalMessageHtml = ''; // For the REPLACE warning
 
-                if (proposedFile.isConsolidatedReplace) {
-                    statusLabel = '(複数回の置換適用済み)'; // More descriptive label
-                    fileComparisonDiv.classList.add('is-replace'); // Keep the styling class
-                    
-                    // Generate a summary of the replace operations for the message
-                    const replaceOpsSummary = proposedFile.originalReplaceOps.map((op, index) => {
-                        const opType = op.isGlobalReplace ? '全ての出現箇所を置換' : '最初の出現箇所を置換';
-                        const oldStringSnippet = Utils.escapeHtml(op.old_string.substring(0, 100)) + (op.old_string.length > 100 ? '...' : '');
-                        const newStringSnippet = Utils.escapeHtml(op.new_string.substring(0, 100)) + (op.new_string.length > 100 ? '...' : '');
-                        return `
-                            <li>
-                                <strong>置換 #${index + 1} (${opType}):</strong><br>
-                                &nbsp;&nbsp;元文字列: <pre class="replacement-view replacement-old">${oldStringSnippet}</pre><br>
-                                &nbsp;&nbsp;新文字列: <pre class="replacement-view replacement-new">${newStringSnippet}</pre>
-                            </li>
+                if (fileType === 'REPLACE') {
+                    const originalFile = originalFilesMap.get(name);
+                    if (!originalFile) {
+                        console.warn(`Skipping REPLACE proposal for file '${name}': original file not found.`);
+                        return;
+                    }
+                    if (typeof proposedFile.old_string !== 'string' || typeof proposedFile.new_string !== 'string') {
+                        console.warn(`Skipping malformed REPLACE proposal for file '${name}': missing old_string or new_string.`);
+                        return;
+                    }
+
+                    originalSourceForDiff = originalFile.source;
+                    const isGlobalReplaceVisualization = proposedFile.isGlobalReplace === true;
+                    if (isGlobalReplaceVisualization) {
+                        proposedSourceForDiff = originalSourceForDiff.replaceAll(proposedFile.old_string, proposedFile.new_string);
+                        additionalMessageHtml = `
+                            <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
+                                <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」の<strong>全ての出現箇所</strong>を「新しい文字列」に置換します。</p>
+                                <p><strong>注: この差分表示は、提案されたグローバル置換がファイルに適用された場合の仮想的な結果を示しています。</strong></p>
+                                <p class="mt-2 is-size-7"><strong>置換対象文字列 (old_string):</strong> <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string.substring(0, 200))}${proposedFile.old_string.length > 200 ? '...' : ''}</pre></p>
+                                <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
+                            </div>
                         `;
-                    }).join('');
-
-                    additionalMessageHtml = `
-                        <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
-                            <p>この差分表示は、提案された複数回の置換操作をこのファイルに統合適用した結果を示しています。</p>
-                            <p class="mt-2 is-size-7">適用された置換操作の概要:</p>
-                            <ul class="is-size-7" style="list-style: none; margin-left: 0; padding-left: 10px;">${replaceOpsSummary}</ul>
-                        </div>
-                    `;
-                } else {
+                    } else {
+                        proposedSourceForDiff = originalSourceForDiff.replace(proposedFile.old_string, proposedFile.new_string);
+                        additionalMessageHtml = `
+                            <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
+                                <p>この操作は、ファイル内で見つかった正確な「置換対象文字列」の<strong>最初の出現箇所のみ</strong>を「新しい文字列」に置換します。</p>
+                                <p><strong>注: この差分表示は、提案された単一置換がファイルに適用された場合の仮想的な結果を示しています。AIにグローバルな置換を依頼する場合は、プロンプトで具体的に指定してください。</strong></p>
+                                <p class="mt-2 is-size-7"><strong>置換対象文字列 (old_string):</strong> <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string.substring(0, 200))}${proposedFile.old_string.length > 200 ? '...' : ''}</pre></p>
+                                <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
+                            </div>
+                        `;
+                    }
+                    statusLabel = '(Replaced)';
+                    fileComparisonDiv.classList.add('is-replace'); // Keep class for distinct styling
+                } else { // Existing logic for source updates/additions
+                    const originalFile = originalFilesMap.get(name);
+                    originalSourceForDiff = originalFile ? originalFile.source : '';
+                    proposedSourceForDiff = proposedFile.source;
                     statusLabel = originalFile ? '(Updated)' : '(New File)';
                 }
 
@@ -447,9 +411,10 @@
                 fileComparisonDiv.appendChild(originalContentDiv);
                 fileComparisonDiv.appendChild(proposedContentDiv);
                 
+                // Append the additional message only if it's a REPLACE operation
                 if (additionalMessageHtml) {
                     const messageContainer = document.createElement('div');
-                    messageContainer.style.flex = '1 1 100%';
+                    messageContainer.style.flex = '1 1 100%'; // Make it full width below diff
                     messageContainer.innerHTML = additionalMessageHtml;
                     fileComparisonDiv.appendChild(messageContainer);
                 }
