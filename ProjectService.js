@@ -416,9 +416,11 @@ function _listAllDeployments(scriptId, accessToken) {
     const response = _makeApiCall(url, 'get', accessToken, null, 'Failed to list script deployments for cleanup');
     const pageData = JSON.parse(response.getContentText());
     allDeployments = allDeployments.concat(pageData.deployments || []);
+    console.log(`  _listAllDeployments: Fetched ${pageData.deployments?.length || 0} deployments (page ${pageToken ? 'next' : 'first'}). Sample (first 5):`, JSON.stringify((pageData.deployments || []).slice(0, 5).map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber})), null, 2));
     pageToken = pageData.nextPageToken;
     hasMore = !!pageToken;
   }
+  console.log("  _listAllDeployments: All deployments retrieved (total, unsorted):", JSON.stringify(allDeployments.map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber})), null, 2));
   return allDeployments;
 }
 
@@ -547,6 +549,7 @@ function _cleanupOldDeployments(scriptId, accessToken, deploymentsApiUrl) {
   const webAppDeployments = allDeployments.filter(dep => 
     dep.entryPoints?.some(ep => ep.entryPointType === 'WEB_APP')
   );
+  console.log("  _cleanupOldDeployments: All web app deployments (unsorted):", JSON.stringify(webAppDeployments.map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber, entryPointTypes: d.entryPoints?.map(ep => ep.entryPointType)})), null, 2));
   
   console.log(`Current number of web app deployments: ${webAppDeployments.length}`);
 
@@ -556,7 +559,9 @@ function _cleanupOldDeployments(scriptId, accessToken, deploymentsApiUrl) {
     console.log(`Web app deployment count is near limit (${DEPLOYMENT_LIMIT}) - currently ${webAppDeployments.length}. Archiving oldest ${deploymentsToRemoveCount} web app deployments.`);
     
     webAppDeployments.sort((a, b) => new Date(a.createTime).getTime() - new Date(b.createTime).getTime());
+    console.log("  _cleanupOldDeployments: Web app deployments sorted by createTime (oldest first):", JSON.stringify(webAppDeployments.map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber})), null, 2));
 
+    console.log(`  _cleanupOldDeployments: Proposing to archive ${deploymentsToRemoveCount} oldest web app deployments. These are:`, JSON.stringify(webAppDeployments.slice(0, deploymentsToRemoveCount).map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber})), null, 2));
     let removedCount = 0;
     for (let i = 0; i < deploymentsToRemoveCount && i < webAppDeployments.length; i++) {
       const oldDeploymentToDelete = webAppDeployments[i];
@@ -702,20 +707,23 @@ function listScriptVersions(scriptId) {
       console.warn(`Deployment retrieval API error during version listing. Web app URLs will not be available: ${e.message}`);
       // Continue without web app URLs if deployment fetch fails
     }
+    console.log("  listScriptVersions: All raw deployments fetched for version mapping:", JSON.stringify(allDeployments.map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber, entryPointTypes: d.entryPoints?.map(ep => ({type: ep.entryPointType, url: ep.webApp?.url}))})), null, 2));
 
     const webAppUrlMap = {}; // versionNumber -> webAppUrl map
 
     // Sort deployments by create time descending to get the latest web app URL for each version
     allDeployments.sort((a, b) => new Date(b.createTime).getTime() - new Date(a.createTime).getTime());
+    console.log("  listScriptVersions: All deployments (sorted by createTime descending) for web app URL mapping:", JSON.stringify(allDeployments.map(d => ({id: d.deploymentId, createTime: d.createTime, version: d.deploymentConfig?.versionNumber, entryPointTypes: d.entryPoints?.map(ep => ep.entryPointType)})), null, 2));
 
     allDeployments.forEach(d => {
       if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
+        console.log(`  listScriptVersions: Processing deployment ${d.deploymentId} (Version: ${d.deploymentConfig.versionNumber}, Created: ${d.createTime}) for web app URL mapping. Entry points:`, JSON.stringify(d.entryPoints?.map(ep => ({type: ep.entryPointType, url: ep.webApp?.url})), null, 2));
         d.entryPoints?.forEach(ep => {
           if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
             // Add only if not already mapped, ensuring latest deployment's URL
             if (!webAppUrlMap[d.deploymentConfig.versionNumber]) {
               webAppUrlMap[d.deploymentConfig.versionNumber] = ep.webApp.url;
-              console.log(`Mapped latest web app URL for version ${d.deploymentConfig.versionNumber}: ${ep.webApp.url}`);
+              console.log(`  listScriptVersions: Mapped latest web app URL for version ${d.deploymentConfig.versionNumber}: ${ep.webApp.url}`);
             }
           }
         });
@@ -732,6 +740,7 @@ function listScriptVersions(scriptId) {
 
     // Sort versions by versionNumber descending (latest first)
     versions.sort((a, b) => b.versionNumber - a.versionNumber);
+    console.log("  listScriptVersions: Final list of versions (sorted by versionNumber descending) with web app URLs:", JSON.stringify(versions, null, 2));
 
     return { status: 'success', versions: versions, message: 'Versions retrieved successfully.' };
 
