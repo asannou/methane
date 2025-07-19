@@ -39,6 +39,7 @@
         AppState.domElements.fixErrorsButton = document.getElementById('fixErrorsButton');
         AppState.domElements.cancelFixErrorsButton = document.getElementById('cancelFixErrorsButton');
         AppState.domElements.revertVersionButton = document.getElementById('revertVersionButton');
+        AppState.domElements.revertAndDeployButton = document.getElementById('revertAndDeployButton'); /* NEW */
         AppState.domElements.getVersionsButton = document.getElementById('getVersionsButton');
         AppState.domElements.libraryScriptId = document.getElementById('libraryScriptId');
         AppState.domElements.libraryVersion = document.getElementById('libraryVersion');
@@ -87,6 +88,7 @@
         UI.hide('gcpSaveResultContainer');
         UI.hide('proposeBrowserErrorLoggingResultContainer'); // NEW
         UI.hide('oauthScopesResultContainer'); // NEW
+        UI.disable('revertAndDeployButton'); /* NEW */
 
 
         Handlers.initTabNavigation();
@@ -127,6 +129,7 @@
         UI.get('versionSelect').addEventListener('change', Handlers.handleVersionSelectChange);
         UI.get('openWebAppButton').addEventListener('click', Handlers.handleOpenWebApp);
         UI.get('revertVersionButton').addEventListener('click', Handlers.handleRevertVersion);
+        UI.get('revertAndDeployButton').addEventListener('click', Handlers.handleRevertAndDeploy); /* NEW */
 
         UI.get('getFilesListButton').addEventListener('click', Handlers.handleGetFilesList);
     });

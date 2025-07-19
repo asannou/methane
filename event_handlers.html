@@ -20,7 +20,101 @@
                         } else {
                             content.classList.remove('is-active-content');
                         }
-                    });
+                    })
+                .revertToVersion(scriptId, parseInt(selectedVersion));
+        },
+
+        /**
+         * Handle reverting to a specific script version and deploying it.
+         */
+        handleRevertAndDeploy: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const versionSelect = UI.get('versionSelect');
+            const selectedVersion = versionSelect.value;
+            const revertAndDeployButton = UI.get('revertAndDeployButton');
+            const revertButton = UI.get('revertVersionButton'); // Also disable revert
+            const getVersionsButton = UI.get('getVersionsButton');
+            
+            if (!scriptId) {
+                UI.setText('version-result', 'Error: Please select or enter a Script ID.');
+                UI.show('version-result-container');
+                return;
+            }
+            if (!selectedVersion) {
+                UI.setText('version-result', 'Error: Please select a version to revert and deploy.');
+                UI.show('version-result-container');
+                return;
+            }
+
+            if (!confirm(`Reverting script ID ${scriptId} to version ${selectedVersion} and deploying it as a new web app. This cannot be undone. Do you wish to continue?`)) {
+                return;
+            }
+
+            UI.showSpinnerInButton(revertAndDeployButton, 'Reverting & Deploying...');
+            UI.disable('getVersionsButton');
+            UI.disable('versionSelect');
+            UI.disable('openWebAppButton');
+            UI.disable('revertVersionButton');
+            UI.setText('openWebAppMessage', '');
+            UI.show('version-result-container');
+            UI.setText('version-result', `Reverting script to version ${selectedVersion} and initiating deployment...`);
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.status === 'success') {
+                        UI.setText('version-result', response.message + ' Attempting to deploy...');
+                        // If revert is successful, proceed with deployment
+                        google.script.run
+                            .withSuccessHandler(function(deployResponse) {
+                                UI.hideSpinnerInButton(revertAndDeployButton);
+                                UI.enable('getVersionsButton');
+                                UI.enable('versionSelect');
+                                UI.enable('revertVersionButton');
+
+                                if (deployResponse.status === 'success') {
+                                    let webappUrlHtml = `Web App URL: ${deployResponse.webappUrl}`;
+                                    if (deployResponse.webappUrl && deployResponse.webappUrl !== 'null') {
+                                        webappUrlHtml = `Web App URL: <a href="${deployResponse.webappUrl}" target="_blank">${deployResponse.webappUrl}</a>`;
+                                    } else if (deployResponse.webappUrl === null) {
+                                        webappUrlHtml = `Web App URL: Not found in deployment response.`;
+                                    }
+                                    UI.setHtml('version-result', `Revert to Version ${selectedVersion} SUCCESS.<br>${deployResponse.message}<br>Deployment ID: ${deployResponse.deploymentId}<br>${webappUrlHtml}`);
+                                } else {
+                                    UI.setHtml('version-result', `Revert to Version ${selectedVersion} SUCCESS.<br>Deployment FAILED: ${deployResponse.message}`);
+                                }
+                            })
+                            .withFailureHandler(function(deployError) {
+                                UI.hideSpinnerInButton(revertAndDeployButton);
+                                UI.enable('getVersionsButton');
+                                UI.enable('versionSelect');
+                                UI.enable('revertVersionButton');
+
+                                UI.setText('version-result', `Revert to Version ${selectedVersion} SUCCESS.<br>Deployment failed with error: ${deployError.message}`);
+                            })
+                            .deployScript(scriptId, `Reverted to version ${selectedVersion} and deployed via methane UI.`);
+
+                    } else {
+                        UI.hideSpinnerInButton(revertAndDeployButton);
+                        UI.enable('getVersionsButton');
+                        UI.enable('versionSelect');
+                        UI.enable('revertVersionButton');
+
+                        UI.setText('version-result', `Error during reversion: ${response.message}`);
+                        UI.disable('openWebAppButton');
+                        UI.setText('openWebAppMessage', '');
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(revertAndDeployButton);
+                    UI.enable('getVersionsButton');
+                    UI.enable('versionSelect');
+                    UI.enable('revertVersionButton');
+
+                    UI.setText('version-result', `Error reverting and deploying: ${error.message}`);
+                    UI.disable('openWebAppButton');
+                    UI.setText('openWebAppMessage', '');;
                 });
             });
 
@@ -65,6 +159,7 @@
             UI.hideSpinnerInButton(UI.get('fixErrorsButton'));
             UI.hideSpinnerInButton(UI.get('proposeBrowserErrorLoggingButton'));
             UI.hideSpinnerInButton(UI.get('getOAuthScopesButton'));
+            UI.hideSpinnerInButton(UI.get('revertAndDeployButton'));
 
             UI.enable('prompt');
             UI.hide('cancelAiOperationButton');
@@ -1263,8 +1358,10 @@
             const versionsSelect = UI.get('versionSelect');
             const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
 
-            // Enable/disable revert button based on selection
-            UI.get('revertVersionButton').disabled = !selectedOption.value;
+            // Enable/disable revert and revert+deploy buttons based on selection
+            const isVersionSelected = !!selectedOption.value;
+            UI.get('revertVersionButton').disabled = !isVersionSelected;
+            UI.get('revertAndDeployButton').disabled = !isVersionSelected;
 
             // Enable/disable open web app button based on webappUrl in dataset
             const webappUrl = selectedOption.dataset.webappUrl;
