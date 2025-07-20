@@ -50,15 +50,15 @@
 
   /* Dark mode specific colors */
   [data-theme="dark"] {
-    --bg-body: #212121;
+    --bg-body: #1A1A1A;
     --text-body: #e0e0e0;
-    --bg-box: #2b2b2b;
-    --border-box: #424242;
-    --bg-hero: linear-gradient(to right, #1a2a4a, #4a1a4a); /* Darker, more muted gradient */
+    --bg-box: #2C2C2C;
+    --border-box: #363636;
+    --bg-hero: linear-gradient(to right, #121A20, #1A242B);
     --text-hero-title: #e0e0e0;
     --text-hero-subtitle: #cccccc;
     --text-heading: #eeeeee;
-    --border-input: #555555;
+    --border-input: #444444;
     --bg-input: #333333;
     --text-input: #e0e0e0;
     --placeholder-input: #888888;
@@ -66,14 +66,14 @@
     --notification-light-bg-alpha: 0.2; /* Slightly more visible alpha in dark mode */
     --notification-warning-text: #FFDA47; /* Brighter yellow for dark mode */
     --bg-log-display: #333333;
-    --border-log-display: #424242;
+    --border-log-display: #363636;
     --bg-file-item: #363636;
-    --border-file-item: #424242;
+    --border-file-item: #363636;
     --bg-diff-equal: #3a3a3a;
-    --bg-diff-omitted: #444444;
-    --border-diff-omitted: #555;
+    --bg-diff-omitted: #383838;
+    --border-diff-omitted: #484848;
     --bg-line-numbers: #333333;
-    --border-line-numbers: #424242;
+    --border-line-numbers: #363636;
     --text-line-numbers: #cccccc;
     --text-code-content: #f0f0f0;
     --bg-replace-old: rgba(255, 99, 71, 0.2);
@@ -87,7 +87,7 @@
     --text-tab-active: var(--link-color);
     --border-tab-hover: var(--link-color);
     --text-tab-hover: var(--link-color);
-    --border-tab-box: var(--link-color);
+    --border-tab-box: var(--border-box);
 
     /* Override specific Bulma components' internal colors where necessary for dark theme */
     .button.is-warning {
