@@ -79,8 +79,8 @@
 
             Utils.saveScriptIdToLocalStorage(scriptId);
 
-            const editorUrl = `https://script.google.com/d/${scriptId}/edit`;
-            UI.setHtml('editor-url-display', `Apps Script Editor URL: <a href="${Utils.escapeHtml(editorUrl)}" target="_blank">${Utils.escapeHtml(editorUrl)}</a>`);
+            const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
+            UI.setHtml('editor-url-display', "Apps Script Editor URL: <a href=\"" + Utils.escapeHtml(editorUrl) + "\" target=\"_blank\">" + Utils.escapeHtml(editorUrl) + "</a>");
         },
 
         /**
