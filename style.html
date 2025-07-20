@@ -1,28 +1,133 @@
 <style>
-  /* Google Apps Script inspired colors */
   :root {
+    /* Common functional colors (remain constant across themes) */
     --gas-blue-dark: #1A73E8; /* Primary, Hero, Buttons */
     --gas-blue-light: #4285F4; /* Info, Link, Spinners */
     --gas-green: #34A853;     /* Success */
     --gas-yellow: #FBBC04;    /* Warning */
     --gas-red: #D93025;       /* Danger */
-    --gas-grey-light: #F8F9FA;
-    --gas-grey-medium: #DADCE0;
-    --gas-grey-dark: #616161;
+
+    /* Light mode default colors */
+    --bg-body: #f5f5f5; /* Bulma default body background */
+    --text-body: #363636;      /* Bulma default text color */
+    --bg-box: #ffffff;
+    --border-box: #dbdbdb;    /* Bulma default border color */
+    --bg-hero: linear-gradient(to right, #1A73E8, #7B1FA2);
+    --text-hero-title: #fff;
+    --text-hero-subtitle: #fff;
+    --text-heading: #363636;
+    --border-input: #dbdbdb;
+    --bg-input: #ffffff;
+    --text-input: #363636;
+    --placeholder-input: #b5b5b5;
+    --link-color: var(--gas-blue-light);
+    --notification-light-bg-alpha: 0.1;
+    --notification-warning-text: #CC9900;
+    --bg-log-display: #fcfcfc;
+    --border-log-display: var(--gas-grey-medium);
+    --bg-file-item: #fff;
+    --border-file-item: var(--gas-grey-medium);
+    --bg-diff-equal: #f4f4f4;
+    --bg-diff-omitted: #f0f0f0;
+    --border-diff-omitted: #bbb;
+    --bg-line-numbers: #F8F9FA;
+    --border-line-numbers: #DADCE0;
+    --text-line-numbers: #616161;
+    --text-code-content: #333;
+    --bg-replace-old: #fff0f0;
+    --border-replace-old: var(--gas-red);
+    --bg-replace-new: #e6ffea;
+    --border-replace-new: var(--gas-green);
+    --bg-deleted: #ffe6e6;
+    --border-deleted: var(--gas-red);
+    --text-tab-default: #4a4a4a;
+    --border-tab-active: var(--gas-blue-dark);
+    --text-tab-active: var(--gas-blue-dark);
+    --border-tab-hover: var(--gas-blue-light);
+    --text-tab-hover: var(--gas-blue-light);
+    --border-tab-box: var(--gas-blue-light);
   }
 
-  /* Bulma color overrides */
+  /* Dark mode specific colors */
+  [data-theme="dark"] {
+    --bg-body: #212121;
+    --text-body: #e0e0e0;
+    --bg-box: #2b2b2b;
+    --border-box: #424242;
+    --bg-hero: linear-gradient(to right, #1a2a4a, #4a1a4a); /* Darker, more muted gradient */
+    --text-hero-title: #e0e0e0;
+    --text-hero-subtitle: #cccccc;
+    --text-heading: #eeeeee;
+    --border-input: #555555;
+    --bg-input: #333333;
+    --text-input: #e0e0e0;
+    --placeholder-input: #888888;
+    --link-color: #90CAF9; /* Lighter blue for dark mode links */
+    --notification-light-bg-alpha: 0.2; /* Slightly more visible alpha in dark mode */
+    --notification-warning-text: #FFDA47; /* Brighter yellow for dark mode */
+    --bg-log-display: #333333;
+    --border-log-display: #424242;
+    --bg-file-item: #363636;
+    --border-file-item: #424242;
+    --bg-diff-equal: #3a3a3a;
+    --bg-diff-omitted: #444444;
+    --border-diff-omitted: #555;
+    --bg-line-numbers: #333333;
+    --border-line-numbers: #424242;
+    --text-line-numbers: #cccccc;
+    --text-code-content: #f0f0f0;
+    --bg-replace-old: rgba(255, 99, 71, 0.2);
+    --border-replace-old: var(--gas-red);
+    --bg-replace-new: rgba(52, 168, 83, 0.2);
+    --border-replace-new: var(--gas-green);
+    --bg-deleted: rgba(255, 99, 71, 0.1);
+    --border-deleted: var(--gas-red);
+    --text-tab-default: #bbbbbb;
+    --border-tab-active: var(--link-color);
+    --text-tab-active: var(--link-color);
+    --border-tab-hover: var(--link-color);
+    --text-tab-hover: var(--link-color);
+    --border-tab-box: var(--link-color);
+
+    /* Override specific Bulma components' internal colors where necessary for dark theme */
+    .button.is-warning {
+      color: #333 !important; /* Keep dark text for contrast with yellow */
+    }
+    .button.is-warning.is-light {
+      color: var(--notification-warning-text) !important; /* Use brighter yellow for light warning button */
+    }
+    .select:not(.is-multiple):not(.is-loading)::after {
+      border-color: var(--text-body);
+    }
+    .has-text-grey {
+      color: #cccccc !important;
+    }
+  }
+
+  /* Base styles applied to HTML and BODY */
+  html {
+    background-color: var(--bg-body);
+    color: var(--text-body);
+    scroll-behavior: smooth;
+    color-scheme: light dark;
+  }
+  body {
+    color: var(--text-body);
+  }
+
+  /* Bulma color overrides and variable usage */
   .hero.is-primary {
-    background: linear-gradient(to right, #1A73E8, #7B1FA2) !important;
-    color: #fff !important;
+    background: var(--bg-hero) !important;
+    color: var(--text-hero-title) !important;
   }
 
   /* Ensure hero title and subtitle are white */
   .hero .title,
   .hero .subtitle {
-    color: #fff !important;
+    color: var(--text-hero-title) !important;
   }
 
+  /* Buttons */
   .button.is-primary {
     background-color: var(--gas-blue-dark) !important;
     border-color: transparent !important;
@@ -32,7 +137,7 @@
     background-color: #1669E0 !important; /* Slightly darker blue on hover */
   }
   .button.is-primary.is-light {
-    background-color: rgba(26, 115, 232, 0.1) !important; /* Light blue background */
+    background-color: rgba(26, 115, 232, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-blue-dark) !important;
     border-color: rgba(26, 115, 232, 0.2) !important;
   }
@@ -49,7 +154,7 @@
     background-color: #357AE8 !important; /* Slightly darker blue on hover */
   }
   .button.is-info.is-light {
-    background-color: rgba(66, 133, 244, 0.1) !important;
+    background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-blue-light) !important;
     border-color: rgba(66, 133, 244, 0.2) !important;
   }
@@ -66,7 +171,7 @@
     background-color: #2F934A !important;
   }
   .button.is-success.is-light {
-    background-color: rgba(52, 168, 83, 0.1) !important;
+    background-color: rgba(52, 168, 83, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-green) !important;
     border-color: rgba(52, 168, 83, 0.2) !important;
   }
@@ -83,8 +188,8 @@
     background-color: #E8A800 !important;
   }
   .button.is-warning.is-light {
-    background-color: rgba(251, 188, 4, 0.1) !important;
-    color: #CC9900 !important;
+    background-color: rgba(251, 188, 4, var(--notification-light-bg-alpha)) !important;
+    color: var(--notification-warning-text) !important;
     border-color: rgba(251, 188, 4, 0.2) !important;
   }
   .button.is-warning.is-light:hover {
@@ -100,7 +205,7 @@
     background-color: #C5221F !important;
   }
   .button.is-danger.is-light {
-    background-color: rgba(217, 48, 37, 0.1) !important;
+    background-color: rgba(217, 48, 37, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-red) !important;
     border-color: rgba(217, 48, 37, 0.2) !important;
   }
@@ -117,7 +222,7 @@
     background-color: #357AE8 !important;
   }
   .button.is-link.is-light {
-    background-color: rgba(66, 133, 244, 0.1) !important;
+    background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-blue-light) !important;
     border-color: rgba(66, 133, 244, 0.2) !important;
   }
@@ -127,20 +232,20 @@
 
   /* Notification overrides */
   .notification.is-info.is-light {
-    background-color: rgba(66, 133, 244, 0.1) !important;
+    background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-blue-dark) !important;
   }
   .notification.is-danger.is-light {
-    background-color: rgba(217, 48, 37, 0.1) !important;
+    background-color: rgba(217, 48, 37, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-red) !important;
   }
   .notification.is-success.is-light {
-    background-color: rgba(52, 168, 83, 0.1) !important;
+    background-color: rgba(52, 168, 83, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-green) !important;
   }
   .notification.is-warning.is-light {
-    background-color: rgba(251, 188, 4, 0.1) !important;
-    color: #CC9900 !important;
+    background-color: rgba(251, 188, 4, var(--notification-light-bg-alpha)) !important;
+    color: var(--notification-warning-text) !important;
   }
   .notification.is-success {
     background-color: var(--gas-green) !important;
@@ -170,6 +275,10 @@
     display: inline-block; /* Ensure it's not block level by default */
     vertical-align: middle;
   }
+  [data-theme="dark"] .spinner {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    border-left-color: var(--link-color) !important;
+  }
 
   /* Specific styles for spinner inside buttons */
   .button .spinner {
@@ -195,9 +304,9 @@
     display: flex;
     flex-wrap: wrap;
     margin-bottom: 20px;
-    border: 1px solid var(--gas-grey-medium) !important;
+    border: 1px solid var(--border-box) !important;
     padding: 10px;
-    background-color: #ffffff !important;
+    background-color: var(--bg-box) !important;
   }
 
   /* Default to full width on small screens, with vertical spacing */
@@ -227,25 +336,26 @@
 
   .file-comparison h4 {
     margin-top: 0;
+    color: var(--text-heading);
   }
   .file-comparison pre {
     height: 250px;
     overflow-y: scroll;
     overflow-x: auto;
-    border: 1px solid var(--gas-grey-light) !important;
+    border: 1px solid var(--border-box) !important;
     display: flex;
     width: 100%;
   }
 
   /* Styles for line numbers and code content columns - Custom, keep these */
   .line-numbers-col {
-    background-color: var(--gas-grey-light) !important;
-    color: var(--gas-grey-dark) !important;
+    background-color: var(--bg-line-numbers) !important;
+    color: var(--text-line-numbers) !important;
     text-align: right;
     user-select: none;
     flex-shrink: 0;
     width: max-content;
-    border-right: 1px solid var(--gas-grey-medium) !important;
+    border-right: 1px solid var(--border-line-numbers) !important;
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
@@ -255,6 +365,7 @@
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
+    color: var(--text-code-content);
   }
 
   /* NEW: Styles for individual line divs within the pre blocks - Custom, keep these */
@@ -266,38 +377,42 @@
   }
 
   /* Specific diff line highlighting - Custom, keep these */
-  .code-content-col > .diff-line-equal { background-color: #f4f4f4; }
+  .code-content-col > .diff-line-equal { background-color: var(--bg-diff-equal); }
   .code-content-col > .diff-line-added { background-color: #E6FFEA; } /* Lighter Google green */
   .code-content-col > .diff-line-removed { background-color: #FEE7E6; } /* Lighter Google red */
   .code-content-col > .diff-line-modified { background-color: #FFFDE6; } /* Lighter Google yellow */
   .code-content-col > .diff-line-empty-fill { background-color: transparent; }
 
+  [data-theme="dark"] .code-content-col > .diff-line-added { background-color: #31583D; color: #fff; }
+  [data-theme="dark"] .code-content-col > .diff-line-removed { background-color: #6C2B29; color: #fff; }
+  [data-theme="dark"] .code-content-col > .diff-line-modified { background-color: #5A4C07; color: #fff; }
+
   /* Style for omitted lines in diff view */
   .code-content-col > .diff-line-omitted {
-    background-color: #f0f0f0;
+    background-color: var(--bg-diff-omitted);
     color: #666;
     font-style: italic;
     text-align: center;
-    border-top: 1px dashed #ccc;
-    border-bottom: 1px dashed #ccc;
+    border-top: 1px dashed var(--border-diff-omitted);
+    border-bottom: 1px dashed var(--border-diff-omitted);
     padding: 5px;
   }
 
   .line-numbers-col > .diff-line-omitted {
-    background-color: #e0e0e0;
+    background-color: var(--bg-diff-omitted);
     color: #666;
     font-style: italic;
     text-align: center;
-    border-top: 1px dashed #bbb;
-    border-bottom: 1px dashed #bbb;
+    border-top: 1px dashed var(--border-diff-omitted);
+    border-bottom: 1px dashed var(--border-diff-omitted);
     padding: 5px;
   }
 
   /* Styles for Markdown rendered content in ai-policy div */
   #ai-policy {
-    background-color: #ffffff;
+    background-color: var(--bg-box);
     padding: 15px;
-    border: 1px solid var(--gas-grey-medium) !important;
+    border: 1px solid var(--border-box) !important;
     border-radius: 4px;
     margin-bottom: 20px;
     line-height: 1.6;
@@ -306,7 +421,7 @@
   }
 
   #ai-policy pre {
-    background-color: #F8F9FA !important;
+    background-color: var(--bg-line-numbers) !important;
     padding: 10px;
     border-radius: 4px;
     white-space: pre-wrap;
@@ -315,26 +430,28 @@
     font-family: monospace;
     font-size: 0.9em;
     line-height: 1.4;
+    color: var(--text-code-content);
   }
 
 /* NEW: Styles for structured log display */
 .log-display-container {
   max-height: 300px;
   overflow-y: auto;
-  background-color: #fcfcfc;
-  border: 1px solid var(--gas-grey-medium);
+  background-color: var(--bg-log-display);
+  border: 1px solid var(--border-log-display);
   border-radius: 4px;
   padding: 10px;
   font-family: monospace;
   font-size: 0.9em;
   line-height: 1.4;
+  color: var(--text-body);
 }
 
 .log-header {
   margin-bottom: 10px;
   padding: 8px 12px;
   border-radius: 4px;
-  background-color: rgba(66, 133, 244, 0.1);
+  background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha));
   color: var(--gas-blue-dark);
   font-weight: bold;
 }
@@ -343,7 +460,7 @@
   display: flex;
   flex-wrap: wrap; /* Allows wrapping on smaller screens */
   padding: 4px 0;
-  border-bottom: 1px dashed var(--gas-grey-light);
+  border-bottom: 1px dashed var(--border-log-display);
 }
 
 .log-entry:last-child {
@@ -352,7 +469,7 @@
 
 .log-timestamp {
   flex-shrink: 0;
-  color: var(--gas-grey-dark);
+  color: var(--text-line-numbers);
   margin-right: 10px;
   min-width: 160px; /* Adjust as needed for locale string */
 }
@@ -384,27 +501,28 @@
   font-family: inherit;
   white-space: pre-wrap;
   word-wrap: break-word;
+  color: var(--text-body);
 }
 
 /* Log level specific colors */
 .log-level-INFO {
-  background-color: rgba(66, 133, 244, 0.1); /* Light blue */
+  background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)); /* Light blue */
   color: var(--gas-blue-light);
 }
 
 .log-level-WARNING {
-  background-color: rgba(251, 188, 4, 0.1); /* Light yellow */
-  color: #CC9900; /* Darker yellow for contrast */
+  background-color: rgba(251, 188, 4, var(--notification-light-bg-alpha)); /* Light yellow */
+  color: var(--notification-warning-text); /* Darker yellow for contrast */
 }
 
 .log-level-ERROR {
-  background-color: rgba(217, 48, 37, 0.1); /* Light red */
+  background-color: rgba(217, 48, 37, var(--notification-light-bg-alpha)); /* Light red */
   color: var(--gas-red);
 }
 
 .log-level-DEBUG, .log-level-FINE, .log-level-FINER, .log-level-FINEST {
-  background-color: rgba(97, 97, 97, 0.1); /* Light grey */
-  color: var(--gas-grey-dark);
+  background-color: rgba(97, 97, 97, var(--notification-light-bg-alpha)); /* Light grey */
+  color: var(--text-line-numbers);
 }
 
 @media screen and (max-width: 768px) {
@@ -430,8 +548,8 @@
 .file-item {
   display: flex;
   align-items: center;
-  background-color: #fff;
-  border: 1px solid var(--gas-grey-medium) !important;
+  background-color: var(--bg-file-item);
+  border: 1px solid var(--border-file-item) !important;
   border-radius: 8px;
   padding: 10px 15px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -459,7 +577,7 @@
   flex-grow: 1;
   font-family: monospace;
   font-size: 0.9em;
-  color: #333;
+  color: var(--text-body);
   word-break: break-all;
 }
 
@@ -479,13 +597,14 @@
 }
 
 .file-item.is-unknown .file-type-badge {
-  background-color: var(--gas-grey-dark) !important;
+  background-color: var(--text-line-numbers) !important;
+  color: var(--bg-box) !important;
 }
 
 /* NEW: Style for deleted files in diff view */
 .file-comparison.is-deleted {
-  border: 1px dashed var(--gas-red) !important;
-  background-color: #ffe6e6; /* Lighter red */
+  border: 1px dashed var(--border-deleted) !important;
+  background-color: var(--bg-deleted);
 }
 
 .file-comparison.is-deleted .file-name-deleted {
@@ -500,16 +619,15 @@
   text-align: center;
   padding: 20px;
   font-size: 1.1em;
-  background-color: #fff0f0;
-  border: 1px dashed #fcdcdc;
+  background-color: var(--bg-box);
+  border: 1px dashed var(--border-deleted);
   margin-top: 10px;
 }
 
 /* NEW: Styles for REPLACE operation display - Adjusted to be a flex container */
 .file-comparison.is-replace {
   border: 1px dashed var(--gas-blue-light) !important;
-  background-color: #e6f0ff; /* Lighter blue */
-  /* Removed display: block; padding: 20px; */
+  background-color: rgba(230, 240, 255, 0.3); /* Lighter blue */
 }
 
 .file-comparison.is-replace h4 {
@@ -518,10 +636,10 @@
 
 /* NEW: Styles for inline pre-blocks within the notification for REPLACE details */
 .replacement-view {
-  background-color: #f8f9fa;
+  background-color: var(--bg-line-numbers);
   padding: 0.25em 0.5em;
   border-radius: 3px;
-  border: 1px solid var(--gas-grey-medium);
+  border: 1px solid var(--border-box);
   font-family: monospace;
   font-size: 0.8em;
   line-height: 1.4;
@@ -532,16 +650,17 @@
   display: inline-block; /* Make it inline */
   margin: 0; /* Remove block-level margins */
   vertical-align: middle; /* Align with text */
+  color: var(--text-code-content);
 }
 
 .replacement-view.replacement-old {
-  background-color: #fff0f0; /* Light red background for old */
-  border-color: var(--gas-red);
+  background-color: var(--bg-replace-old);
+  border-color: var(--border-replace-old);
 }
 
 .replacement-view.replacement-new {
-  background-color: #e6ffea; /* Light green background for new */
-  border-color: var(--gas-green);
+  background-color: var(--bg-replace-new);
+  border-color: var(--border-replace-new);
 }
 
 /* Removed .replacement-details .columns as they are no longer needed */
@@ -551,13 +670,17 @@
   margin-bottom: 2rem;
 }
 
+.tabs ul li a {
+  color: var(--text-tab-default);
+}
+
 .tabs ul li.is-active a {
-  border-bottom-color: var(--gas-blue-dark) !important;
-  color: var(--gas-blue-dark) !important;
+  border-bottom-color: var(--border-tab-active) !important;
+  color: var(--text-tab-active) !important;
 }
 .tabs a:hover {
-  border-bottom-color: var(--gas-blue-light) !important;
-  color: var(--gas-blue-light) !important;
+  border-bottom-color: var(--border-tab-hover) !important;
+  color: var(--text-tab-hover) !important;
 }
 
 .tab-content {
@@ -571,17 +694,18 @@
 .tab-content .box {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
-  border-top: 2px solid var(--gas-blue-light);
+  border-top: 2px solid var(--border-tab-box);
   padding-top: calc(1.25rem - 2px);
 }
 .tab-content h2.title,
 .tab-content h3.title {
   margin-top: 0.75rem !important; /* Adjust to better balance with .box padding */
   margin-bottom: 1.25rem !important; /* Ensure adequate space below title before content */
+  color: var(--text-heading);
 }
 .tab-content hr {
   margin: 3rem 0;
-  background-color: #f0f0f0;
+  background-color: var(--border-box);
   height: 1px;
 }
 
@@ -589,7 +713,13 @@
 .field .input,
 .field .textarea,
 .field .select select {
-  border-color: var(--gas-grey-medium);
+  border-color: var(--border-input);
+  background-color: var(--bg-input);
+  color: var(--text-input);
+}
+.field .input::placeholder,
+.field .textarea::placeholder {
+  color: var(--placeholder-input);
 }
 .field .input:focus,
 .field .textarea:focus,
@@ -604,17 +734,114 @@
   100% { transform: rotate(360deg); }
 }
 
+/* Ensure the Bulma spinner color is correct too */
+.button.is-loading::after {
+  border-color: transparent transparent var(--gas-blue-light) var(--gas-blue-light) !important;
+}
+[data-theme="dark"] .button.is-loading::after {
+  border-color: transparent transparent var(--link-color) var(--link-color) !important;
+}
+
+/* Light/Dark mode toggle switch style */
+.theme-switch-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* Align right within hero-body */
+  margin-left: auto; /* Push to right */
+  position: absolute;
+  top: 1.5rem; /* Adjust top padding for hero */
+  right: 1.5rem; /* Adjust right padding for hero */
+}
+
+.theme-switch {
+  display: inline-block;
+  height: 24px;
+  position: relative;
+  width: 48px;
+}
+
+.theme-switch input {
+  display:none;
+}
+
+.slider {
+  background-color: #ccc;
+  bottom: 0;
+  cursor: pointer;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  transition: .4s;
+}
+
+.slider:before {
+  background-color: #fff;
+  bottom: 2px;
+  content: "";
+  height: 20px;
+  left: 2px;
+  position: absolute;
+  width: 20px;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: var(--gas-blue-light);
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+.slider.round {
+  border-radius: 24px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.theme-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px; /* Adjust size to fit */
+  line-height: 1;
+  color: #fff;
+  pointer-events: none; /* Allow click to pass through to slider */
+}
+
+.theme-icon.sun {
+  left: 8px; /* Position for sun */
+  display: block; /* Default to visible in light mode */
+}
+
+.theme-icon.moon {
+  right: 8px; /* Position for moon */
+  display: none; /* Default to hidden in light mode */
+}
+
+[data-theme="dark"] .theme-icon.sun {
+  display: none;
+}
+
+[data-theme="dark"] .theme-icon.moon {
+  display: block;
+}
+
 /* NEW: Styles for OAuth Scopes display */
 .oauth-scopes-display-container {
   max-height: 400px; /* Limit height for scrollability */
   overflow-y: auto;
-  background-color: #fcfcfc;
-  border: 1px solid var(--gas-grey-medium);
+  background-color: var(--bg-log-display);
+  border: 1px solid var(--border-log-display);
   border-radius: 4px;
   padding: 10px;
   font-family: monospace; /* Use a monospace font for consistency with URLs */
   font-size: 0.9em;
   line-height: 1.5;
+  color: var(--text-body);
 }
 
 .oauth-scopes-list {
@@ -636,15 +863,13 @@
 
 .oauth-scopes-list li .scope-url {
   display: inline-block;
-  background-color: #f0f0f0;
+  background-color: var(--bg-line-numbers);
   padding: 3px 6px;
   border-radius: 3px;
   font-size: 0.9em;
-  color: #333;
+  color: var(--text-code-content);
   word-break: break-all;
   margin-bottom: 0;
   width: auto;
 }
-
-
 </style>

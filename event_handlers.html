@@ -1584,6 +1584,19 @@
                     UI.appendNotification(resultDisplay, 'is-danger', `サーバー関数呼び出し中にエラーが発生しました: ${Utils.escapeHtml(error.message)}`);
                 })
                 .getProjectOAuthScopes(scriptId);
+        },
+        /**
+         * Handle theme toggle.
+         */
+        handleThemeToggle: () => {
+            const themeToggle = UI.get('themeToggle');
+            if (themeToggle.checked) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('theme', 'light');
+            }
         }
     };
 </script>
