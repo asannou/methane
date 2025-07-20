@@ -51,7 +51,8 @@
                             // Explicitly trigger change event to update editor URL display
                             scriptIdSelect.dispatchEvent(new Event('change'));
                         }
-                    } else {
+                    }
+                    else {
                         alert('Failed to load Apps Script projects: ' + response.message);
                     }
                 })
@@ -127,7 +128,8 @@
                     diffResult.push({ type: 'equal', original: currentOriginalLine, proposed: currentProposedLine });
                     i++;
                     j++;
-                } else {
+                }
+                else {
                     let originalFoundInProposedAhead = -1;
                     for (let k = j + 1; k < Math.min(j + 1 + lookAheadWindow, proposedLines.length); k++) {
                         if (i < originalLines.length && originalLines[i] === proposedLines[k]) {
@@ -148,16 +150,20 @@
                         diffResult.push({ type: 'modified', original: currentOriginalLine, proposed: currentProposedLine });
                         i++;
                         j++;
-                    } else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
+                    }
+                    else if (originalFoundInProposedAhead !== -1 && (proposedFoundInOriginalAhead === -1 || (originalFoundInProposedAhead - j) <= (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                         j++;
-                    } else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (proposedFoundInOriginalAhead - i))) {
+                    }
+                    else if (proposedFoundInOriginalAhead !== -1 && (originalFoundInProposedAhead === -1 || (proposedFoundInOriginalAhead - j) < (proposedFoundInOriginalAhead - i))) {
                         diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                         i++;
-                    } else if (i < originalLines.length) {
+                    }
+                    else if (i < originalLines.length) {
                         diffResult.push({ type: 'removed', original: currentOriginalLine, proposed: '' });
                         i++;
-                    } else if (j < proposedLines.length) {
+                    }
+                    else if (j < proposedLines.length) {
                         diffResult.push({ type: 'added', original: '', proposed: currentProposedLine });
                         j++;
                     }
@@ -221,7 +227,8 @@
                             currentProposedLineNum++;
                         }
 
-                    } else {
+                    }
+                    else {
                         for (let l = 0; l < equalCount; l++) {
                             const lineEntry = diffResult[equalBlockStartIndex + l];
                             originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
@@ -232,20 +239,23 @@
                             currentProposedLineNum++;
                         }
                     }
-                } else {
+                }
+                else {
                     if (entry.type === 'added') {
                         originalLineNumbersHtml += `<div>&nbsp;</div>`;
                         originalCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
                         proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
                         proposedCodeContentHtml += `<div class="diff-line-added">${Utils.escapeHtml(entry.proposed)}</div>`;
                         currentProposedLineNum++;
-                    } else if (entry.type === 'removed') {
+                    }
+                    else if (entry.type === 'removed') {
                         originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
                         originalCodeContentHtml += `<div class="diff-line-removed">${Utils.escapeHtml(entry.original)}</div>`;
                         proposedLineNumbersHtml += `<div>&nbsp;</div>`;
                         proposedCodeContentHtml += `<div class="diff-line-empty-fill">&nbsp;</div>`;
                         currentOriginalLineNum++;
-                    } else if (entry.type === 'modified') {
+                    }
+                    else if (entry.type === 'modified') {
                         originalLineNumbersHtml += `<div>${currentOriginalLineNum}</div>`;
                         originalCodeContentHtml += `<div class="diff-line-modified">${Utils.escapeHtml(entry.original)}</div>`;
                         proposedLineNumbersHtml += `<div>${currentProposedLineNum}</div>`;
@@ -268,6 +278,7 @@
          * @param {Array<object>} originalFiles - The original files array.
          * @param {Array<object>} proposedFiles - The proposed files array.
          * @param {Array<string>} [deletedFileNames=[]] - Array of file names explicitly marked for deletion by AI.
+         * @returns {boolean} True if any changes (additions, modifications, or deletions) were proposed, false otherwise.
          */
         displayFileComparison: (originalFiles, proposedFiles, deletedFileNames = []) => {
             const displayArea = UI.get('proposedFilesDisplay');
@@ -291,7 +302,7 @@
 
             if (explicitDeletedFiles.length === 0 && proposedFiles.length === 0) {
                 UI.setHtml('proposedFilesDisplay', '<p>AI did not propose any changes (no files added, updated, or deleted).</p>');
-                return;
+                return false;
             }
 
             explicitDeletedFiles.forEach(deletedFile => {
@@ -364,7 +375,8 @@
                                 <p class="is-size-7"><strong>新しい文字列 (new_string):</strong> <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string.substring(0, 200))}${proposedFile.new_string.length > 200 ? '...' : ''}</pre></p>
                             </div>
                         `;
-                    } else {
+                    }
+                    else {
                         proposedSourceForDiff = originalSourceForDiff.replace(proposedFile.old_string, proposedFile.new_string);
                         additionalMessageHtml = `
                             <div class="notification is-info is-light mt-2 mb-2" style="flex: 1 1 100%;">
@@ -377,7 +389,8 @@
                     }
                     statusLabel = '(Replaced)';
                     fileComparisonDiv.classList.add('is-replace'); // Keep class for distinct styling
-                } else { // Existing logic for source updates/additions
+                }
+                else { // Existing logic for source updates/additions
                     const originalFile = originalFilesMap.get(name);
                     originalSourceForDiff = originalFile ? originalFile.source : '';
                     proposedSourceForDiff = proposedFile.source;
@@ -425,6 +438,7 @@
                     });
                 }
             });
+            return true;
         },
 
         /**

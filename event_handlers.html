@@ -120,7 +120,7 @@
 
                     UI.setText('version-result', `Error reverting and deploying: ${error.message}`);
                     UI.disable('openWebAppButton');
-                    UI.setText('openWebAppMessage', '');;
+                    UI.setText('openWebAppMessage', '');; 
                 });
             },
 
@@ -396,12 +396,14 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
+                        const hasChanges = Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
-                        UI.show('applyChangesNoDeployButton');
-                        UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
+                        if (hasChanges) {
+                            UI.show('applyChangesNoDeployButton');
+                            UI.show('applyAndDeployButton');
+                        }
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
                     } else if (response.status === 'error') {
@@ -515,7 +517,8 @@
                         UI.show('acceptPolicyButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
-                    } else if (response.status === 'error') {
+                    }
+                    else if (response.status === 'error') {
                         UI.setText('ai-policy', 'Error: ' + response.message);
                         UI.show('policy-container');
                         UI.show('regeneratePolicyButton');
@@ -610,7 +613,7 @@
                                 if (response.webappUrl && response.webappUrl !== 'null') {
                                     messageBodyContent += `<li><strong>Web App URL:</strong> <a href="${Utils.escapeHtml(response.webappUrl)}" target="_blank">${Utils.escapeHtml(response.webappUrl)}</a></li>`;
                                 } else if (response.webappUrl === null) {
-                                    messageBodyContent += `<li><strong>Web App URL:</strong> Not found in deployment response.</li>`;
+                                    webappUrlHtml = `Web App URL: Not found in deployment response.`;
                                 }
                                 messageBodyContent += `</ul>`;
                             } else if (response.deploymentStatus === 'error') {
@@ -656,7 +659,8 @@
                         UI.hide('html-validation-warnings');
                         UI.setHtml('html-validation-warnings', '');
                         UI.hide('fixApplyErrorsButton');
-                    } else {
+                    }
+                    else {
                         UI.appendNotification('apply-result-content', 'is-danger', `Failed to Apply Changes: ${Utils.escapeHtml(response.message)}`, response.apiErrorDetails || response.fullErrorText);
                         UI.show('fixApplyErrorsButton');
                     }
@@ -725,8 +729,6 @@
                     }
                     AppState.activeRequestId = null;
                     UI.hideSpinnerInButton(UI.get('regenerateProposalButton'));
-                    UI.enable('applyChangesNoDeployButton');
-                    UI.enable('applyAndDeployButton');
                     UI.enable('prompt');
                     UI.hide('cancelAiOperationButton');
                     UI.enable('proposeBrowserErrorLoggingButton');
@@ -755,15 +757,18 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
+                        const hasChanges = Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
-                        UI.show('applyChangesNoDeployButton');
-                        UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
+                        if (hasChanges) {
+                            UI.show('applyChangesNoDeployButton');
+                            UI.show('applyAndDeployButton');
+                        }
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
-                    } else if (response.status === 'error') {
+                    }
+                    else if (response.status === 'error') {
                         UI.appendNotification('apply-result-content', 'is-danger', 'Failed to regenerate proposal.', response.message);
                         UI.show('apply-result-container');
                         UI.show('regenerateProposalButton');
@@ -862,16 +867,19 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
+                        const hasChanges = Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
-                        UI.show('applyChangesNoDeployButton');
-                        UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
+                        if (hasChanges) {
+                            UI.show('applyChangesNoDeployButton');
+                            UI.show('applyAndDeployButton');
+                        }
                         UI.hide('fixApplyErrorsButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
-                    } else if (response.status === 'error') {
+                    }
+                    else if (response.status === 'error') {
                         UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message);
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
@@ -971,16 +979,19 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
+                        const hasChanges = Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
                         Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Add this line
-                        UI.show('applyChangesNoDeployButton');
-                        UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
-                        UI.hide('fixApplyErrorsButton');
+                        if (hasChanges) {
+                            UI.show('applyChangesNoDeployButton');
+                            UI.show('applyAndDeployButton');
+                        }
+                        UI.hide('fixErrorsButton');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
-                    } else if (response.status === 'error') {
+                    }
+                    else if (response.status === 'error') {
                         UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message);
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
@@ -1084,12 +1095,17 @@
                             UI.show('html-validation-warnings');
                         }
 
-                        Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
+                        const hasChanges = Utils.displayFileComparison(response.originalFiles, response.proposedFiles, response.deletedFileNames);
                         UI.show('proposal-container');
-                        UI.show('applyChangesNoDeployButton');
-                        UI.show('applyAndDeployButton');
                         UI.show('regenerateProposalButton');
                         UI.hide('fixApplyErrorsButton');
+                        if (hasChanges) { // Only show apply buttons if there are changes
+                            UI.show('applyChangesNoDeployButton');
+                            UI.show('applyAndDeployButton');
+                        } else {
+                            UI.hide('applyChangesNoDeployButton');
+                            UI.hide('applyAndDeployButton');
+                        }
                         // Ensure Policy related buttons are hidden/shown correctly if this flow bypasses policy generation
                         UI.hide('policy-container');
                         UI.hide('acceptPolicyButton');
@@ -1099,7 +1115,8 @@
                         UI.appendNotification('apply-result-content', 'is-danger', 'Failed to generate proposal.', response.message);
                         UI.show('apply-result-container');
                         UI.show('generatePolicyButton'); // Restore original AI button
-                    } else {
+                    }
+                    else {
                         UI.appendNotification('apply-result-content', 'is-warning', 'Unexpected response status:', response);
                         UI.show('apply-result-container');
                         UI.show('generatePolicyButton'); // Restore original AI button
@@ -1264,7 +1281,8 @@
                         UI.setText('add-library-result', response.message);
                         UI.clearValue('libraryScriptId');
                         UI.clearValue('libraryVersion');
-                    } else {
+                    }
+                    else {
                         UI.setText('add-library-result', `Error: ${response.message}`);
                     }
                 })
@@ -1435,7 +1453,8 @@
                         UI.disable('revertVersionButton');
                         UI.disable('openWebAppButton');
                         UI.setText('openWebAppMessage', '');
-                    } else {
+                    }
+                    else {
                         UI.setText('version-result', `Error: ${response.message}`);
                         UI.disable('openWebAppButton');
                         UI.setText('openWebAppMessage', '');
@@ -1530,7 +1549,8 @@
                         } else {
                             UI.setHtml(filesListDisplay, '<p>No files found in this script.</p>');
                         }
-                    } else {
+                    }
+                    else {
                         UI.setHtml(filesListDisplay, `<p class="has-text-danger">Error retrieving files: ${Utils.escapeHtml(response.message)}</p>`);
                         if (response.apiErrorDetails) {
                             UI.setHtml('filesListDisplay', UI.get('filesListDisplay').innerHTML + `<pre class="has-text-danger-dark is-size-7 mt-2">${Utils.escapeHtml(JSON.stringify(response.apiErrorDetails, null, 2))}</pre>`);
