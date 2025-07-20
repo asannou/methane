@@ -54,6 +54,24 @@
         AppState.domElements.oauthScopesResult = document.getElementById('oauth-scopes-result');
         AppState.domElements.themeToggle = document.getElementById('themeToggle'); // NEW
 
+        // Load theme from localStorage or system preference and apply
+        const themeToggle = AppState.domElements.themeToggle; // Reference to the checkbox
+        const storedTheme = localStorage.getItem('theme');
+
+        if (storedTheme) {
+            document.documentElement.setAttribute('data-theme', storedTheme);
+            themeToggle.checked = (storedTheme === 'dark');
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            // If no theme stored, check system preference and default to dark
+            document.documentElement.setAttribute('data-theme', 'dark');
+            themeToggle.checked = true;
+            localStorage.setItem('theme', 'dark'); // Store default
+        } else {
+            // Default to light theme if no preference is stored and system preference is not dark
+            document.documentElement.setAttribute('data-theme', 'light');
+            themeToggle.checked = false;
+            localStorage.setItem('theme', 'light'); // Store default
+        }
 
         // Load initial state from localStorage
         const savedScriptId = localStorage.getItem('targetScriptId');
