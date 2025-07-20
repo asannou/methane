@@ -1315,11 +1315,7 @@
                                 const option = document.createElement('option');
                                 option.value = version.versionNumber;
                                 option.textContent = `Version ${version.versionNumber} (Created: ${new Date(version.createTime).toLocaleString()}) - ${version.description}`;
-                                if (version.webappUrl !== null) {
-                                    option.dataset.webappUrl = version.webappUrl;
-                                } else {
-                                    option.dataset.webappUrl = 'null';
-                                }
+                                option.dataset.webappUrl = version.webappUrl || '';
                                 versionsSelect.appendChild(option);
                             });
                             UI.setText('version-result', `Versions found: ${response.versions.length} items`);
@@ -1366,10 +1362,10 @@
             // Enable/disable open web app button based on webappUrl in dataset
             const webappUrl = selectedOption.dataset.webappUrl;
 
-            if (selectedOption.value && webappUrl && webappUrl !== 'null') {
+            if (selectedOption.value && webappUrl) {
                 UI.enable('openWebAppButton');
                 UI.setText('openWebAppMessage', '');
-            } else if (selectedOption.value && (webappUrl === 'null' || !webappUrl)) {
+            } else if (selectedOption.value && !webappUrl) {
                 UI.disable('openWebAppButton');
                 UI.setText('openWebAppMessage', 'No web app URL for this version.');
             } else {
