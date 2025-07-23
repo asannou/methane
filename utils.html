@@ -157,13 +157,7 @@
                     fileContentHtml = `
                         <div class="file-comparison is-replace">
                             <h4 class="title is-5 full-width-panel">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
-                            <div class="notification is-info is-light full-width-panel">
-                                <p>これは、既存のファイル内容の一部を置換する操作のプレビューです。</p>
-                                <p class="is-size-7 mt-2"><strong>置換前テキスト:</strong> <code class="replacement-view replacement-old-inline">${Utils.escapeHtml(oldString)}</code></p>
-                                <p class="is-size-7"><strong>置換後テキスト:</strong> <code class="replacement-view replacement-new-inline">${Utils.escapeHtml(newString)}</code></p>
-                                <p class="is-size-7"><strong>グローバル置換:</strong> ${isGlobalReplace ? 'はい' : 'いいえ'}</p>
-                                ${!replacementPerformed ? `<p class="is-size-7 has-text-danger mt-2"><strong>警告:</strong> '置換前テキスト' が元のファイルに見つからなかったため、実際の置換は行われませんでした。表示されている差分は、元のファイルと元のファイルの比較です。</p>` : ''}
-                            </div>
+
                             <div class="original-file-panel">
                                 <h4 class="title is-5">変更前:</h4>
                                 <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
