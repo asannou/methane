@@ -396,6 +396,9 @@
             let currentProposedLineContentChars = []; // Accumulates character-level HTML for the current logical line (proposed side)
             let lineContainsInsert = false; // Flag if the current logical line contains an insertion
             let lineContainsDelete = false; // Flag if the current logical line contains a deletion
+            // Accumulators for raw text content of the current logical line for precise comparison
+            let currentOriginalLineRawText = [];
+            let currentProposedLineRawText = [];
 
             for (let i = 0; i < diffs.length; ++i) {
                 const type = diffs[i][0]; 
@@ -405,21 +408,27 @@
 
                 for (let j = 0; j < textParts.length; ++j) {
                     const part = Utils.escapeHtml(textParts[j]); 
+                    const rawPart = textParts[j]; // Keep raw text for final comparison
                     const isLastPartInDiffSegment = (j === textParts.length - 1);
 
                     // Append character-level HTML for this 'part' to the current logical line's content buffers
+                    // And accumulate raw text for later precise comparison
                     if (type === DIFF_EQUAL) {
                         currentOriginalLineContentChars.push(part);
                         currentProposedLineContentChars.push(part);
+                        currentOriginalLineRawText.push(rawPart);
+                        currentProposedLineRawText.push(rawPart);
                     } else if (type === DIFF_INSERT) {
                         currentProposedLineContentChars.push(`<ins class="diff-char-added">${part}</ins>`);
-                        // For insertions, the original side is empty; insert nothing for character alignment.
-                        currentOriginalLineContentChars.push(''); 
+                        currentOriginalLineContentChars.push(''); // For insertions, the original side is empty for character alignment.
+                        currentProposedLineRawText.push(rawPart);
+                        currentOriginalLineRawText.push(''); // Original side has nothing for raw comparison for this segment
                         lineContainsInsert = true;
                     } else { // DIFF_DELETE
                         currentOriginalLineContentChars.push(`<del class="diff-char-removed">${part}</del>`);
-                        // For deletions, the proposed side is empty; insert nothing for character alignment.
-                        currentProposedLineContentChars.push(''); 
+                        currentProposedLineContentChars.push(''); // For deletions, the proposed side is empty for character alignment.
+                        currentOriginalLineRawText.push(rawPart);
+                        currentProposedLineRawText.push(''); // Proposed side has nothing for raw comparison for this segment
                         lineContainsDelete = true;
                     }
 
@@ -428,13 +437,20 @@
                     const isLogicalLineEnd = !isLastPartInDiffSegment || (i === diffs.length - 1 && j === textParts.length - 1);
 
                     if (isLogicalLineEnd) {
-                        // Logical line is complete. Get its full content.
-                        const originalFullLine = currentOriginalLineContentChars.join('');
-                        const proposedFullLine = currentProposedLineContentChars.join('');
+                        // Logical line is complete. Get its full content (with highlighting HTML).
+                        const originalFullHtmlLine = currentOriginalLineContentChars.join('');
+                        const proposedFullHtmlLine = currentProposedLineContentChars.join('');
+
+                        // Reconstruct the full raw lines for precise equality check
+                        const originalRawLine = currentOriginalLineRawText.join('');
+                        const proposedRawLine = currentProposedLineRawText.join('');
 
                         // Determine the overall status of this logical line (equal, added, removed, modified)
                         let lineStatusClass = 'equal';
-                        if (lineContainsInsert && lineContainsDelete) {
+                        // Force 'equal' if raw content is identical, overriding intermediate flags
+                        if (originalRawLine === proposedRawLine) {
+                            lineStatusClass = 'equal';
+                        } else if (lineContainsInsert && lineContainsDelete) {
                             lineStatusClass = 'modified';
                         } else if (lineContainsInsert) {
                             lineStatusClass = 'added';
@@ -446,19 +462,19 @@
                         if (lineStatusClass === 'equal') {
                             consecutiveEqualLinesCount++;
                             equalLineNumbersBufferOriginal.push(`<div>${currentOriginalLineNumber}</div>`);
-                            equalLinesBufferOriginal.push(`<div class="diff-line-equal">${originalFullLine || '&nbsp;'}</div>`);
+                            equalLinesBufferOriginal.push(`<div class="diff-line-equal">${originalFullHtmlLine || '&nbsp;'}</div>`);
                             equalLineNumbersBufferProposed.push(`<div>${currentProposedLineNumber}</div>`);
-                            equalLinesBufferProposed.push(`<div class="diff-line-equal">${proposedFullLine || '&nbsp;'}</div>`);
+                            equalLinesBufferProposed.push(`<div class="diff-line-equal">${proposedFullHtmlLine || '&nbsp;'}</div>`);
                         } else {
                             // This is a non-equal line. Flush any pending equal lines first (applying omission if needed).
                             flushEqualLines();
 
                             // Then add the current non-equal line directly to the final output arrays.
                             originalLineNumbers.push(`<div>${currentOriginalLineNumber}</div>`);
-                            originalLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${originalFullLine || '&nbsp;'}</div>`);
+                            originalLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${originalFullHtmlLine || '&nbsp;'}</div>`);
 
                             proposedLineNumbers.push(`<div>${currentProposedLineNumber}</div>`);
-                            proposedLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${proposedFullLine || '&nbsp;'}</div>`);
+                            proposedLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${proposedFullHtmlLine || '&nbsp;'}</div>`);
                         }
 
                         // Increment line numbers for the next logical line
@@ -468,6 +484,8 @@
                         // Reset character-level content buffers and flags for the next logical line
                         currentOriginalLineContentChars = [];
                         currentProposedLineContentChars = [];
+                        currentOriginalLineRawText = []; // Reset raw text buffers too
+                        currentProposedLineRawText = []; // Reset raw text buffers too
                         lineContainsInsert = false;
                         lineContainsDelete = false;
                     }
