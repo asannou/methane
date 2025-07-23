@@ -13,45 +13,6 @@
       <div class="container">
         <p class="title">methane</p>
         <p class="subtitle">Google Apps Script AI Assistant</p>
-
-        <h2 class="title is-4 mt-5">Download File from URL</h2>
-        <div class="box">
-          <p class="content">Download a file from a specified URL and add/update it in the target Apps Script project. Existing files with the same name will be overwritten.</p>
-          <div class="notification is-warning is-light mb-4">
-            <p><strong>Security Warning:</strong> Downloading and executing code from external URLs can pose significant security risks. Only download files from trusted sources. Malicious code could compromise your Google account or data.</p>
-          </div>
-          <div class="field">
-            <label class="label" for="fileUrl">File URL:</label>
-            <div class="control">
-              <input type="url" id="fileUrl" name="fileUrl" class="input" placeholder="e.g., https://example.com/my-script.js" required>
-            </div>
-          </div>
-          <div class="field">
-            <label class="label" for="newFileName">Target File Name (in project, without extension):</label>
-            <div class="control">
-              <input type="text" id="newFileName" name="newFileName" class="input" placeholder="e.g., MyNewScript, index" required>
-            </div>
-          </div>
-          <div class="field">
-            <label class="label" for="newFileType">Target File Type:</label>
-            <div class="control">
-              <div class="select is-fullwidth">
-                <select id="newFileType" name="newFileType" required>
-                  <option value="SERVER_JS">Server-side JavaScript (.gs)</option>
-                  <option value="HTML">HTML (.html)</option>
-                  <option value="JSON">JSON (.json)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="control mt-3">
-            <button type="button" id="downloadAndAddFileButton" class="button is-info">Download & Add/Update File</button>
-          </div>
-          <div id="download-result-container" class="box mt-4" style="display:none;">
-            <h3 class="title is-5">Download Result:</h3>
-            <pre id="download-result" class="content"></pre>
-          </div>
-        </div>
       </div>
     </div>
   </section>
@@ -284,6 +245,45 @@
           <div id="filesListContainer" class="box mt-4" style="display:none;">
             <h3 class="title is-5">Files in Script:</h3>
             <div id="filesListDisplay" class="files-grid"></div>
+          </div>
+        </div>
+
+        <h2 class="title is-4 mt-5">Download File from URL</h2>
+        <div class="box">
+          <p class="content">Download a file from a specified URL and add/update it in the target Apps Script project. Existing files with the same name will be overwritten.</p>
+          <div class="notification is-warning is-light mb-4">
+            <p><strong>Security Warning:</strong> Downloading and executing code from external URLs can pose significant security risks. Only download files from trusted sources. Malicious code could compromise your Google account or data.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="fileUrl">File URL:</label>
+            <div class="control">
+              <input type="url" id="fileUrl" name="fileUrl" class="input" placeholder="e.g., https://example.com/my-script.js" required>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="newFileName">Target File Name (in project, without extension):</label>
+            <div class="control">
+              <input type="text" id="newFileName" name="newFileName" class="input" placeholder="e.g., MyNewScript, index" required>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="newFileType">Target File Type:</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id="newFileType" name="newFileType" required>
+                  <option value="SERVER_JS">Server-side JavaScript (.gs)</option>
+                  <option value="HTML">HTML (.html)</option>
+                  <option value="JSON">JSON (.json)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="control mt-3">
+            <button type="button" id="downloadAndAddFileButton" class="button is-info">Download & Add/Update File</button>
+          </div>
+          <div id="download-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Download Result:</h3>
+            <pre id="download-result" class="content"></pre>
           </div>
         </div>
       </div>
