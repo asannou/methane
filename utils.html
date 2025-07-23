@@ -234,14 +234,13 @@
                         <div class="file-comparison is-replace">
                             <div class="original-file-panel">
                                 <h4 class="title is-5">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
-                                <p class="content">以下の差分は、元のファイルに「<code class="replacement-view replacement-old-inline">${Utils.escapeHtml(oldString)}</code>」を「<code class="replacement-view replacement-new-inline">${Utils.escapeHtml(newString)}</code>」に置換${isGlobalReplace ? '（グローバル）' : ''}した場合のプレビューです。</p>
-                                <h4 class="title is-6">置換前:</h4>
+                                <h4 class="title is-5">変更前:</h4>
                                 <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
                             </div>
                             <div class="proposed-file-panel">
                                 <h4 class="title is-5">&nbsp;</h4> <!-- Keep alignment with previous panel's title/description -->
                                 <p class="content">&nbsp;</p> <!-- Keep alignment -->
-                                <h4 class="title is-6">置換後 (シミュレーション):</h4>
+                                <h4 class="title is-5">変更後:</h4>
                                 <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
                         </div>
