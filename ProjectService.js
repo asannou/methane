@@ -1,4 +1,98 @@
 /**
+ * Internal helper to get file extension based on file type.
+ * @param {string} type - The file type (SERVER_JS, JSON, HTML).
+ * @returns {string} The corresponding file extension.
+ */
+function _getFileExtension(type) {
+  switch (type) {
+    case 'SERVER_JS': return 'gs';
+    case 'JSON': return 'json';
+    default: return 'html'; // Default for HTML
+  }
+}
+
+/**
+ * Downloads a file from a URL and adds/updates it in the target Apps Script project.
+ * @param {string} targetScriptId - The ID of the script to modify.
+ * @param {string} url - The URL of the file to download.
+ * @param {string} fileName - The desired file name in the project (without extension).
+ * @param {string} fileType - The type of the file ('SERVER_JS', 'HTML', 'JSON').
+ * @returns {object} - Object indicating the success or failure of the operation.
+ */
+function downloadAndAddFile(targetScriptId, url, fileName, fileType) {
+  if (!targetScriptId || targetScriptId.trim() === '') {
+    return { status: 'error', message: 'Target Script ID is not specified.' };
+  }
+  if (!url || url.trim() === '') {
+    return { status: 'error', message: 'File URL is not specified.' };
+  }
+  if (!fileName || fileName.trim() === '') {
+    return { status: 'error', message: 'File Name for the project is not specified.' };
+  }
+  if (!['SERVER_JS', 'HTML', 'JSON'].includes(fileType)) {
+    return { status: 'error', message: `Invalid File Type: ${fileType}. Must be SERVER_JS, HTML, or JSON.` };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
+
+    // 1. Fetch file content from the provided URL
+    console.log(`Fetching content from URL: ${url}`);
+    let fileContent;
+    try {
+      const fetchOptions = {
+        method: 'get',
+        muteHttpExceptions: true
+      };
+      const response = UrlFetchApp.fetch(url, fetchOptions);
+      const responseCode = response.getResponseCode();
+      if (responseCode >= 400) {
+        throw new Error(`Failed to download file from URL (Status: ${responseCode}): ${response.getContentText()}`);
+      }
+      fileContent = response.getContentText();
+    } catch (e) {
+      console.error(`Error fetching from URL ${url}: ${e.message}`);
+      return { status: 'error', message: `Failed to download file from URL: ${e.message}` };
+    }
+
+    // 2. Retrieve current script content to avoid overwriting other files
+    console.log(`Retrieving current script content for ID: ${targetScriptId}`);
+    const getResponse = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content for update');
+    const originalProjectContent = JSON.parse(getResponse.getContentText());
+
+    // Create a map for easy access and modification
+    const newProjectFilesMap = new Map(originalProjectContent.files.map(f => [f.name, f]));
+
+    // Prepare the new/updated file object
+    const newFileObject = {
+      name: fileName.trim(),
+      type: fileType,
+      source: fileContent
+    };
+
+    // Add or update the file in the map
+    newProjectFilesMap.set(newFileObject.name, newFileObject);
+
+    // Ensure appsscript.json is present (handled by _ensureAppsscriptJsonFallback)
+    let finalFilesForPutPayload = Array.from(newProjectFilesMap.values());
+    finalFilesForPutPayload = _ensureAppsscriptJsonFallback(finalFilesForPutPayload, originalProjectContent.files);
+
+    const finalPayload = { files: finalFilesForPutPayload };
+
+    // 3. Update the script content
+    console.log(`Updating script content for ID: ${targetScriptId} with file '${fileName}'`);
+    _makeApiCall(contentUrl, 'put', accessToken, JSON.stringify(finalPayload), `Failed to add/update file '${fileName}'`);
+
+    return { status: 'success', message: `File '${fileName}.${_getFileExtension(fileType)}' successfully downloaded and added/updated in script ID ${targetScriptId}.` };
+
+  } catch (error) {
+    console.error("Error downloading and adding file:", error);
+    return { status: 'error', message: `File operation error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null, fullErrorText: error.fullErrorText || null };
+  }
+}
+
+/**
  * Applies changes proposed by AI to the script files.
  * @param {string} scriptId - The ID of the script to update.
  * @param {Array<object>} proposedFiles - Array of file objects (new or modified source, or REPLACE operations).
@@ -511,7 +605,8 @@ function _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deployme
       const version = allVersions[i];
       if (!activeDeployedVersions.has(version.versionNumber)) {
         versionsToDelete.push(version);
-      } else {
+      }
+      else {
         console.log(`Version ${version.versionNumber} (created: ${version.createTime}) is linked to an active deployment, retaining.`);
       }
     }

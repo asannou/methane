@@ -1616,6 +1616,70 @@
                 document.documentElement.setAttribute('data-theme', 'light');
                 localStorage.setItem('theme', 'light');
             }
+        },
+
+        /**
+         * Handle downloading a file from a URL and adding/updating it to the project.
+         */
+        handleDownloadAndAddFile: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const fileUrl = UI.get('fileUrl').value.trim();
+            const newFileName = UI.get('newFileName').value.trim();
+            const newFileType = UI.get('newFileType').value;
+            const downloadButton = UI.get('downloadAndAddFileButton');
+            const resultContainer = UI.get('download-result-container');
+            const resultDisplay = UI.get('download-result');
+
+            UI.showSpinnerInButton(downloadButton, 'Downloading...');
+            UI.show(resultContainer);
+            UI.setText(resultDisplay, ''); // Clear previous result
+
+            if (!scriptId) {
+                UI.hideSpinnerInButton(downloadButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: Please select or enter a Script ID.');
+                return;
+            }
+            if (!fileUrl) {
+                UI.hideSpinnerInButton(downloadButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: File URL cannot be empty.');
+                return;
+            }
+            if (!newFileName) {
+                UI.hideSpinnerInButton(downloadButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: Target File Name cannot be empty.');
+                return;
+            }
+            // Basic URL validation
+            try {
+                new URL(fileUrl);
+            } catch (e) {
+                UI.hideSpinnerInButton(downloadButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: Invalid File URL format.');
+                return;
+            }
+
+            UI.appendNotification(resultDisplay, 'is-info', 'Attempting to download and add/update file...', `URL: ${fileUrl}\nFile Name: ${newFileName}\nFile Type: ${newFileType}`);
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(downloadButton);
+                    if (response.status === 'success') {
+                        UI.appendNotification(resultDisplay, 'is-success', response.message);
+                        // Clear input fields on success
+                        UI.clearValue('fileUrl');
+                        UI.clearValue('newFileName');
+                        UI.get('newFileType').value = 'SERVER_JS'; // Reset to default
+                    } else {
+                        UI.appendNotification(resultDisplay, 'is-danger', `Failed to download and add/update file: ${response.message}`, response.apiErrorDetails || response.fullErrorText);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(downloadButton);
+                    UI.appendNotification(resultDisplay, 'is-danger', `Error calling server function: ${error.message}`);
+                })
+                .downloadAndAddFile(scriptId, fileUrl, newFileName, newFileType);
         }
     };
 </script>

@@ -53,6 +53,12 @@
         AppState.domElements.oauthScopesResultContainer = document.getElementById('oauth-scopes-result-container');
         AppState.domElements.oauthScopesResult = document.getElementById('oauth-scopes-result');
         AppState.domElements.themeToggle = document.getElementById('themeToggle'); // NEW
+        AppState.domElements.fileUrl = document.getElementById('fileUrl');
+        AppState.domElements.newFileName = document.getElementById('newFileName');
+        AppState.domElements.newFileType = document.getElementById('newFileType');
+        AppState.domElements.downloadAndAddFileButton = document.getElementById('downloadAndAddFileButton');
+        AppState.domElements.downloadResultContainer = document.getElementById('download-result-container');
+        AppState.domElements.downloadResult = document.getElementById('download-result');
 
         // Load theme from localStorage or system preference and apply
         const themeToggle = AppState.domElements.themeToggle; // Reference to the checkbox
@@ -110,6 +116,9 @@
         UI.disable('revertAndDeployButton'); /* NEW */
 
 
+        // Initial UI state setup for new elements
+        UI.hide('downloadResultContainer');
+
         Handlers.initTabNavigation();
 
         // Register event listeners
@@ -152,5 +161,6 @@
 
         UI.get('getFilesListButton').addEventListener('click', Handlers.handleGetFilesList);
         AppState.domElements.themeToggle.addEventListener('change', Handlers.handleThemeToggle);
+        UI.get('downloadAndAddFileButton').addEventListener('click', Handlers.handleDownloadAndAddFile);
     });
 </script>
