@@ -106,6 +106,114 @@
         },
 
         /**
+         * Displays the file comparison and proposed changes in the UI.
+         * @param {Array<object>} originalFiles - Array of original file objects.
+         * @param {Array<object>} proposedFiles - Array of proposed file objects (with new source or replace operations).
+         * @param {Array<string>} deletedFileNames - Array of file names marked for deletion.
+         * @returns {boolean} True if any changes were displayed, false otherwise.
+         */
+        displayFileComparison: (originalFiles, proposedFiles, deletedFileNames) => {
+            const proposedFilesDisplay = UI.get('proposed-files-display');
+            proposedFilesDisplay.innerHTML = ''; // Clear previous content
+
+            let hasChanges = false;
+
+            // Create maps for easier lookup
+            const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
+            const proposedFilesMap = new Map(proposedFiles.map(f => [f.name, f]));
+
+            // 1. Display DELETED files
+            deletedFileNames.forEach(deletedFileName => {
+                const originalFile = originalFilesMap.get(deletedFileName);
+                if (originalFile) { // Ensure the file actually existed in original project
+                    hasChanges = true;
+                    const ext = Utils.getFileExtension(originalFile.type);
+                    const deletedHtml = `
+                        <div class="file-comparison is-deleted">
+                            <h4 class="title is-5">DELETED: <span class="file-name-deleted">${Utils.escapeHtml(deletedFileName)}.${ext}</span></h4>
+                            <div class="deleted-message notification is-danger is-light">This file is proposed for deletion. Original content shown below (struck-through):</div>
+                            <pre><div class="line-numbers-col">${Utils.generateLineNumbersHtml(originalFile.source)}</div><div class="code-content-col diff-line-removed">${Utils.generateSourceHtml(originalFile.source)}</div></pre>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += deletedHtml;
+                } else {
+                    console.warn(`File '${deletedFileName}' was marked for deletion but not found in original files. Skipping deletion display.`);
+                }
+            });
+
+            // 2. Display NEW, MODIFIED, or REPLACE files
+            proposedFiles.forEach(proposedFile => {
+                const originalFile = originalFilesMap.get(proposedFile.name);
+                let fileContentHtml = '';
+
+                if (proposedFile.type === 'REPLACE') {
+                    // This is a REPLACE operation
+                    hasChanges = true;
+                    const originalSourceForReplace = originalFile ? originalFile.source : 'File content not available for comparison.';
+                    const originalFileTypeForReplace = originalFile ? Utils.getFileExtension(originalFile.type) : 'unknown';
+
+                    fileContentHtml = `
+                        <div class="file-comparison is-replace">
+                            <h4 class="title is-5">REPLACE Operation: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
+                            <p class="content">This operation will replace specific text within the file. ${proposedFile.isGlobalReplace ? 'All occurrences will be replaced (global).' : 'Only the first occurrence will be replaced.'}</p>
+                            <div class="columns">
+                                <div class="column">
+                                    <h5 class="title is-6 has-text-danger">Old String:</h5>
+                                    <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string)}</pre>
+                                </div>
+                                <div class="column">
+                                    <h5 class="title is-6 has-text-success">New String:</h5>
+                                    <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string)}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += fileContentHtml;
+
+                } else if (!originalFile) {
+                    // This is a NEW file (exists in proposed but not in original)
+                    hasChanges = true;
+                    const ext = Utils.getFileExtension(proposedFile.type);
+                    fileContentHtml = `
+                        <div class="file-comparison">
+                            <h4 class="title is-5">NEW FILE: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
+                            <div class="notification is-info is-light">This is a new file proposed by the AI.</div>
+                            <pre><div class="line-numbers-col">${Utils.generateLineNumbersHtml(proposedFile.source)}</div><div class="code-content-col diff-line-added">${Utils.generateSourceHtml(proposedFile.source)}</div></pre>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += fileContentHtml;
+
+                } else if (originalFile.source !== proposedFile.source) {
+                    // This is a MODIFIED file (exists in both, but source is different)
+                    hasChanges = true;
+                    const diffsHtml = Utils.generateFormattedDiffPanels(originalFile.source, proposedFile.source);
+                    const ext = Utils.getFileExtension(proposedFile.type);
+                    fileContentHtml = `
+                        <div class="file-comparison">
+                            <div class="original-file-panel">
+                                <h4 class="title is-5">Original: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
+                                <pre><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
+                            </div>
+                            <div class="proposed-file-panel">
+                                <h4 class="title is-5">Proposed: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
+                                <pre><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
+                            </div>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += fileContentHtml;
+                }
+                // Files present in both original and proposed, but with identical content, are skipped (no display needed)
+            });
+
+            // If no changes at all (neither deleted, new, modified, nor replace operations)
+            if (!hasChanges) {
+                proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">No changes proposed by AI for the selected script. This could mean the prompt was fully satisfied without code modifications, or no relevant changes were found.</p>`;
+            }
+
+            return hasChanges;
+        },
+
+        /**
          * Generate formatted diff panels HTML using diff_match_patch library.
          * @param {string} originalSource - The original source code.
          * @param {string} proposedSource - The proposed source code.
@@ -220,7 +328,7 @@
         },
 
         /**
-         * Helper to generate simple line numbers HTML for deleted files.
+         * Helper to generate simple line numbers HTML for deleted/new files.
          * @param {string} source - The source code.
          * @returns {string} HTML for line numbers.
          */
@@ -234,7 +342,7 @@
         },
 
         /**
-         * Helper to generate simple source HTML for deleted files.
+         * Helper to generate simple source HTML for deleted/new files.
          * @param {string} source - The source code.
          * @returns {string} HTML for source content.
          */
