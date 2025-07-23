@@ -304,8 +304,22 @@
 
   .file-comparison > .original-file-panel,
   .file-comparison > .proposed-file-panel {
-      width: 100%;
-      margin-bottom: 10px;
+      width: 100%; /* Default to full width for mobile */
+      margin-bottom: 10px; /* Margin for when they stack */
+  }
+
+  /* For larger screens, make them side-by-side */
+  @media screen and (min-width: 769px) { /* Bulma desktop breakpoint */
+    .file-comparison {
+      gap: 20px; /* Increase gap for desktop side-by-side */
+    }
+
+    .file-comparison > .original-file-panel,
+    .file-comparison > .proposed-file-panel {
+        flex: 1; /* Allow them to grow and shrink, occupying equal space */
+        min-width: 0; /* Allow shrinking below content size if needed, but usually handled by pre scroll */
+        margin-bottom: 0; /* No bottom margin when side-by-side */
+    }
   }
 
   .file-comparison > *:last-child {
