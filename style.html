@@ -655,35 +655,35 @@
 }
 
 /* NEW: Styles for inline pre-blocks within the notification for REPLACE details */
-.replacement-view {
-  background-color: var(--bg-line-numbers);
-  padding: 0.25em 0.5em;
-  border-radius: 3px;
-  border: 1px solid var(--border-box);
-  font-family: monospace;
-  font-size: 0.8em;
-  line-height: 1.4;
-  white-space: pre-wrap; /* Ensure line breaks are preserved */
-  word-break: break-all;
-  max-height: 100px; /* Limit height for long strings */
-  overflow-y: auto;
-  display: inline-block; /* Make it inline */
-  margin: 0; /* Remove block-level margins */
-  vertical-align: middle; /* Align with text */
-  color: var(--text-code-content);
-}
-
-.replacement-view.replacement-old {
+.replacement-view.replacement-old-inline {
   background-color: var(--bg-replace-old);
-  border-color: var(--border-replace-old);
+  border: 1px solid var(--border-replace-old);
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: var(--text-code-content);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
-.replacement-view.replacement-new {
+.replacement-view.replacement-new-inline {
   background-color: var(--bg-replace-new);
-  border-color: var(--border-replace-new);
+  border: 1px solid var(--border-replace-new);
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: var(--text-code-content);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
-
-/* Removed .replacement-details .columns as they are no longer needed */
+[data-theme="dark"] .replacement-view.replacement-old-inline {
+  background-color: rgba(255, 99, 71, 0.4); /* Darker alpha for dark mode */
+}
+[data-theme="dark"] .replacement-view.replacement-new-inline {
+  background-color: rgba(52, 168, 83, 0.4); /* Darker alpha for dark mode */
+}
 
 /* Styles for Bulma Tabs integration */
 .tabs {

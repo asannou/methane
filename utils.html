@@ -156,7 +156,8 @@
 
             // Create maps for easier lookup
             const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
-            const proposedFilesMap = new Map(proposedFiles.map(f => [f.name, f]));
+            // The proposedFilesMap is not strictly needed as we iterate through proposedFiles directly.
+            // const proposedFilesMap = new Map(proposedFiles.map(f => [f.name, f]));
 
             // 1. Display DELETED files
             deletedFileNames.forEach(deletedFileName => {
@@ -188,28 +189,66 @@
                 let fileContentHtml = '';
 
                 if (proposedFile.type === 'REPLACE') {
-                    // This is a REPLACE operation
                     hasChanges = true;
-                    const originalSourceForReplace = originalFile ? originalFile.source : 'ファイルの内容は比較できません。';
+                    const originalSourceForReplace = originalFile ? originalFile.source : ''; // Default to empty string if original file not found
                     const originalFileTypeForReplace = originalFile ? Utils.getFileExtension(originalFile.type) : 'unknown';
+
+                    const oldString = proposedFile.old_string;
+                    const newString = proposedFile.new_string;
+                    const isGlobalReplace = proposedFile.isGlobalReplace === true;
+
+                    if (typeof oldString !== 'string' || typeof newString !== 'string' || oldString === null || newString === null) {
+                        console.warn(`REPLACE operation for '${proposedFile.name}' has malformed old_string or new_string. Cannot simulate replacement.`);
+                        fileContentHtml = `
+                            <div class="file-comparison is-replace">
+                                <h4 class="title is-5">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
+                                <div class="notification is-danger is-light">
+                                    <p><strong>エラー:</strong> 置換操作のデータが不正なため、プレビューを生成できませんでした。</p>
+                                    <p><strong>置換前:</strong> <code class="replacement-view replacement-old-inline">${Utils.escapeHtml(String(oldString))}</code></p>
+                                    <p><strong>置換後:</strong> <code class="replacement-view replacement-new-inline">${Utils.escapeHtml(String(newString))}</code></p>
+                                </div>
+                            </div>
+                        `;
+                        proposedFilesDisplay.innerHTML += fileContentHtml;
+                        return; // Skip to next file
+                    }
+
+                    let simulatedNewSource = originalSourceForReplace;
+                    if (originalSourceForReplace.includes(oldString)) {
+                        if (isGlobalReplace) {
+                            simulatedNewSource = originalSourceForReplace.replaceAll(oldString, newString);
+                        } else {
+                            simulatedNewSource = originalSourceForReplace.replace(oldString, newString);
+                        }
+                    } else {
+                        console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Cannot simulate replacement precisely, showing original only.`);
+                        simulatedNewSource = originalSourceForReplace; // If old string not found, the result is effectively the original.
+                    }
+
+                    const diffsHtml = Utils.generateFormattedDiffPanels(originalSourceForReplace, simulatedNewSource);
+                    
+                    const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                    const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
                     fileContentHtml = `
                         <div class="file-comparison is-replace">
-                            <h4 class="title is-5">REPLACE Operation: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
-                            <p class="content">この操作はファイル内の特定のテキストを置換します。${proposedFile.isGlobalReplace ? 'すべての出現箇所が置換されます（グローバル置換）。' : '最初の出現箇所のみが置換されます。'}</p>
-                            <div class="columns">
-                                <div class="column">
-                                    <h5 class="title is-6 has-text-danger">置換前テキスト:</h5>
-                                    <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string)}</pre>
-                                </div>
-                                <div class="column">
-                                    <h5 class="title is-6 has-text-success">置換後テキスト:</h5>
-                                    <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string)}</pre>
-                                </div>
+                            <div class="original-file-panel">
+                                <h4 class="title is-5">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
+                                <p class="content">以下の差分は、元のファイルに「<code class="replacement-view replacement-old-inline">${Utils.escapeHtml(oldString)}</code>」を「<code class="replacement-view replacement-new-inline">${Utils.escapeHtml(newString)}</code>」に置換${isGlobalReplace ? '（グローバル）' : ''}した場合のプレビューです。</p>
+                                <h4 class="title is-6">置換前:</h4>
+                                <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
+                            </div>
+                            <div class="proposed-file-panel">
+                                <h4 class="title is-5">&nbsp;</h4> <!-- Keep alignment with previous panel's title/description -->
+                                <p class="content">&nbsp;</p> <!-- Keep alignment -->
+                                <h4 class="title is-6">置換後 (シミュレーション):</h4>
+                                <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
+                    scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
+
 
                 } else if (!originalFile) {
                     // This is a NEW file (exists in proposed but not in original)
