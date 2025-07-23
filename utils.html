@@ -2,6 +2,39 @@
     // 3. Utility Functions
     const Utils = {
         /**
+         * Keeps track of whether a scroll event is programmatic to prevent infinite loops.
+         * @type {boolean}
+         */
+        _isProgrammaticScroll: false,
+
+        /**
+         * Sets up scroll synchronization between two scrollable elements.
+         * @param {HTMLElement} element1 - The first scrollable element (e.g., a <pre> tag).
+         * @param {HTMLElement} element2 - The second scrollable element.
+         */
+        _setupScrollSync: (element1, element2) => {
+            if (!element1 || !element2) {
+                console.warn("Cannot set up scroll sync: one or both elements are null.");
+                return;
+            }
+
+            const syncScroll = (scrollingElement, targetElement) => {
+                if (!Utils._isProgrammaticScroll) {
+                    Utils._isProgrammaticScroll = true; // Set flag
+                    targetElement.scrollTop = scrollingElement.scrollTop;
+                    targetElement.scrollLeft = scrollingElement.scrollLeft; // Also sync horizontal scroll
+                    // Use a short debounce to reset the flag, allowing user scrolling immediately after programmatic sync
+                    setTimeout(() => {
+                        Utils._isProgrammaticScroll = false;
+                    }, 50); // A small delay to ensure the target element has processed its scroll
+                }
+            };
+
+            element1.addEventListener('scroll', () => syncScroll(element1, element2));
+            element2.addEventListener('scroll', () => syncScroll(element2, element1));
+        },
+
+        /**
          * Get the effective Script ID (manual input takes precedence).
          * @returns {string} The effective Script ID.
          */
@@ -118,6 +151,9 @@
 
             let hasChanges = false;
 
+            // Store references to elements that need scroll sync
+            const scrollSyncElements = [];
+
             // Create maps for easier lookup
             const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
             const proposedFilesMap = new Map(proposedFiles.map(f => [f.name, f]));
@@ -197,19 +233,27 @@
                     hasChanges = true;
                     const diffsHtml = Utils.generateFormattedDiffPanels(originalFile.source, proposedFile.source);
                     const ext = Utils.getFileExtension(proposedFile.type);
+                    
+                    // Generate unique IDs for the pre elements to easily select them after DOM update
+                    const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                    const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
                     fileContentHtml = `
                         <div class="file-comparison">
                             <div class="original-file-panel">
                                 <h4 class="title is-5">変更前: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
-                                <pre><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
+                                <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
                             </div>
                             <div class="proposed-file-panel">
                                 <h4 class="title is-5">変更後: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
-                                <pre><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
+                                <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
+
+                    // Add IDs to the list for post-DOM-update scroll sync setup
+                    scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
                 }
                 // Files present in both original and proposed, but with identical content, are skipped (no display needed)
             });
@@ -218,6 +262,20 @@
             if (!hasChanges) {
                 proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">選択されたスクリプトに対してAIからの変更提案はありません。これは、プロンプトがコード変更なしで完全に満たされたか、関連する変更が見つからなかったことを意味します。</p>`;
             }
+
+            // After all HTML is added, find the elements and set up scroll synchronization
+            // Use setTimeout to ensure elements are fully rendered and available in the DOM
+            setTimeout(() => {
+                scrollSyncElements.forEach(ids => {
+                    const originalPre = document.getElementById(ids.originalId);
+                    const proposedPre = document.getElementById(ids.proposedId);
+                    if (originalPre && proposedPre) {
+                        Utils._setupScrollSync(originalPre, proposedPre);
+                    } else {
+                        console.warn(`Could not find pre elements for scroll sync with IDs: ${ids.originalId}, ${ids.proposedId}`);
+                    }
+                });
+            }, 0); // Execute after current call stack finishes and DOM updates
 
             return hasChanges;
         },
