@@ -1,75 +1,40 @@
 <script>
-    // 3. Utility Functions
     const Utils = {
-        /**
-         * Keeps track of whether a scroll event is programmatic to prevent infinite loops.
-         * @type {boolean}
-         */
         _isProgrammaticScroll: false,
-
-        /**
-         * Sets up scroll synchronization between two scrollable elements.
-         * @param {HTMLElement} element1 - The first scrollable element (e.g., a <pre> tag).
-         * @param {HTMLElement} element2 - The second scrollable element.
-         */
         _setupScrollSync: (element1, element2) => {
             if (!element1 || !element2) {
                 console.warn("Cannot set up scroll sync: one or both elements are null.");
                 return;
             }
-
             const syncScroll = (scrollingElement, targetElement) => {
                 if (!Utils._isProgrammaticScroll) {
-                    Utils._isProgrammaticScroll = true; // Set flag
+                    Utils._isProgrammaticScroll = true;
                     targetElement.scrollTop = scrollingElement.scrollTop;
-                    targetElement.scrollLeft = scrollingElement.scrollLeft; // Also sync horizontal scroll
-                    // Use a short debounce to reset the flag, allowing user scrolling immediately after programmatic sync
+                    targetElement.scrollLeft = scrollingElement.scrollLeft;
                     setTimeout(() => {
                         Utils._isProgrammaticScroll = false;
-                    }, 50); // A small delay to ensure the target element has processed its scroll
+                    }, 50);
                 }
             };
-
             element1.addEventListener('scroll', () => syncScroll(element1, element2));
             element2.addEventListener('scroll', () => syncScroll(element2, element1));
         },
-
-        /**
-         * Get the effective Script ID (manual input takes precedence).
-         * @returns {string} The effective Script ID.
-         */
         getEffectiveScriptId: () => {
             return UI.get('scriptIdSelect').value.trim();
         },
-
-        /**
-         * Save the target Script ID to Local Storage.
-         * @param {string} id - The Script ID to save.
-         */
         saveScriptIdToLocalStorage: (id) => {
             if (id) {
                 localStorage.setItem('targetScriptId', id);
             }
         },
-
-        /**
-         * Save the GCP Project ID to Local Storage.
-         * @param {string} id - The GCP Project ID to save.
-         */
         saveGcpProjectIdToLocalStorage: (id) => {
             if (id) {
                 localStorage.setItem('gcpProjectId', id);
             }
         },
-
-        /**
-         * Load Apps Script projects into the dropdown.
-         * @param {string} [selectedId=null] - The ID of the project to pre-select.
-         */
         loadProjectsIntoDropdown: (selectedId = null) => {
             const scriptIdSelect = UI.get('scriptIdSelect');
             scriptIdSelect.innerHTML = '<option value="">-- Select a Script ID --</option>';
-
             google.script.run
                 .withSuccessHandler(function(response) {
                     if (response.status === 'success') {
@@ -81,7 +46,6 @@
                         });
                         if (selectedId) {
                             scriptIdSelect.value = selectedId;
-                            // Explicitly trigger change event to update editor URL display
                             scriptIdSelect.dispatchEvent(new Event('change'));
                         }
                     }
@@ -94,41 +58,24 @@
                 })
                 .listAppsScriptProjects();
         },
-
-        /**
-         * Update the display for the Apps Script Editor URL.
-         */
         updateEditorUrlDisplay: () => {
             const scriptId = Utils.getEffectiveScriptId();
             const editorUrlDisplayDiv = UI.get('editor-url-display');
-            
             UI.setHtml('editor-url-display', '');
-
             if (!scriptId) {
                 UI.setText('editor-url-display', 'Apps Script Editor URL: (Script ID needed)');
                 return;
             }
-
             UI.setHtml('editor-url-display', 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
-
             Utils.saveScriptIdToLocalStorage(scriptId);
-
             const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
             UI.setHtml('editor-url-display', "Apps Script Editor URL: <a href=\"" + Utils.escapeHtml(editorUrl) + "\" target=\"_blank\">" + Utils.escapeHtml(editorUrl) + "</a>");
         },
-
-        /**
-         * Validate HTML syntax.
-         * @param {string} htmlString - The HTML string to validate.
-         * @param {string} fileName - The name of the file being validated.
-         * @returns {{isValid: boolean, message?: string}} Validation result.
-         */
         validateHtml: (htmlString, fileName) => {
             console.log(`HTML validation started for file: ${fileName}`);
             const parser = new DOMParser();
             const doc = parser.parseFromString(htmlString, 'text/html');
             const parseError = doc.querySelector('parsererror');
-
             if (parseError) {
                 const errorMessage = parseError.textContent;
                 console.error(`HTML validation failed in ${fileName}:`, errorMessage);
@@ -137,44 +84,27 @@
             console.log(`HTML validation successful for file: ${fileName}`);
             return { isValid: true };
         },
-
-        /**
-         * Displays the file comparison and proposed changes in the UI.
-         * @param {Array<object>} originalFiles - Array of original file objects.
-         * @param {Array<object>} proposedFiles - Array of proposed file objects (with new source or replace operations).
-         * @param {Array<string>} deletedFileNames - Array of file names marked for deletion.
-         * @returns {boolean} True if any changes were displayed, false otherwise.
-         */
         displayFileComparison: (originalFiles, proposedFiles, deletedFileNames) => {
             const proposedFilesDisplay = UI.get('proposed-files-display');
-            proposedFilesDisplay.innerHTML = ''; // Clear previous content
-
+            proposedFilesDisplay.innerHTML = '';
             let hasChanges = false;
-
-            // Store references to elements that need scroll sync
             const scrollSyncElements = [];
-
-            // Create maps for easier lookup
             const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
-            // The proposedFilesMap is not strictly needed as we iterate through proposedFiles directly.
-            // const proposedFilesMap = new Map(proposedFiles.map(f => [f.name, f]));
-
-            // 1. Display DELETED files
             deletedFileNames.forEach(deletedFileName => {
                 const originalFile = originalFilesMap.get(deletedFileName);
-                if (originalFile) { // Ensure the file actually existed in original project
+                if (originalFile) {
                     hasChanges = true;
                     const ext = Utils.getFileExtension(originalFile.type);
-                    // For deleted files, display original content as removed
                     const originalContentLines = Utils.getActualContentLines(originalFile.source);
                     const lineNumbersHtml = originalContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
                     const contentHtml = originalContentLines.map(line => `<div class="diff-line-removed">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
-
                     const deletedHtml = `
                         <div class="file-comparison is-deleted">
-                            <h4 class="title is-5">DELETED: <span class="file-name-deleted">${Utils.escapeHtml(deletedFileName)}.${ext}</span></h4>
-                            <div class="deleted-message notification is-danger is-light">このファイルは削除が提案されています。元の内容は以下に示されています（取り消し線付き）：</div>
-                            <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
+                            <h4 class="title is-5 full-width-panel">DELETED: <span class="file-name-deleted">${Utils.escapeHtml(deletedFileName)}.${ext}</span></h4>
+                            <div class="deleted-message notification is-danger is-light full-width-panel">このファイルは削除が提案されています。元の内容は以下に示されています（取り消し線付き）：</div>
+                            <div class="single-file-content-panel">
+                                <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
+                            </div>
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += deletedHtml;
@@ -182,64 +112,63 @@
                     console.warn(`File '${deletedFileName}' was marked for deletion but not found in original files. Skipping deletion display.`);
                 }
             });
-
-            // 2. Display NEW, MODIFIED, or REPLACE files
             proposedFiles.forEach(proposedFile => {
                 const originalFile = originalFilesMap.get(proposedFile.name);
                 let fileContentHtml = '';
-
                 if (proposedFile.type === 'REPLACE') {
                     hasChanges = true;
-                    const originalSourceForReplace = originalFile ? originalFile.source : ''; // Default to empty string if original file not found
+                    const originalSourceForReplace = originalFile ? originalFile.source : '';
                     const originalFileTypeForReplace = originalFile ? Utils.getFileExtension(originalFile.type) : 'unknown';
-
                     const oldString = proposedFile.old_string;
                     const newString = proposedFile.new_string;
                     const isGlobalReplace = proposedFile.isGlobalReplace === true;
-
                     if (typeof oldString !== 'string' || typeof newString !== 'string' || oldString === null || newString === null) {
                         console.warn(`REPLACE operation for '${proposedFile.name}' has malformed old_string or new_string. Cannot simulate replacement.`);
                         fileContentHtml = `
                             <div class="file-comparison is-replace">
-                                <h4 class="title is-5">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
-                                <div class="notification is-danger is-light">
+                                <h4 class="title is-5 full-width-panel">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
+                                <div class="notification is-danger is-light full-width-panel">
                                     <p><strong>エラー:</strong> 置換操作のデータが不正なため、プレビューを生成できませんでした。</p>
-                                    <p><strong>置換前:</strong> <code class="replacement-view replacement-old-inline">${Utils.escapeHtml(String(oldString))}</code></p>
-                                    <p><strong>置換後:</strong> <code class="replacement-view replacement-new-inline">${Utils.escapeHtml(String(newString))}</code></p>
+                                    <p class="is-size-7 mt-2"><strong>置換前:</strong> <code class="replacement-view replacement-old-inline">${Utils.escapeHtml(String(oldString))}</code></p>
+                                    <p class="is-size-7"><strong>置換後:</strong> <code class="replacement-view replacement-new-inline">${Utils.escapeHtml(String(newString))}</code></p>
                                 </div>
                             </div>
                         `;
                         proposedFilesDisplay.innerHTML += fileContentHtml;
-                        return; // Skip to next file
+                        return;
                     }
-
                     let simulatedNewSource = originalSourceForReplace;
+                    let replacementPerformed = false;
                     if (originalSourceForReplace.includes(oldString)) {
                         if (isGlobalReplace) {
                             simulatedNewSource = originalSourceForReplace.replaceAll(oldString, newString);
+                            replacementPerformed = true;
                         } else {
                             simulatedNewSource = originalSourceForReplace.replace(oldString, newString);
+                            replacementPerformed = true;
                         }
                     } else {
-                        console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Cannot simulate replacement precisely, showing original only.`);
-                        simulatedNewSource = originalSourceForReplace; // If old string not found, the result is effectively the original.
+                        simulatedNewSource = originalSourceForReplace;
+                        console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Showing diff between original and original.`);
                     }
-
                     const diffsHtml = Utils.generateFormattedDiffPanels(originalSourceForReplace, simulatedNewSource);
-                    
                     const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                     const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
                     fileContentHtml = `
                         <div class="file-comparison is-replace">
+                            <h4 class="title is-5 full-width-panel">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
+                            <div class="notification is-info is-light full-width-panel">
+                                <p>これは、既存のファイル内容の一部を置換する操作のプレビューです。</p>
+                                <p class="is-size-7 mt-2"><strong>置換前テキスト:</strong> <code class="replacement-view replacement-old-inline">${Utils.escapeHtml(oldString)}</code></p>
+                                <p class="is-size-7"><strong>置換後テキスト:</strong> <code class="replacement-view replacement-new-inline">${Utils.escapeHtml(newString)}</code></p>
+                                <p class="is-size-7"><strong>グローバル置換:</strong> ${isGlobalReplace ? 'はい' : 'いいえ'}</p>
+                                ${!replacementPerformed ? `<p class="is-size-7 has-text-danger mt-2"><strong>警告:</strong> '置換前テキスト' が元のファイルに見つからなかったため、実際の置換は行われませんでした。表示されている差分は、元のファイルと元のファイルの比較です。</p>` : ''}
+                            </div>
                             <div class="original-file-panel">
-                                <h4 class="title is-5">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
                                 <h4 class="title is-5">変更前:</h4>
                                 <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
                             </div>
                             <div class="proposed-file-panel">
-                                <h4 class="title is-5">&nbsp;</h4> <!-- Keep alignment with previous panel's title/description -->
-                                <p class="content">&nbsp;</p> <!-- Keep alignment -->
                                 <h4 class="title is-5">変更後:</h4>
                                 <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
@@ -247,35 +176,28 @@
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
                     scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
-
-
                 } else if (!originalFile) {
-                    // This is a NEW file (exists in proposed but not in original)
                     hasChanges = true;
                     const ext = Utils.getFileExtension(proposedFile.type);
                     const proposedContentLines = Utils.getActualContentLines(proposedFile.source);
                     const lineNumbersHtml = proposedContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
                     const contentHtml = proposedContentLines.map(line => `<div class="diff-line-added">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
-
                     fileContentHtml = `
                         <div class="file-comparison">
-                            <h4 class="title is-5">NEW FILE: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
-                            <div class="notification is-info is-light">これはAIによって提案された新しいファイルです。</div>
-                            <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
+                            <h4 class="title is-5 full-width-panel">NEW FILE: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
+                            <div class="notification is-info is-light full-width-panel">これはAIによって提案された新しいファイルです。</div>
+                            <div class="single-file-content-panel">
+                                <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
+                            </div>
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
-
                 } else if (originalFile.source !== proposedFile.source) {
-                    // This is a MODIFIED file (exists in both, but source is different)
                     hasChanges = true;
                     const diffsHtml = Utils.generateFormattedDiffPanels(originalFile.source, proposedFile.source);
                     const ext = Utils.getFileExtension(proposedFile.type);
-                    
-                    // Generate unique IDs for the pre elements to easily select them after DOM update
                     const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                     const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
                     fileContentHtml = `
                         <div class="file-comparison">
                             <div class="original-file-panel">
@@ -289,20 +211,12 @@
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
-
-                    // Add IDs to the list for post-DOM-update scroll sync setup
                     scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
                 }
-                // Files present in both original and proposed, but with identical content, are skipped (no display needed)
             });
-
-            // If no changes at all (neither deleted, new, modified, nor replace operations)
             if (!hasChanges) {
                 proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">選択されたスクリプトに対してAIからの変更提案はありません。これは、プロンプトがコード変更なしで完全に満たされたか、関連する変更が見つからなかったことを意味します。</p>`;
             }
-
-            // After all HTML is added, find the elements and set up scroll synchronization
-            // Use setTimeout to ensure elements are fully rendered and available in the DOM
             setTimeout(() => {
                 scrollSyncElements.forEach(ids => {
                     const originalPre = document.getElementById(ids.originalId);
@@ -313,62 +227,39 @@
                         console.warn(`Could not find pre elements for scroll sync with IDs: ${ids.originalId}, ${ids.proposedId}`);
                     }
                 });
-            }, 0); // Execute after current call stack finishes and DOM updates
-
+            }, 0);
             return hasChanges;
         },
-
-        /**
-         * Generate formatted diff panels HTML using diff_match_patch library,
-         * ensuring character-level changes within a line are highlighted,
-         * and each logical line is contained within its own <div>.
-         * Also implements omission of consecutive unchanged lines for brevity.
-         * @param {string} originalSource - The original source code.
-         * @param {string} proposedSource - The proposed source code.
-         * @returns {{originalLineNumbersHtml: string, originalCodeContentHtml: string, proposedLineNumbersHtml: string, proposedCodeContentHtml: string}} HTML parts for diff display.
-         */
         generateFormattedDiffPanels: (originalSource, proposedSource) => {
             const dmp = new diff_match_patch();
             let diffs = dmp.diff_main(originalSource, proposedSource);
             dmp.diff_cleanupSemantic(diffs);
-
             const originalLinesHtml = [];
             const proposedLinesHtml = [];
             const originalLineNumbers = [];
             const proposedLineNumbers = [];
-
             let currentOriginalLineNumber = 1;
             let currentProposedLineNumber = 1;
-
-            const OMIT_THRESHOLD = 5; // Number of equal lines that, if exceeded, triggers omission
-            const CONTEXT_LINES = 2; // Number of equal lines to show before and after an omission block
-
+            const OMIT_THRESHOLD = 5;
+            const CONTEXT_LINES = 2;
             let consecutiveEqualLinesCount = 0;
-            let equalLinesBufferOriginal = []; 
-            let equalLinesBufferProposed = []; 
-            let equalLineNumbersBufferOriginal = []; 
-            let equalLineNumbersBufferProposed = []; 
-
-            // Helper to flush buffered equal lines into the main output arrays, applying omission if needed.
+            let equalLinesBufferOriginal = [];
+            let equalLinesBufferProposed = [];
+            let equalLineNumbersBufferOriginal = [];
+            let equalLineNumbersBufferProposed = [];
             const flushEqualLines = () => {
                 if (consecutiveEqualLinesCount > 0) {
                     if (consecutiveEqualLinesCount > OMIT_THRESHOLD) {
-                        // Add context lines at the beginning of the omitted block
                         for (let k = 0; k < Math.min(CONTEXT_LINES, equalLinesBufferOriginal.length); k++) {
                             originalLinesHtml.push(equalLinesBufferOriginal[k]);
                             proposedLinesHtml.push(equalLinesBufferProposed[k]);
                             originalLineNumbers.push(equalLineNumbersBufferOriginal[k]);
                             proposedLineNumbers.push(equalLineNumbersBufferProposed[k]);
                         }
-
-                        // Add the omission marker
                         originalLinesHtml.push(`<div class="diff-line-omitted">...</div>`);
                         proposedLinesHtml.push(`<div class="diff-line-omitted">...</div>`);
                         originalLineNumbers.push(`<div class="diff-line-omitted">...</div>`);
                         proposedLineNumbers.push(`<div class="diff-line-omitted">...</div>`);
-
-                        // Add context lines at the end of the omitted block
-                        // Ensure we don't re-add lines already added as 'beginning context'
                         const startIndexForEndContext = Math.max(CONTEXT_LINES, equalLinesBufferOriginal.length - CONTEXT_LINES);
                         for (let k = startIndexForEndContext; k < equalLinesBufferOriginal.length; k++) {
                             originalLinesHtml.push(equalLinesBufferOriginal[k]);
@@ -377,13 +268,11 @@
                             proposedLineNumbers.push(equalLineNumbersBufferProposed[k]);
                         }
                     } else {
-                        // If not enough lines to omit, just add all buffered equal lines directly
                         originalLinesHtml.push(...equalLinesBufferOriginal);
                         proposedLinesHtml.push(...equalLinesBufferProposed);
                         originalLineNumbers.push(...equalLineNumbersBufferOriginal);
                         proposedLineNumbers.push(...equalLineNumbersBufferProposed);
                     }
-                    // Reset buffers for the next sequence of equal lines
                     consecutiveEqualLinesCount = 0;
                     equalLinesBufferOriginal = [];
                     equalLinesBufferProposed = [];
@@ -391,28 +280,20 @@
                     equalLineNumbersBufferProposed = [];
                 }
             };
-
-            let currentOriginalLineContentChars = []; // Accumulates character-level HTML for the current logical line (original side)
-            let currentProposedLineContentChars = []; // Accumulates character-level HTML for the current logical line (proposed side)
-            let lineContainsInsert = false; // Flag if the current logical line contains an insertion
-            let lineContainsDelete = false; // Flag if the current logical line contains a deletion
-            // Accumulators for raw text content of the current logical line for precise comparison
+            let currentOriginalLineContentChars = [];
+            let currentProposedLineContentChars = [];
+            let lineContainsInsert = false;
+            let lineContainsDelete = false;
             let currentOriginalLineRawText = [];
             let currentProposedLineRawText = [];
-
             for (let i = 0; i < diffs.length; ++i) {
-                const type = diffs[i][0]; 
+                const type = diffs[i][0];
                 const text = diffs[i][1];
-
                 const textParts = text.split('\n');
-
                 for (let j = 0; j < textParts.length; ++j) {
-                    const part = Utils.escapeHtml(textParts[j]); 
-                    const rawPart = textParts[j]; // Keep raw text for final comparison
+                    const part = Utils.escapeHtml(textParts[j]);
+                    const rawPart = textParts[j];
                     const isLastPartInDiffSegment = (j === textParts.length - 1);
-
-                    // Append character-level HTML for this 'part' to the current logical line's content buffers
-                    // And accumulate raw text for later precise comparison
                     if (type === DIFF_EQUAL) {
                         currentOriginalLineContentChars.push(part);
                         currentProposedLineContentChars.push(part);
@@ -420,34 +301,24 @@
                         currentProposedLineRawText.push(rawPart);
                     } else if (type === DIFF_INSERT) {
                         currentProposedLineContentChars.push(`<ins class="diff-char-added">${part}</ins>`);
-                        currentOriginalLineContentChars.push(''); // For insertions, the original side is empty for character alignment.
+                        currentOriginalLineContentChars.push('');
                         currentProposedLineRawText.push(rawPart);
-                        currentOriginalLineRawText.push(''); // Original side has nothing for raw comparison for this segment
+                        currentOriginalLineRawText.push('');
                         lineContainsInsert = true;
-                    } else { // DIFF_DELETE
+                    } else {
                         currentOriginalLineContentChars.push(`<del class="diff-char-removed">${part}</del>`);
-                        currentProposedLineContentChars.push(''); // For deletions, the proposed side is empty for character alignment.
+                        currentProposedLineContentChars.push('');
                         currentOriginalLineRawText.push(rawPart);
-                        currentProposedLineRawText.push(''); // Proposed side has nothing for raw comparison for this segment
+                        currentProposedLineRawText.push('');
                         lineContainsDelete = true;
                     }
-
-                    // A logical line ends if there's a newline within the current diff segment (not the last part)
-                    // OR if this is the very last part of the *entire* diffs array.
                     const isLogicalLineEnd = !isLastPartInDiffSegment || (i === diffs.length - 1 && j === textParts.length - 1);
-
                     if (isLogicalLineEnd) {
-                        // Logical line is complete. Get its full content (with highlighting HTML).
                         const originalFullHtmlLine = currentOriginalLineContentChars.join('');
                         const proposedFullHtmlLine = currentProposedLineContentChars.join('');
-
-                        // Reconstruct the full raw lines for precise equality check
                         const originalRawLine = currentOriginalLineRawText.join('');
                         const proposedRawLine = currentProposedLineRawText.join('');
-
-                        // Determine the overall status of this logical line (equal, added, removed, modified)
                         let lineStatusClass = 'equal';
-                        // Force 'equal' if raw content is identical, overriding intermediate flags
                         if (originalRawLine === proposedRawLine) {
                             lineStatusClass = 'equal';
                         } else if (lineContainsInsert && lineContainsDelete) {
@@ -457,8 +328,6 @@
                         } else if (lineContainsDelete) {
                             lineStatusClass = 'removed';
                         }
-
-                        // Apply omission logic: If it's an equal line, buffer it. Otherwise, flush buffer and add current line.
                         if (lineStatusClass === 'equal') {
                             consecutiveEqualLinesCount++;
                             equalLineNumbersBufferOriginal.push(`<div>${currentOriginalLineNumber}</div>`);
@@ -466,35 +335,24 @@
                             equalLineNumbersBufferProposed.push(`<div>${currentProposedLineNumber}</div>`);
                             equalLinesBufferProposed.push(`<div class="diff-line-equal">${proposedFullHtmlLine || '&nbsp;'}</div>`);
                         } else {
-                            // This is a non-equal line. Flush any pending equal lines first (applying omission if needed).
                             flushEqualLines();
-
-                            // Then add the current non-equal line directly to the final output arrays.
                             originalLineNumbers.push(`<div>${currentOriginalLineNumber}</div>`);
                             originalLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${originalFullHtmlLine || '&nbsp;'}</div>`);
-
                             proposedLineNumbers.push(`<div>${currentProposedLineNumber}</div>`);
                             proposedLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${proposedFullHtmlLine || '&nbsp;'}</div>`);
                         }
-
-                        // Increment line numbers for the next logical line
                         currentOriginalLineNumber++;
                         currentProposedLineNumber++;
-
-                        // Reset character-level content buffers and flags for the next logical line
                         currentOriginalLineContentChars = [];
                         currentProposedLineContentChars = [];
-                        currentOriginalLineRawText = []; // Reset raw text buffers too
-                        currentProposedLineRawText = []; // Reset raw text buffers too
+                        currentOriginalLineRawText = [];
+                        currentProposedLineRawText = [];
                         lineContainsInsert = false;
                         lineContainsDelete = false;
                     }
                 }
             }
-
-            // After processing all diff segments, flush any remaining buffered equal lines.
             flushEqualLines();
-
             return {
                 originalLineNumbersHtml: originalLineNumbers.join(''),
                 originalCodeContentHtml: originalLinesHtml.join(''),
@@ -502,30 +360,12 @@
                 proposedCodeContentHtml: proposedLinesHtml.join('')
             };
         },
-
-        /**
-         * Splits a string into an array of lines, correctly handling trailing newlines.
-         * A trailing newline character means the last line is empty and should be represented.
-         * For example, "a\n" represents line "a" followed by an empty line.
-         * @param {string} text - The input string.
-         * @returns {Array<string>} An array of logical lines.
-         */
         getActualContentLines: (text) => {
             if (text === null || text === undefined) {
                 return [];
             }
-            // text.split('\n') will correctly produce an empty string at the end
-            // if the original text ends with '\n'. This empty string represents a valid, empty line.
             return text.split('\n');
         },
-
-        /**
-         * Helper to generate simple line numbers HTML for deleted/new files.
-         * This function is now mostly for `DELETED` and `NEW` file types,
-         * where `generateFormattedDiffPanels` is not used directly on the whole file.
-         * @param {string} source - The source code.
-         * @returns {string} HTML for line numbers.
-         */
         generateLineNumbersHtml: (source) => {
             const lines = Utils.getActualContentLines(source);
             let html = '';
@@ -534,30 +374,14 @@
             }
             return html;
         },
-
-        /**
-         * Helper to generate simple source HTML for deleted/new files.
-         * This function is now mostly for `DELETED` and `NEW` file types,
-         * where `generateFormattedDiffPanels` is not used directly on the whole file.
-         * @param {string} source - The source code.
-         * @returns {string} HTML for source content.
-         */
         generateSourceHtml: (source) => {
             const lines = Utils.getActualContentLines(source);
             let html = '';
-            // For new/deleted files, all lines are essentially 'equal' within their own context for basic display,
-            // but the `diff-line-removed` or `diff-line-added` class on the parent div provides context.
             for (let i = 0; i < lines.length; i++) {
-                html += `<div class="diff-line-equal">${Utils.escapeHtml(lines[i]) || '&nbsp;'}</div>`; // Use equal as base, parent div takes care of add/remove styling
+                html += `<div class="diff-line-equal">${Utils.escapeHtml(lines[i]) || '&nbsp;'}</div>`;
             }
             return html;
         },
-
-        /**
-         * Get file extension based on file type.
-         * @param {string} type - The file type (SERVER_JS, JSON, HTML).
-         * @returns {string} The corresponding file extension.
-         */
         getFileExtension: (type) => {
             switch (type) {
                 case 'SERVER_JS': return 'gs';
@@ -565,12 +389,6 @@
                 default: return 'html';
             }
         },
-
-        /**
-         * Escape HTML entities in a string.
-         * @param {string} text - The text to escape.
-         * @returns {string} The escaped HTML string.
-         */
         escapeHtml: (text) => {
             const div = document.createElement('div');
             div.appendChild(document.createTextNode(text));

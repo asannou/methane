@@ -1,17 +1,14 @@
 <style>
   :root {
-    /* Common functional colors (remain constant across themes) */
-    --gas-blue-dark: #1A73E8; /* Primary, Hero, Buttons */
-    --gas-blue-light: #4285F4; /* Info, Link, Spinners */
-    --gas-green: #34A853;     /* Success */
-    --gas-yellow: #FBBC04;    /* Warning */
-    --gas-red: #D93025;       /* Danger */
-
-    /* Light mode default colors */
-    --bg-body: #f5f5f5; /* Bulma default body background */
-    --text-body: #363636;      /* Bulma default text color */
+    --gas-blue-dark: #1A73E8;
+    --gas-blue-light: #4285F4;
+    --gas-green: #34A853;
+    --gas-yellow: #FBBC04;
+    --gas-red: #D93025;
+    --bg-body: #f5f5f5;
+    --text-body: #363636;
     --bg-box: #ffffff;
-    --border-box: #dbdbdb;    /* Bulma default border color */
+    --border-box: #dbdbdb;
     --bg-hero: linear-gradient(to right, #1A73E8, #7B1FA2);
     --text-hero-title: #fff;
     --text-hero-subtitle: #fff;
@@ -48,7 +45,6 @@
     --border-tab-box: var(--gas-blue-light);
   }
 
-  /* Dark mode specific colors */
   [data-theme="dark"] {
     --bg-body: #1A1A1A;
     --text-body: #e0e0e0;
@@ -62,9 +58,9 @@
     --bg-input: #333333;
     --text-input: #e0e0e0;
     --placeholder-input: #888888;
-    --link-color: #90CAF9; /* Lighter blue for dark mode links */
-    --notification-light-bg-alpha: 0.2; /* Slightly more visible alpha in dark mode */
-    --notification-warning-text: #FFDA47; /* Brighter yellow for dark mode */
+    --link-color: #90CAF9;
+    --notification-light-bg-alpha: 0.2;
+    --notification-warning-text: #FFDA47;
     --bg-log-display: #333333;
     --border-log-display: #363636;
     --bg-file-item: #363636;
@@ -76,9 +72,9 @@
     --border-line-numbers: #363636;
     --text-line-numbers: #cccccc;
     --text-code-content: #f0f0f0;
-    --bg-replace-old: rgba(255, 99, 71, 0.2);
+    --bg-replace-old: rgba(255, 99, 71, 0.4);
     --border-replace-old: var(--gas-red);
-    --bg-replace-new: rgba(52, 168, 83, 0.2);
+    --bg-replace-new: rgba(52, 168, 83, 0.4);
     --border-replace-new: var(--gas-green);
     --bg-deleted: rgba(255, 99, 71, 0.1);
     --border-deleted: var(--gas-red);
@@ -88,13 +84,11 @@
     --border-tab-hover: var(--link-color);
     --text-tab-hover: var(--link-color);
     --border-tab-box: var(--border-box);
-
-    /* Override specific Bulma components' internal colors where necessary for dark theme */
     .button.is-warning {
-      color: #333 !important; /* Keep dark text for contrast with yellow */
+      color: #333 !important;
     }
     .button.is-warning.is-light {
-      color: var(--notification-warning-text) !important; /* Use brighter yellow for light warning button */
+      color: var(--notification-warning-text) !important;
     }
     .select:not(.is-multiple):not(.is-loading)::after {
       border-color: var(--text-body);
@@ -104,7 +98,6 @@
     }
   }
 
-  /* Base styles applied to HTML and BODY */
   html {
     background-color: var(--bg-body);
     color: var(--text-body);
@@ -115,26 +108,23 @@
     color: var(--text-body);
   }
 
-  /* Bulma color overrides and variable usage */
   .hero.is-primary {
     background: var(--bg-hero) !important;
     color: var(--text-hero-title) !important;
   }
 
-  /* Ensure hero title and subtitle are white */
   .hero .title,
   .hero .subtitle {
     color: var(--text-hero-title) !important;
   }
 
-  /* Buttons */
   .button.is-primary {
     background-color: var(--gas-blue-dark) !important;
     border-color: transparent !important;
     color: #fff !important;
   }
   .button.is-primary:hover {
-    background-color: #1669E0 !important; /* Slightly darker blue on hover */
+    background-color: #1669E0 !important;
   }
   .button.is-primary.is-light {
     background-color: rgba(26, 115, 232, var(--notification-light-bg-alpha)) !important;
@@ -151,7 +141,7 @@
     color: #fff !important;
   }
   .button.is-info:hover {
-    background-color: #357AE8 !important; /* Slightly darker blue on hover */
+    background-color: #357AE8 !important;
   }
   .button.is-info.is-light {
     background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)) !important;
@@ -230,7 +220,6 @@
     background-color: rgba(66, 133, 244, 0.2) !important;
   }
 
-  /* Notification overrides */
   .notification.is-info.is-light {
     background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)) !important;
     color: var(--gas-blue-dark) !important;
@@ -264,15 +253,14 @@
     color: #fff !important;
   }
 
-  /* Spinner properties */
   .spinner {
     border: 4px solid rgba(0, 0, 0, 0.1) !important;
-    border-left-color: var(--gas-blue-light) !important; /* Blue from GAS theme */
+    border-left-color: var(--gas-blue-light) !important;
     border-radius: 50% !important;
     width: 24px !important;
     height: 24px !important;
     animation: spin 1s linear infinite;
-    display: inline-block; /* Ensure it's not block level by default */
+    display: inline-block;
     vertical-align: middle;
   }
   [data-theme="dark"] .spinner {
@@ -280,26 +268,23 @@
     border-left-color: var(--link-color) !important;
   }
 
-  /* Specific styles for spinner inside buttons */
   .button .spinner {
-    width: 1em; /* Make it relative to font size */
+    width: 1em;
     height: 1em;
-    margin-right: 8px; /* Add some space between spinner and text */
+    margin-right: 8px;
     vertical-align: middle;
-    border-width: 2px !important; /* Thinner border for smaller spinner */
+    border-width: 2px !important;
   }
 
-  /* The small spinner in editor-url-display needs specific override */
   #editor-url-display .spinner {
     width: 14px;
     height: 14px;
     margin: 0 5px;
     display: inline-block;
     vertical-align: middle;
-    border-width: 2px !important; /* Keep its original border width for consistency */
+    border-width: 2px !important;
   }
 
-  /* Layout for diff-like display - Custom, keep these */
   .file-comparison {
     display: flex;
     flex-wrap: wrap;
@@ -309,36 +294,31 @@
     background-color: var(--bg-box) !important;
   }
 
-  /* Default to full width on small screens, with vertical spacing */
-  .file-comparison > div {
-    width: 100%;
-    margin-bottom: 10px;
-  }
-  .file-comparison > div:last-child {
-    margin-bottom: 0;
+  .file-comparison > .title.full-width-panel,
+  .file-comparison > .notification.full-width-panel,
+  .file-comparison > .single-file-content-panel {
+      flex-basis: 100%;
+      width: 100%;
+      margin-bottom: 10px;
   }
 
-  /* For screens wider than 768px (Bulma's 'tablet' breakpoint) */
-  @media screen and (min-width: 769px) {
-    .file-comparison {
-      flex-wrap: nowrap;
-      justify-content: space-between;
-    }
-    .file-comparison > div {
-      flex: 1 1 calc(50% - 5px);
+  .file-comparison > .original-file-panel,
+  .file-comparison > .proposed-file-panel {
+      width: 100%;
+      margin-bottom: 10px;
+  }
+
+  .file-comparison > *:last-child {
       margin-bottom: 0;
-      min-width: 0; /* Added to resolve flex-basis functionality issues */
-    }
-    .file-comparison > div:first-child {
-      margin-right: 5px;
-    }
   }
 
   .file-comparison h4 {
     margin-top: 0;
     color: var(--text-heading);
   }
-  .file-comparison pre {
+  .original-file-panel pre,
+  .proposed-file-panel pre,
+  .single-file-content-panel pre {
     height: 250px;
     overflow-y: scroll;
     overflow-x: auto;
@@ -347,7 +327,6 @@
     width: 100%;
   }
 
-  /* Styles for line numbers and code content columns - Custom, keep these */
   .line-numbers-col {
     background-color: var(--bg-line-numbers) !important;
     color: var(--text-line-numbers) !important;
@@ -368,7 +347,6 @@
     color: var(--text-code-content);
   }
 
-  /* NEW: Styles for individual line divs within the pre blocks - Custom, keep these */
   .line-numbers-col > div,
   .code-content-col > div {
     padding: 0 5px;
@@ -376,27 +354,25 @@
     box-sizing: border-box;
   }
 
-  /* Specific diff line highlighting - Custom, keep these */
   .code-content-col > .diff-line-equal { background-color: var(--bg-diff-equal); }
-  .code-content-col > .diff-line-added { background-color: #E6FFEA; } /* Lighter Google green */
-  .code-content-col > .diff-line-removed { background-color: #FEE7E6; } /* Lighter Google red */
-  .code-content-col > .diff-line-modified { background-color: #FFFDE6; } /* Lighter Google yellow */
+  .code-content-col > .diff-line-added { background-color: #E6FFEA; }
+  .code-content-col > .diff-line-removed { background-color: #FEE7E6; }
+  .code-content-col > .diff-line-modified { background-color: #FFFDE6; }
 
-  /* NEW: Styles for inline character-level diffs */
   .diff-char-added {
-    background-color: #B9FFC9; /* Slightly darker green than line-added */
+    background-color: #B9FFC9;
     text-decoration: none;
   }
   .diff-char-removed {
-    background-color: #FFB3AE; /* Slightly darker red than line-removed */
+    background-color: #FFB3AE;
     text-decoration: line-through;
   }
   .diff-char-equal {
     background-color: transparent;
   }
-  /* Placeholders for empty cells in aligned diffs */
+
   .diff-char-empty-fill {
-    /* No background for empty fill */
+
   }
 
   [data-theme="dark"] .code-content-col > .diff-line-added { background-color: #31583D; color: #fff; }
@@ -407,7 +383,6 @@
   [data-char-removed] .diff-char-removed { background-color: #A33A36; color: #fff; }
   [data-theme="dark"] .diff-char-equal { background-color: transparent; }
 
-  /* Style for omitted lines in diff view */
   .code-content-col > .diff-line-omitted {
     background-color: var(--bg-diff-omitted);
     color: #666;
@@ -428,7 +403,6 @@
     padding: 5px;
   }
 
-  /* Styles for Markdown rendered content in ai-policy div */
   #ai-policy {
     background-color: var(--bg-box);
     padding: 15px;
@@ -453,7 +427,6 @@
     color: var(--text-code-content);
   }
 
-/* NEW: Styles for structured log display */
 .log-display-container {
   max-height: 300px;
   overflow-y: auto;
@@ -478,7 +451,7 @@
 
 .log-entry {
   display: flex;
-  flex-wrap: wrap; /* Allows wrapping on smaller screens */
+  flex-wrap: wrap;
   padding: 4px 0;
   border-bottom: 1px dashed var(--border-log-display);
 }
@@ -491,7 +464,7 @@
   flex-shrink: 0;
   color: var(--text-line-numbers);
   margin-right: 10px;
-  min-width: 160px; /* Adjust as needed for locale string */
+  min-width: 160px;
 }
 
 .log-level {
@@ -507,9 +480,9 @@
 
 .log-message {
   flex-grow: 1;
-  flex-basis: 0; /* Allows the message to better utilize available space for long messages */
-  white-space: pre-wrap; /* Preserve formatting for textPayload */
-  word-wrap: break-word; /* Break long words */
+  flex-basis: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .log-message pre {
@@ -524,24 +497,23 @@
   color: var(--text-body);
 }
 
-/* Log level specific colors */
 .log-level-INFO {
-  background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha)); /* Light blue */
+  background-color: rgba(66, 133, 244, var(--notification-light-bg-alpha));
   color: var(--gas-blue-light);
 }
 
 .log-level-WARNING {
-  background-color: rgba(251, 188, 4, var(--notification-light-bg-alpha)); /* Light yellow */
-  color: var(--notification-warning-text); /* Darker yellow for contrast */
+  background-color: rgba(251, 188, 4, var(--notification-light-bg-alpha));
+  color: var(--notification-warning-text);
 }
 
 .log-level-ERROR {
-  background-color: rgba(217, 48, 37, var(--notification-light-bg-alpha)); /* Light red */
+  background-color: rgba(217, 48, 37, var(--notification-light-bg-alpha));
   color: var(--gas-red);
 }
 
 .log-level-DEBUG, .log-level-FINE, .log-level-FINER, .log-level-FINEST {
-  background-color: rgba(97, 97, 97, var(--notification-light-bg-alpha)); /* Light grey */
+  background-color: rgba(97, 97, 97, var(--notification-light-bg-alpha));
   color: var(--text-line-numbers);
 }
 
@@ -556,8 +528,6 @@
   }
 }
 
-
-/* NEW: Styles for Target Script Files display */
 .files-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -601,7 +571,6 @@
   word-break: break-all;
 }
 
-/* Specific styles for different file types */
 .file-item.is-server-js .file-type-badge {
   background-color: var(--gas-green) !important;
   color: #fff !important;
@@ -621,7 +590,6 @@
   color: var(--bg-box) !important;
 }
 
-/* NEW: Style for deleted files in diff view */
 .file-comparison.is-deleted {
   border: 1px dashed var(--border-deleted) !important;
   background-color: var(--bg-deleted);
@@ -644,17 +612,15 @@
   margin-top: 10px;
 }
 
-/* NEW: Styles for REPLACE operation display - Adjusted to be a flex container */
 .file-comparison.is-replace {
   border: 1px dashed var(--gas-blue-light) !important;
-  background-color: rgba(230, 240, 255, 0.3); /* Lighter blue */
+  background-color: rgba(230, 240, 255, 0.3);
 }
 
 .file-comparison.is-replace h4 {
-  /* Keeps existing styles */
+
 }
 
-/* NEW: Styles for inline pre-blocks within the notification for REPLACE details */
 .replacement-view.replacement-old-inline {
   background-color: var(--bg-replace-old);
   border: 1px solid var(--border-replace-old);
@@ -679,13 +645,12 @@
   word-break: break-all;
 }
 [data-theme="dark"] .replacement-view.replacement-old-inline {
-  background-color: rgba(255, 99, 71, 0.4); /* Darker alpha for dark mode */
+  background-color: rgba(255, 99, 71, 0.4);
 }
 [data-theme="dark"] .replacement-view.replacement-new-inline {
-  background-color: rgba(52, 168, 83, 0.4); /* Darker alpha for dark mode */
+  background-color: rgba(52, 168, 83, 0.4);
 }
 
-/* Styles for Bulma Tabs integration */
 .tabs {
   margin-bottom: 2rem;
 }
@@ -719,8 +684,8 @@
 }
 .tab-content h2.title,
 .tab-content h3.title {
-  margin-top: 0.75rem !important; /* Adjust to better balance with .box padding */
-  margin-bottom: 1.25rem !important; /* Ensure adequate space below title before content */
+  margin-top: 0.75rem !important;
+  margin-bottom: 1.25rem !important;
   color: var(--text-heading);
 }
 .tab-content hr {
@@ -729,7 +694,6 @@
   height: 1px;
 }
 
-/* Input/Textarea/Select focus state to match GAS colors */
 .field .input,
 .field .textarea,
 .field .select select {
@@ -748,13 +712,11 @@
   box-shadow: 0 0 0 0.125em rgba(66, 133, 244, 0.25);
 }
 
-/* Keyframes for spinner animation */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-/* Ensure the Bulma spinner color is correct too */
 .button.is-loading::after {
   border-color: transparent transparent var(--gas-blue-light) var(--gas-blue-light) !important;
 }
@@ -762,15 +724,9 @@
   border-color: transparent transparent var(--link-color) var(--link-color) !important;
 }
 
-/* Light/Dark mode toggle switch style */
 .theme-switch-wrapper {
   display: flex;
-  align-items: center;
-  /* Removed: justify-content: flex-end; */
-  /* Removed: margin-left: auto; */
-  /* Removed: position: absolute; */
-  /* Removed: top; */
-  /* Removed: right; */
+
 }
 
 .theme-switch {
@@ -826,20 +782,20 @@ input:checked + .slider:before {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 14px; /* Adjust size to fit */
+  font-size: 14px;
   line-height: 1;
   color: #fff;
-  pointer-events: none; /* Allow click to pass through to slider */
+  pointer-events: none;
 }
 
 .theme-icon.sun {
-  left: 8px; /* Position for sun */
-  display: block; /* Default to visible in light mode */
+  left: 8px;
+  display: block;
 }
 
 .theme-icon.moon {
-  right: 8px; /* Position for moon */
-  display: none; /* Default to hidden in light mode */
+  right: 8px;
+  display: none;
 }
 
 [data-theme="dark"] .theme-icon.sun {
@@ -850,22 +806,21 @@ input:checked + .slider:before {
   display: block;
 }
 
-/* NEW: Styles for OAuth Scopes display */
 .oauth-scopes-display-container {
-  max-height: 400px; /* Limit height for scrollability */
+  max-height: 400px;
   overflow-y: auto;
   background-color: var(--bg-log-display);
   border: 1px solid var(--border-log-display);
   border-radius: 4px;
   padding: 10px;
-  font-family: monospace; /* Use a monospace font for consistency with URLs */
+  font-family: monospace;
   font-size: 0.9em;
   line-height: 1.5;
   color: var(--text-body);
 }
 
 .oauth-scopes-list {
-  list-style: none; /* Remove default bullet points */
+  list-style: none;
   padding-left: 0;
   margin-top: 10px;
 }
