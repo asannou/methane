@@ -128,11 +128,16 @@
                 if (originalFile) { // Ensure the file actually existed in original project
                     hasChanges = true;
                     const ext = Utils.getFileExtension(originalFile.type);
+                    // For deleted files, display original content as removed
+                    const originalContentLines = Utils.getActualContentLines(originalFile.source);
+                    const lineNumbersHtml = originalContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
+                    const contentHtml = originalContentLines.map(line => `<div class="diff-line-removed">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
+
                     const deletedHtml = `
                         <div class="file-comparison is-deleted">
                             <h4 class="title is-5">DELETED: <span class="file-name-deleted">${Utils.escapeHtml(deletedFileName)}.${ext}</span></h4>
-                            <div class="deleted-message notification is-danger is-light">This file is proposed for deletion. Original content shown below (struck-through):</div>
-                            <pre><div class="line-numbers-col">${Utils.generateLineNumbersHtml(originalFile.source)}</div><div class="code-content-col diff-line-removed">${Utils.generateSourceHtml(originalFile.source)}</div></pre>
+                            <div class="deleted-message notification is-danger is-light">このファイルは削除が提案されています。元の内容は以下に示されています（取り消し線付き）：</div>
+                            <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += deletedHtml;
@@ -149,20 +154,20 @@
                 if (proposedFile.type === 'REPLACE') {
                     // This is a REPLACE operation
                     hasChanges = true;
-                    const originalSourceForReplace = originalFile ? originalFile.source : 'File content not available for comparison.';
+                    const originalSourceForReplace = originalFile ? originalFile.source : 'ファイルの内容は比較できません。';
                     const originalFileTypeForReplace = originalFile ? Utils.getFileExtension(originalFile.type) : 'unknown';
 
                     fileContentHtml = `
                         <div class="file-comparison is-replace">
                             <h4 class="title is-5">REPLACE Operation: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
-                            <p class="content">This operation will replace specific text within the file. ${proposedFile.isGlobalReplace ? 'All occurrences will be replaced (global).' : 'Only the first occurrence will be replaced.'}</p>
+                            <p class="content">この操作はファイル内の特定のテキストを置換します。${proposedFile.isGlobalReplace ? 'すべての出現箇所が置換されます（グローバル置換）。' : '最初の出現箇所のみが置換されます。'}</p>
                             <div class="columns">
                                 <div class="column">
-                                    <h5 class="title is-6 has-text-danger">Old String:</h5>
+                                    <h5 class="title is-6 has-text-danger">置換前テキスト:</h5>
                                     <pre class="replacement-view replacement-old">${Utils.escapeHtml(proposedFile.old_string)}</pre>
                                 </div>
                                 <div class="column">
-                                    <h5 class="title is-6 has-text-success">New String:</h5>
+                                    <h5 class="title is-6 has-text-success">置換後テキスト:</h5>
                                     <pre class="replacement-view replacement-new">${Utils.escapeHtml(proposedFile.new_string)}</pre>
                                 </div>
                             </div>
@@ -174,11 +179,15 @@
                     // This is a NEW file (exists in proposed but not in original)
                     hasChanges = true;
                     const ext = Utils.getFileExtension(proposedFile.type);
+                    const proposedContentLines = Utils.getActualContentLines(proposedFile.source);
+                    const lineNumbersHtml = proposedContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
+                    const contentHtml = proposedContentLines.map(line => `<div class="diff-line-added">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
+
                     fileContentHtml = `
                         <div class="file-comparison">
                             <h4 class="title is-5">NEW FILE: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
-                            <div class="notification is-info is-light">This is a new file proposed by the AI.</div>
-                            <pre><div class="line-numbers-col">${Utils.generateLineNumbersHtml(proposedFile.source)}</div><div class="code-content-col diff-line-added">${Utils.generateSourceHtml(proposedFile.source)}</div></pre>
+                            <div class="notification is-info is-light">これはAIによって提案された新しいファイルです。</div>
+                            <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
@@ -191,11 +200,11 @@
                     fileContentHtml = `
                         <div class="file-comparison">
                             <div class="original-file-panel">
-                                <h4 class="title is-5">Original: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
+                                <h4 class="title is-5">変更前: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
                                 <pre><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
                             </div>
                             <div class="proposed-file-panel">
-                                <h4 class="title is-5">Proposed: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
+                                <h4 class="title is-5">変更後: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
                                 <pre><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
                         </div>
@@ -207,14 +216,16 @@
 
             // If no changes at all (neither deleted, new, modified, nor replace operations)
             if (!hasChanges) {
-                proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">No changes proposed by AI for the selected script. This could mean the prompt was fully satisfied without code modifications, or no relevant changes were found.</p>`;
+                proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">選択されたスクリプトに対してAIからの変更提案はありません。これは、プロンプトがコード変更なしで完全に満たされたか、関連する変更が見つからなかったことを意味します。</p>`;
             }
 
             return hasChanges;
         },
 
         /**
-         * Generate formatted diff panels HTML using diff_match_patch library.
+         * Generate formatted diff panels HTML using diff_match_patch library,
+         * ensuring character-level changes within a line are highlighted,
+         * and each logical line is contained within its own <div>.
          * @param {string} originalSource - The original source code.
          * @param {string} proposedSource - The proposed source code.
          * @returns {{originalLineNumbersHtml: string, originalCodeContentHtml: string, proposedLineNumbersHtml: string, proposedCodeContentHtml: string}} HTML parts for diff display.
@@ -222,108 +233,122 @@
         generateFormattedDiffPanels: (originalSource, proposedSource) => {
             const dmp = new diff_match_patch();
             let diffs = dmp.diff_main(originalSource, proposedSource);
-            dmp.diff_cleanupSemantic(diffs);
+            dmp.diff_cleanupSemantic(diffs); // Apply semantic cleanup for better diffs
 
-            const originalHtmlLines = [];
-            const proposedHtmlLines = [];
+            const originalLinesHtml = [];
+            const proposedLinesHtml = [];
             const originalLineNumbers = [];
             const proposedLineNumbers = [];
 
             let currentOriginalLine = 1;
             let currentProposedLine = 1;
 
-            const OMIT_THRESHOLD = 8;
-            const CONTEXT_LINES = 3;
+            // Buffers to accumulate parts of the current logical line (including inline HTML tags)
+            let currentOriginalLineContent = [];
+            let currentProposedLineContent = [];
 
-            for (let i = 0; i < diffs.length; ) {
-                const type = diffs[i][0];
+            // Flags to determine overall line status
+            let lineHadInsert = false;
+            let lineHadDelete = false;
+
+            for (let i = 0; i < diffs.length; ++i) {
+                const type = diffs[i][0]; // DIFF_EQUAL, DIFF_INSERT, DIFF_DELETE
                 const text = diffs[i][1];
 
-                if (type === DIFF_EQUAL) {
-                    let combinedEqualLines = [];
-                    let j = i;
-                    while (j < diffs.length && diffs[j][0] === DIFF_EQUAL) {
-                        // Correctly split each equal segment into logical lines before concatenation
-                        const currentSegmentLines = Utils.getActualContentLines(diffs[j][1]);
-                        combinedEqualLines = combinedEqualLines.concat(currentSegmentLines);
-                        j++;
+                // Split the diff text segment by newline characters
+                // An empty string in `textParts` means a blank line.
+                const textParts = text.split('\n');
+
+                for (let j = 0; j < textParts.length; ++j) {
+                    const part = Utils.escapeHtml(textParts[j]); // Escape HTML for the segment part
+                    const isLastPartInSegment = (j === textParts.length - 1);
+
+                    // Append the HTML for this part to the current line buffers
+                    if (type === DIFF_EQUAL) {
+                        currentOriginalLineContent.push(part);
+                        currentProposedLineContent.push(part);
+                    } else if (type === DIFF_INSERT) {
+                        currentOriginalLineContent.push(''); // Original side has nothing for an insertion
+                        currentProposedLineContent.push(`<ins class="diff-char-added">${part}</ins>`);
+                        lineHadInsert = true;
+                    } else { // DIFF_DELETE
+                        currentOriginalLineContent.push(`<del class="diff-char-removed">${part}</del>`);
+                        currentProposedLineContent.push(''); // Proposed side has nothing for a deletion
+                        lineHadDelete = true;
                     }
 
-                    if (combinedEqualLines.length > OMIT_THRESHOLD) {
-                        // Add leading context
-                        for (let k = 0; k < CONTEXT_LINES; k++) {
-                            const line = combinedEqualLines[k];
-                            originalLineNumbers.push(`<div>${currentOriginalLine++}</div>`);
-                            originalHtmlLines.push(`<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`);
-                            proposedLineNumbers.push(`<div>${currentProposedLine++}</div>`);
-                            proposedHtmlLines.push(`<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`);
+                    // If this is NOT the last part of the current diff text segment,
+                    // it means a newline was encountered *within this diff segment*.
+                    // This signals the end of a logical line for display.
+                    if (!isLastPartInSegment) {
+                        // Construct the full HTML for the current logical lines
+                        const originalFullLine = currentOriginalLineContent.join('');
+                        const proposedFullLine = currentProposedLineContent.join('');
+
+                        // Determine the line status class based on the content accumulated for this logical line
+                        let lineStatusClass = 'equal';
+                        if (lineHadInsert && lineHadDelete) {
+                            lineStatusClass = 'modified';
+                        } else if (lineHadInsert) {
+                            lineStatusClass = 'added';
+                        } else if (lineHadDelete) {
+                            lineStatusClass = 'removed';
                         }
 
-                        // Add omitted block placeholder
-                        const omittedCount = combinedEqualLines.length - (2 * CONTEXT_LINES);
-                        const originalOmittedStart = currentOriginalLine;
-                        const proposedOmittedStart = currentProposedLine;
+                        // Push the completed line HTML and line numbers
+                        originalLineNumbers.push(`<div>${currentOriginalLine}</div>`);
+                        originalLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${originalFullLine || '&nbsp;'}</div>`);
 
-                        currentOriginalLine += omittedCount;
-                        currentProposedLine += omittedCount;
+                        proposedLineNumbers.push(`<div>${currentProposedLine}</div>`);
+                        proposedLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${proposedFullLine || '&nbsp;'}</div>`);
 
-                        originalLineNumbers.push(`<div class="diff-line-omitted">${originalOmittedStart}-${currentOriginalLine - 1}</div>`);
-                        originalHtmlLines.push(`<div class="diff-line-omitted">... ${omittedCount} lines omitted ...</div>`);
-                        proposedLineNumbers.push(`<div class="diff-line-omitted">${proposedOmittedStart}-${currentProposedLine - 1}</div>`);
-                        proposedHtmlLines.push(`<div class="diff-line-omitted">... ${omittedCount} lines omitted ...</div>`);
+                        // Increment line numbers for the next logical line
+                        currentOriginalLine++;
+                        currentProposedLine++;
 
-                        // Add trailing context
-                        for (let k = combinedEqualLines.length - CONTEXT_LINES; k < combinedEqualLines.length; k++) {
-                            const line = combinedEqualLines[k];
-                            originalLineNumbers.push(`<div>${currentOriginalLine++}</div>`);
-                            originalHtmlLines.push(`<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`);
-                            proposedLineNumbers.push(`<div>${currentProposedLine++}</div>`);
-                            proposedHtmlLines.push(`<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`);
-                        }
-                    } else {
-                        // Add all equal lines
-                        for (const line of combinedEqualLines) {
-                            originalLineNumbers.push(`<div>${currentOriginalLine++}</div>`);
-                            originalHtmlLines.push(`<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`);
-                            proposedLineNumbers.push(`<div>${currentProposedLine++}</div>`);
-                            proposedHtmlLines.push(`<div class="diff-line-equal">${Utils.escapeHtml(line)}</div>`);
-                        }
+                        // Reset buffers and flags for the next logical line
+                        currentOriginalLineContent = [];
+                        currentProposedLineContent = [];
+                        lineHadInsert = false;
+                        lineHadDelete = false;
                     }
-                    i = j; // Move index past the processed equal block
-                } else {
-                    // Handle added or removed lines
-                    // Use getActualContentLines for consistent line interpretation
-                    const actualLines = Utils.getActualContentLines(text);
-                    
-                    for (const line of actualLines) {
-                        if (type === DIFF_INSERT) {
-                            originalLineNumbers.push(`<div>&nbsp;</div>`);
-                            originalHtmlLines.push(`<div class="diff-line-empty-fill">&nbsp;</div>`);
-                            proposedLineNumbers.push(`<div>${currentProposedLine++}</div>`);
-                            proposedHtmlLines.push(`<div class="diff-line-added">${Utils.escapeHtml(line)}</div>`);
-                        } else if (type === DIFF_DELETE) {
-                            originalLineNumbers.push(`<div>${currentOriginalLine++}</div>`);
-                            originalHtmlLines.push(`<div class="diff-line-removed">${Utils.escapeHtml(line)}</div>`);
-                            proposedLineNumbers.push(`<div>&nbsp;</div>`);
-                            proposedHtmlLines.push(`<div class="diff-line-empty-fill">&nbsp;</div>`);
-                        }
-                    }
-                    i++;
                 }
+            }
+
+            // After the loop, if there's any content left in buffers, it means the last logical line was processed.
+            // Push this final line.
+            if (currentOriginalLineContent.length > 0 || currentProposedLineContent.length > 0) {
+                const originalFullLine = currentOriginalLineContent.join('');
+                const proposedFullLine = currentProposedLineContent.join('');
+
+                let lineStatusClass = 'equal';
+                if (lineHadInsert && lineHadDelete) {
+                    lineStatusClass = 'modified';
+                } else if (lineHadInsert) {
+                    lineStatusClass = 'added';
+                } else if (lineHadDelete) {
+                    lineStatusClass = 'removed';
+                }
+
+                originalLineNumbers.push(`<div>${currentOriginalLine}</div>`);
+                originalLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${originalFullLine || '&nbsp;'}</div>`);
+
+                proposedLineNumbers.push(`<div>${currentProposedLine}</div>`);
+                proposedLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${proposedFullLine || '&nbsp;'}</div>`);
             }
 
             return {
                 originalLineNumbersHtml: originalLineNumbers.join(''),
-                originalCodeContentHtml: originalHtmlLines.join(''),
+                originalCodeContentHtml: originalLinesHtml.join(''),
                 proposedLineNumbersHtml: proposedLineNumbers.join(''),
-                proposedCodeContentHtml: proposedHtmlLines.join('')
+                proposedCodeContentHtml: proposedLinesHtml.join('')
             };
         },
 
         /**
          * Splits a string into an array of lines, correctly handling trailing newlines.
-         * A trailing newline character means the last line is empty, but it's not an *additional* line.
-         * For example, "a\n" represents one line "a". "a\n\n" represents two lines "a" and "".
+         * A trailing newline character means the last line is empty and should be represented.
+         * For example, "a\n" represents line "a" followed by an empty line.
          * @param {string} text - The input string.
          * @returns {Array<string>} An array of logical lines.
          */
@@ -331,25 +356,20 @@
             if (text === null || text === undefined) {
                 return [];
             }
-            const lines = text.split('\n');
-            // If the original string ends with a newline, the last element from split is an empty string.
-            // This empty string represents the content *after* the final newline, which is typically not a new logical line for display.
-            // We only pop if the last character *of the original text* was a newline AND the last element of the split array is an empty string.
-            if (text.length > 0 && text.charAt(text.length - 1) === '\n') {
-                if (lines.length > 0 && lines[lines.length - 1] === '') {
-                    lines.pop();
-                }
-            }
-            return lines;
+            // text.split('\n') will correctly produce an empty string at the end
+            // if the original text ends with '\n'. This empty string represents a valid, empty line.
+            return text.split('\n');
         },
 
         /**
          * Helper to generate simple line numbers HTML for deleted/new files.
+         * This function is now mostly for `DELETED` and `NEW` file types,
+         * where `generateFormattedDiffPanels` is not used directly on the whole file.
          * @param {string} source - The source code.
          * @returns {string} HTML for line numbers.
          */
         generateLineNumbersHtml: (source) => {
-            const lines = Utils.getActualContentLines(source); // Use the new helper
+            const lines = Utils.getActualContentLines(source);
             let html = '';
             for (let i = 0; i < lines.length; i++) {
                 html += `<div>${i + 1}</div>`;
@@ -359,14 +379,18 @@
 
         /**
          * Helper to generate simple source HTML for deleted/new files.
+         * This function is now mostly for `DELETED` and `NEW` file types,
+         * where `generateFormattedDiffPanels` is not used directly on the whole file.
          * @param {string} source - The source code.
          * @returns {string} HTML for source content.
          */
         generateSourceHtml: (source) => {
-            const lines = Utils.getActualContentLines(source); // Use the new helper
+            const lines = Utils.getActualContentLines(source);
             let html = '';
+            // For new/deleted files, all lines are essentially 'equal' within their own context for basic display,
+            // but the `diff-line-removed` or `diff-line-added` class on the parent div provides context.
             for (let i = 0; i < lines.length; i++) {
-                html += `<div class="diff-line-equal">${Utils.escapeHtml(lines[i])}</div>`;
+                html += `<div class="diff-line-equal">${Utils.escapeHtml(lines[i]) || '&nbsp;'}</div>`; // Use equal as base, parent div takes care of add/remove styling
             }
             return html;
         },

@@ -381,11 +381,31 @@
   .code-content-col > .diff-line-added { background-color: #E6FFEA; } /* Lighter Google green */
   .code-content-col > .diff-line-removed { background-color: #FEE7E6; } /* Lighter Google red */
   .code-content-col > .diff-line-modified { background-color: #FFFDE6; } /* Lighter Google yellow */
-  .code-content-col > .diff-line-empty-fill { background-color: transparent; }
+
+  /* NEW: Styles for inline character-level diffs */
+  .diff-char-added {
+    background-color: #B9FFC9; /* Slightly darker green than line-added */
+    text-decoration: none;
+  }
+  .diff-char-removed {
+    background-color: #FFB3AE; /* Slightly darker red than line-removed */
+    text-decoration: line-through;
+  }
+  .diff-char-equal {
+    background-color: transparent;
+  }
+  /* Placeholders for empty cells in aligned diffs */
+  .diff-char-empty-fill {
+    /* No background for empty fill */
+  }
 
   [data-theme="dark"] .code-content-col > .diff-line-added { background-color: #31583D; color: #fff; }
   [data-theme="dark"] .code-content-col > .diff-line-removed { background-color: #6C2B29; color: #fff; }
   [data-theme="dark"] .code-content-col > .diff-line-modified { background-color: #5A4C07; color: #fff; }
+
+  [data-theme="dark"] .diff-char-added { background-color: #3D834C; color: #fff; }
+  [data-theme="dark"] .diff-char-removed { background-color: #A33A36; color: #fff; }
+  [data-theme="dark"] .diff-char-equal { background-color: transparent; }
 
   /* Style for omitted lines in diff view */
   .code-content-col > .diff-line-omitted {
