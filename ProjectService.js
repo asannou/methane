@@ -636,13 +636,16 @@ function _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deployme
 
   let versionsToDelete = [];
   if (allVersions.length > VERSION_CLEANUP_THRESHOLD) {
-    const numberOfVersionsToCull = allVersions.length - VERSION_CLEANUP_THRESHOLD;
-    for (let i = 0; i < numberOfVersionsToCull; i++) {
-      const version = allVersions[i];
+    const targetVersionCount = VERSION_CLEANUP_THRESHOLD;
+    for (const version of allVersions) { // Iterate through all versions, oldest first
+      // Stop if we've identified enough versions to delete to bring the total count down to the threshold.
+      if (allVersions.length - versionsToDelete.length <= targetVersionCount) {
+        break;
+      }
+
       if (!activeDeployedVersions.has(version.versionNumber)) {
         versionsToDelete.push(version);
-      }
-      else {
+      } else {
         console.log(`Version ${version.versionNumber} (created: ${version.createTime}) is linked to an active deployment, retaining.`);
       }
     }
