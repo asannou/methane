@@ -1257,26 +1257,26 @@
             e.preventDefault();
             const submitButton = UI.get('addLibraryButton');
 
-            UI.showSpinnerInButton(submitButton, 'Adding Library...');
-            UI.hide('add-library-result-container');
-            UI.setText('add-library-result', '');
-
             const targetScriptId = Utils.getEffectiveScriptId();
             const libraryScriptId = UI.get('libraryScriptId').value.trim();
             const libraryVersion = UI.get('libraryVersion').value.trim();
 
             if (!targetScriptId) {
+                UI.hideSpinnerInButton(submitButton);
                 UI.setText('add-library-result', 'Error: Please select or enter a Target Script ID.');
                 UI.show('add-library-result-container');
-                UI.hideSpinnerInButton(submitButton);
                 return;
             }
             if (!libraryScriptId) {
+                UI.hideSpinnerInButton(submitButton);
                 UI.setText('add-library-result', 'Error: Library Script ID cannot be empty.');
                 UI.show('add-library-result-container');
-                UI.hideSpinnerInButton(submitButton);
                 return;
             }
+
+            UI.showSpinnerInButton(submitButton, 'Adding Library...');
+            UI.hide('add-library-result-container');
+            UI.setText('add-library-result', '');
 
             Utils.saveScriptIdToLocalStorage(targetScriptId);
 
@@ -1311,6 +1311,15 @@
             const versionsSelect = UI.get('versionSelect');
             const getVersionsButton = UI.get('getVersionsButton');
             
+            if (!scriptId) {
+                UI.hideSpinnerInButton(getVersionsButton);
+                UI.setHtml('versionSelect', '<option value="">-- Select a Script ID first --</option>');
+                UI.setText('version-result', 'Error: Please select or enter a Script ID to get versions.');
+                UI.show('version-result-container');
+                UI.enable('versionSelect');
+                return;
+            }
+            
             UI.setHtml('versionSelect', '<option value="">-- Loading versions --</option>');
             UI.disable('versionSelect');
             UI.showSpinnerInButton(getVersionsButton, 'Getting Versions...');
@@ -1318,15 +1327,6 @@
             UI.disable('openWebAppButton');
             UI.setText('openWebAppMessage', '');
             UI.hide('version-result-container');
-
-            if (!scriptId) {
-                UI.setHtml('versionSelect', '<option value="">-- Select a Script ID first --</option>');
-                UI.setText('version-result', 'Error: Please select or enter a Script ID to get versions.');
-                UI.show('version-result-container');
-                UI.enable('versionSelect');
-                UI.hideSpinnerInButton(getVersionsButton);
-                return;
-            }
 
             Utils.saveScriptIdToLocalStorage(scriptId);
 
@@ -1463,17 +1463,20 @@
             const getVersionsButton = UI.get('getVersionsButton');
             
             if (!scriptId) {
+                UI.hideSpinnerInButton(revertButton);
                 UI.setText('version-result', 'Error: Please select or enter a Script ID.');
                 UI.show('version-result-container');
                 return;
             }
             if (!selectedVersion) {
+                UI.hideSpinnerInButton(revertButton);
                 UI.setText('version-result', 'Error: Please select a version to revert to.');
                 UI.show('version-result-container');
                 return;
             }
 
             if (!confirm(`Reverting script ID ${scriptId} to version ${selectedVersion}. This cannot be undone. Do you wish to continue?`)) {
+                UI.hideSpinnerInButton(revertButton);
                 return;
             }
 
@@ -1530,20 +1533,21 @@
             // Determine if the call is from the explicit button click or an automatic change event
             const isManualButtonClick = event && event.type === 'click' && event.currentTarget.id === 'getFilesListButton';
 
+            if (!scriptId) {
+                if (isManualButtonClick) {
+                    UI.hideSpinnerInButton(getFilesListButton);
+                }
+                UI.setHtml(filesListDisplay, '');
+                UI.setHtml(filesListDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
+                return;
+            }
+
             if (isManualButtonClick) {
                 UI.showSpinnerInButton(getFilesListButton, 'Getting Files...');
                 UI.setHtml(filesListDisplay, ''); // Clear previous results immediately for manual trigger
             } else {
                 // For automatic trigger (e.g., dropdown change), show spinner directly in the display area
                 UI.setHtml(filesListDisplay, `<p><span class="spinner" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 8px;"></span>Loading files...</p>`);
-            }
-
-            if (!scriptId) {
-                if (isManualButtonClick) {
-                    UI.hideSpinnerInButton(getFilesListButton);
-                }
-                UI.setHtml(filesListDisplay, '<p class="has-text-danger">Error: Please select or enter a Script ID.</p>');
-                return;
             }
 
             Utils.saveScriptIdToLocalStorage(scriptId);
@@ -1676,34 +1680,36 @@
             const resultContainer = UI.get('download-result-container');
             const resultDisplay = UI.get('download-result');
 
-            UI.showSpinnerInButton(downloadButton, 'Downloading...');
-            UI.show(resultContainer);
-            UI.setText(resultDisplay, ''); // Clear previous result
+            // Clear previous results and hide container initially
+            UI.setText(resultDisplay, '');
+            UI.hide(resultContainer); 
 
             if (!scriptId) {
-                UI.hideSpinnerInButton(downloadButton);
+                UI.show(resultContainer); // Only show container if there's an error
                 UI.appendNotification(resultDisplay, 'is-danger', 'Error: Please select or enter a Script ID.');
                 return;
             }
             if (!fileUrl) {
-                UI.hideSpinnerInButton(downloadButton);
+                UI.show(resultContainer);
                 UI.appendNotification(resultDisplay, 'is-danger', 'Error: File URL cannot be empty.');
                 return;
             }
             if (!newFileName) {
-                UI.hideSpinnerInButton(downloadButton);
+                UI.show(resultContainer);
                 UI.appendNotification(resultDisplay, 'is-danger', 'Error: Target File Name cannot be empty.');
                 return;
             }
-            // Basic URL validation
             try {
                 new URL(fileUrl);
             } catch (e) {
-                UI.hideSpinnerInButton(downloadButton);
+                UI.show(resultContainer);
                 UI.appendNotification(resultDisplay, 'is-danger', 'Error: Invalid File URL format.');
                 return;
             }
 
+            // All client-side validations passed, now show spinner and proceed
+            UI.showSpinnerInButton(downloadButton, 'Downloading...');
+            UI.show(resultContainer); // Show it now for the loading message
             UI.appendNotification(resultDisplay, 'is-info', 'Attempting to download and add/update file...', `URL: ${fileUrl}\nFile Name: ${newFileName}\nFile Type: ${newFileType}`);
 
             Utils.saveScriptIdToLocalStorage(scriptId);
