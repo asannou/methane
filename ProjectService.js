@@ -110,7 +110,7 @@ function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDep
     console.log(`Retrieving current script content for ID: ${scriptId}`);
     const getResponse = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content for update');
     const originalProjectContent = JSON.parse(getResponse.getContentText());
-    
+
     // Initialize map with current files, ready for updates/deletions
     const newProjectFilesMap = new Map(originalProjectContent.files.map(f => [f.name, f]));
 
@@ -121,15 +121,15 @@ function applyProposedChanges(scriptId, proposedFiles, deletedFileNames, autoDep
 
     // Remove files marked for deletion from the map
     _deleteFilesFromMap(newProjectFilesMap, deletedFileNames, originalProjectContent.files);
-    
+
     // Convert map to array for the final PUT payload
     let finalFilesForPutPayload = Array.from(newProjectFilesMap.values());
-    
+
     // Ensure appsscript.json is always present, even if AI's proposal somehow removes it
     finalFilesForPutPayload = _ensureAppsscriptJsonFallback(finalFilesForPutPayload, originalProjectContent.files);
 
     const finalPayload = { files: finalFilesForPutPayload };
-    
+
     // 2. Update the script content with the final file list
     console.log(`Updating script content for ID: ${scriptId}`);
     const putResponse = _makeApiCall(contentUrl, 'put', accessToken, JSON.stringify(finalPayload), 'Failed to update script');
@@ -362,7 +362,7 @@ function getScriptLogs(targetScriptId) {
       console.log("Script propertiesにGCPプロジェクトIDが見つかりません。メタデータから取得を試みます。");
       const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
       const metadataResponse = _makeApiCall(currentScriptMetadataUrl, 'get', accessToken, null, 'Failed to retrieve current script metadata');
-      
+
       const metadata = JSON.parse(metadataResponse.getContentText());
 
       if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
@@ -393,7 +393,7 @@ function getScriptLogs(targetScriptId) {
 
     console.log(`Retrieving logs from GCP project ${gcpProjectId}...`);
     const response = _makeApiCall(loggingApiUrl, 'post', accessToken, JSON.stringify(requestBody), 'Cloud Logging API error');
-    
+
     const logsData = JSON.parse(response.getContentText());
     if (!logsData.entries || logsData.entries.length === 0) {
       return []; // Return empty array if no logs are found
@@ -445,10 +445,10 @@ function getScriptLogs(targetScriptId) {
 
 /**
  * Creates a new Apps Script version and deploys it as a new web app.
- * Handles cleanup of old versions and web app deployments if limits are reached.
+ * Handles cleanup of old web app deployments if limits are reached, and warns about version limits.
  * @param {string} scriptId - The ID of the script to deploy.
  * @param {string} description - The deployment description (optional).
- * @returns {object} - Deployment result (success/failure, deployment ID, URL).
+ * @returns {object} - Deployment result (success/failure, deployment ID, URL, versionWarning).
  */
 function deployScript(scriptId, description = '') {
   console.log("Starting deployScript for Script ID:", scriptId, "Description:", description);
@@ -457,10 +457,23 @@ function deployScript(scriptId, description = '') {
   const deploymentsApiUrl = `https://script.googleapis.com/v1/projects/${scriptId}/deployments`;
 
   try {
-    // Cleanup old versions before creating a new one
-    _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deploymentsApiUrl);
+    const MAX_VERSIONS = 200;
+    const WARNING_THRESHOLD = 175; // Warn if 175 or more versions exist
 
-    // Cleanup old web app deployments before creating a new one
+    let versionWarning = null;
+    let currentVersions = [];
+    try {
+        currentVersions = _listAllVersions(scriptId, accessToken);
+    } catch (e) {
+        console.warn(`Failed to retrieve current versions for count check. Skipping version warning. Error: ${e.message}`);
+    }
+
+    if (currentVersions.length >= WARNING_THRESHOLD) {
+        versionWarning = `This script currently has ${currentVersions.length} versions. The maximum allowed is ${MAX_VERSIONS}. Consider deleting old versions manually in the Apps Script editor (Project settings > Versions) to avoid future deployment issues.`;
+        console.warn(versionWarning);
+    }
+
+    // Cleanup old web app deployments before creating a new one (This part remains as it's for deployments, not versions)
     _cleanupOldDeployments(scriptId, accessToken, deploymentsApiUrl);
 
     // 1. Create a new version
@@ -491,7 +504,8 @@ function deployScript(scriptId, description = '') {
       status: 'success',
       message: 'Deployment completed successfully.',
       deploymentId: newDeploymentId,
-      webappUrl: webappUrl
+      webappUrl: webappUrl,
+      versionWarning: versionWarning // Include the warning in the response
     };
 
   } catch (e) {
@@ -555,22 +569,6 @@ function _listAllDeployments(scriptId, accessToken) {
 }
 
 /**
- * Internal helper to delete a specific script version.
- * @param {string} scriptId - The ID of the script.
- * @param {string} accessToken - OAuth token.
- * @param {number} versionNumber - The version number to delete.
- */
-function _deleteVersion(scriptId, accessToken, versionNumber) {
-  const deleteVersionUrl = `https://script.googleapis.com/v1/projects/${scriptId}/versions/${versionNumber}`;
-  try {
-    _makeApiCall(deleteVersionUrl, 'delete', accessToken, null, `Failed to delete version ${versionNumber}`);
-    console.log(`Successfully deleted version ${versionNumber}.`);
-  } catch (e) {
-    console.warn(`Warning: Failed to delete version ${versionNumber}. Error: ${e.message}. This might be a deployed version.`);
-  }
-}
-
-/**
  * Internal helper to delete a specific script deployment.
  * @param {string} scriptId - The ID of the script.
  * @param {string} accessToken - OAuth token.
@@ -583,82 +581,6 @@ function _deleteDeployment(scriptId, accessToken, deploymentId) {
     console.log(`Successfully deleted deployment ${deploymentId}.`);
   } catch (e) {
     console.warn(`Warning: Failed to delete deployment ${deploymentId}. Error: ${e.message}. This might be a read-only deployment.`);
-  }
-}
-
-/**
- * Internal helper to clean up old script versions.
- * @param {string} scriptId - The ID of the script.
- * @param {string} accessToken - OAuth token.
- * @param {string} versionsApiBaseUrl - Base URL for versions API.
- * @param {string} deploymentsApiUrl - URL for deployments API.
- */
-function _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deploymentsApiUrl) {
-  console.log("Checking for old versions to clean up...");
-  const VERSION_CLEANUP_THRESHOLD = 175; // Retain latest N versions (Google Apps Script version limit is 200)
-
-  let allVersions = [];
-  try {
-    allVersions = _listAllVersions(scriptId, accessToken);
-  } catch (e) {
-    console.warn(`Failed to retrieve all versions for cleanup. Skipping version cleanup. Error: ${e.message}`);
-    return;
-  }
-
-  if (allVersions.length === 0) {
-    console.log("No versions found for cleanup.");
-    return;
-  }
-
-  allVersions.sort((a, b) => a.versionNumber - b.versionNumber); // Sort oldest first
-
-  const activeDeployedVersions = new Set();
-  try {
-    const allDeployments = _listAllDeployments(scriptId, accessToken);
-    // Sort deployments by createTime in ascending order (oldest first)
-    allDeployments.sort((a, b) => new Date(a.updateTime).getTime() - new Date(b.updateTime).getTime());
-    allDeployments.forEach(d => {
-      if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
-        const isActiveEntryPoint = d.entryPoints?.some(ep => ep.entryPointType === 'WEB_APP' || ep.entryPointType === 'API_EXECUTABLE');
-        if (isActiveEntryPoint) {
-          activeDeployedVersions.add(d.deploymentConfig.versionNumber);
-        }
-      }
-    });
-  } catch (e) {
-    console.warn(`Failed to retrieve active deployments for version cleanup. Error: ${e.message}. Cleanup will proceed, but active versions might not be excluded.`);
-  }
-
-  console.log(`Current number of versions: ${allVersions.length}`);
-  console.log(`Versions linked to active deployments: ${Array.from(activeDeployedVersions).join(', ')}`);
-
-  let versionsToDelete = [];
-  if (allVersions.length > VERSION_CLEANUP_THRESHOLD) {
-    const targetVersionCount = VERSION_CLEANUP_THRESHOLD;
-    for (const version of allVersions) { // Iterate through all versions, oldest first
-      // Stop if we've identified enough versions to delete to bring the total count down to the threshold.
-      if (allVersions.length - versionsToDelete.length <= targetVersionCount) {
-        break;
-      }
-
-      if (!activeDeployedVersions.has(version.versionNumber)) {
-        versionsToDelete.push(version);
-      } else {
-        console.log(`Version ${version.versionNumber} (created: ${version.createTime}) is linked to an active deployment, retaining.`);
-      }
-    }
-  }
-
-  if (versionsToDelete.length > 0) {
-    console.log(`Deleting ${versionsToDelete.length} old versions.`);
-    let deletedCount = 0;
-    for (const version of versionsToDelete) {
-      _deleteVersion(scriptId, accessToken, version.versionNumber);
-      deletedCount++;
-    }
-    console.log(`${deletedCount} old versions deleted.`);
-  } else {
-    console.log("No old versions found for deletion or all are actively deployed. Current version count: " + allVersions.length);
   }
 }
 
@@ -680,19 +602,19 @@ function _cleanupOldDeployments(scriptId, accessToken, deploymentsApiUrl) {
     return;
   }
 
-  const webAppDeployments = allDeployments.filter(dep => 
+  const webAppDeployments = allDeployments.filter(dep =>
     dep.entryPoints?.some(ep => ep.entryPointType === 'WEB_APP')
   );
   // Log a compact summary for web app deployments
   console.log(`  _cleanupOldDeployments: All web app deployments (total: ${webAppDeployments.length}, unsorted). Sample (first 5 compact):`, JSON.stringify(webAppDeployments.slice(0, 5).map(d => ({id: d.deploymentId, updateTime: d.updateTime, version: d.deploymentConfig?.versionNumber})), null, 2));
-  
+
   console.log(`Current number of web app deployments: ${webAppDeployments.length}`);
 
   const deploymentsToRemoveCount = webAppDeployments.length - (DEPLOYMENT_LIMIT - 1);
 
   if (deploymentsToRemoveCount > 0) {
     console.log(`Web app deployment count is near limit (${DEPLOYMENT_LIMIT}) - currently ${webAppDeployments.length}. Archiving oldest ${deploymentsToRemoveCount} web app deployments.`);
-    
+
     webAppDeployments.sort((a, b) => new Date(a.updateTime).getTime() - new Date(b.updateTime).getTime());
     // Log a compact sample for sorted web app deployments
     console.log(`  _cleanupOldDeployments: Web app deployments sorted by updateTime (oldest first, total: ${webAppDeployments.length}). Sample (first 5 compact):`, JSON.stringify(webAppDeployments.slice(0, 5).map(d => ({id: d.deploymentId, updateTime: d.updateTime, version: d.deploymentConfig?.versionNumber})), null, 2));
@@ -759,10 +681,10 @@ function listAppsScriptProjects() {
     // Requires 'Drive API' to be enabled in Advanced Google Services (Resources > Advanced Google services...)
     // Requires 'https://www.googleapis.com/auth/drive.readonly' scope in appsscript.json
     console.log("Listing Apps Script projects using Drive API...");
-    
+
     // Filter for Apps Script files that are not trashed
     const query = 'mimeType = "application/vnd.google-apps.script" and trashed = false';
-    
+
     // Fetch files, limit to a reasonable number (e.g., 200)
     let response = Drive.Files.list({
       q: query,
@@ -816,7 +738,7 @@ function listScriptVersions(scriptId) {
     } catch (e) {
       return { status: 'error', message: `Version retrieval error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
     }
-    
+
     let versions = allVersionsFromApi.map(v => ({
       versionNumber: v.versionNumber,
       createTime: v.createTime,
@@ -895,7 +817,7 @@ function revertToVersion(scriptId, versionNumber) {
     console.log(`Retrieving content for version ${versionNumber}...`);
     const getVersionContentResponse = _makeApiCall(getContentForVersionUrl, 'get', accessToken, null, `Failed to retrieve content for version ${versionNumber}`);
     const versionContent = JSON.parse(getVersionContentResponse.getContentText());
-    
+
     if (!versionContent.files || !Array.isArray(versionContent.files) || versionContent.files.length === 0) {
       console.error(`Content for version ${versionNumber} contains no file data or is malformed. Response:`, getVersionContentResponse.getContentText());
       return {
@@ -934,9 +856,9 @@ function listTargetScriptFiles(scriptId) {
 
     console.log(`Retrieving file content for Script ID: ${scriptId}...`);
     const response = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content');
-    
+
     const projectContent = JSON.parse(response.getContentText());
-    
+
     const filesList = (projectContent.files || []).map(file => ({
       name: file.name,
       type: file.type

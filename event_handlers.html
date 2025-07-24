@@ -1210,7 +1210,7 @@
 
             UI.showSpinnerInButton(submitButton, 'Deploying...');
             UI.hide('deploy-result-container');
-            UI.setText('deploy-result', '');
+            UI.setHtml('deploy-result-content', '');
 
             const scriptId = Utils.getEffectiveScriptId();
             const description = UI.get('deploymentDescription').value;
@@ -1227,15 +1227,24 @@
                         } else if (response.webappUrl === null) {
                             webappUrlHtml = `Web App URL: Not found in deployment response.`;
                         }
-                        UI.setHtml('deploy-result', `${response.message}<br>Deployment ID: ${response.deploymentId}<br>${webappUrlHtml}`);
+                        UI.setHtml('deploy-result-content', `
+                            <div class="notification is-success is-light">
+                                <p>${Utils.escapeHtml(response.message)}</p>
+                                <p><strong>Deployment ID:</strong> ${Utils.escapeHtml(response.deploymentId)}</p>
+                                <p>${webappUrlHtml}</p>
+                            </div>
+                        `);
+                        if (response.versionWarning) {
+                            UI.appendNotification('deploy-result-content', 'is-warning', 'Version Warning', response.versionWarning);
+                        }
                     } else {
-                        UI.setText('deploy-result', `Error: ${response.message}`);
+                        UI.appendNotification('deploy-result-content', 'is-danger', 'Deployment Error', response.message);
                     }
                 })
                 .withFailureHandler(function(error) {
                     UI.hideSpinnerInButton(submitButton);
                     UI.show('deploy-result-container');
-                    UI.setText('deploy-result', `Error deploying script: ${error.message}`);
+                    UI.appendNotification('deploy-result-content', 'is-danger', 'Error deploying script', error.message);
                 })
                 .deployScript(scriptId, description);
         },
