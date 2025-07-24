@@ -546,8 +546,6 @@ function _listAllDeployments(scriptId, accessToken) {
     const response = _makeApiCall(url, 'get', accessToken, null, 'Failed to list script deployments for cleanup');
     const pageData = JSON.parse(response.getContentText());
     allDeployments = allDeployments.concat(pageData.deployments || []);
-    // Log a compact sample instead of full objects to prevent truncation
-    console.log(`  _listAllDeployments: Fetched ${pageData.deployments?.length || 0} deployments (page ${pageToken ? 'next' : 'first'}). Sample (first 5 compact):`, JSON.stringify((pageData.deployments || []).slice(0, 5).map(d => ({id: d.deploymentId, updateTime: d.updateTime, version: d.deploymentConfig?.versionNumber})), null, 2));
     pageToken = pageData.nextPageToken;
     hasMore = !!pageToken;
   }
@@ -835,25 +833,17 @@ function listScriptVersions(scriptId) {
       console.warn(`Deployment retrieval API error during version listing. Web app URLs will not be available: ${e.message}`);
       // Continue without web app URLs if deployment fetch fails
     }
-    // Log a compact summary for raw deployments
-    console.log(`  listScriptVersions: All raw deployments fetched (total: ${allDeployments.length}). Sample (first 5 compact):`, JSON.stringify(allDeployments.slice(0, 5).map(d => ({id: d.deploymentId, updateTime: d.updateTime, version: d.deploymentConfig?.versionNumber})), null, 2));
-
     const webAppUrlMap = {}; // versionNumber -> webAppUrl map
 
     // Sort deployments by create time descending to get the latest web app URL for each version
     allDeployments.sort((a, b) => new Date(b.updateTime).getTime() - new Date(a.updateTime).getTime());
-    // Log a compact summary for sorted deployments
-    console.log(`  listScriptVersions: All deployments (sorted by updateTime descending, total: ${allDeployments.length}). Sample (first 5 compact):`, JSON.stringify(allDeployments.slice(0, 5).map(d => ({id: d.deploymentId, updateTime: d.updateTime, version: d.deploymentConfig?.versionNumber})), null, 2));
-
     allDeployments.forEach(d => {
       if (d.deploymentConfig && d.deploymentConfig.versionNumber) {
-        console.log(`  listScriptVersions: Processing deployment ${d.deploymentId} (Version: ${d.deploymentConfig.versionNumber}, Updated: ${d.updateTime}) for web app URL mapping.`);
         d.entryPoints?.forEach(ep => {
           if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) {
             // Add only if not already mapped, ensuring latest deployment's URL
             if (!webAppUrlMap[d.deploymentConfig.versionNumber]) {
               webAppUrlMap[d.deploymentConfig.versionNumber] = ep.webApp.url;
-              console.log(`  listScriptVersions: Mapped latest web app URL for version ${d.deploymentConfig.versionNumber}: ${ep.webApp.url} (from deployment ${d.deploymentId} updated at ${d.updateTime})`);
             }
           }
         });
