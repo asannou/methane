@@ -1403,6 +1403,9 @@
         /**
          * Handle opening the web app URL for the selected version.
          */
+        /**
+         * Handle opening the web app URL for the selected version.
+         */
         handleOpenWebApp: () => {
             const versionsSelect = UI.get('versionSelect');
             const selectedOption = versionsSelect.options[versionsSelect.selectedIndex];
@@ -1413,6 +1416,37 @@
             } else {
                 alert('No web app URL found for the selected version, or URL is invalid.');
             }
+        },
+
+        /**
+         * Handle opening the Apps Script Editor for the selected script ID.
+         */
+        handleOpenEditorButton: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            if (scriptId) {
+                const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
+                window.open(editorUrl, '_blank');
+            } else {
+                UI.setText('editorUrlMessage', 'Error: Please select a Script ID first.');
+            }
+        },
+
+        /**
+         * Handle script ID change specifically for the editor button.
+         */
+        handleScriptIdChangeForEditorButton: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            if (scriptId) {
+                UI.enable('openEditorButton');
+                UI.setText('editorUrlMessage', `Editor link ready for: ${scriptId}`);
+            } else {
+                UI.disable('openEditorButton');
+                UI.setText('editorUrlMessage', 'Select a Script ID to enable editor link.');
+            }
+            // Also call other handlers that depend on scriptIdSelect change here
+            Handlers.handleGetFilesList(null); // Pass null as event since it's programmatic
+            Handlers.handleGetOAuthScopes();
+            Handlers.handleGetVersions();
         },
 
         /**
