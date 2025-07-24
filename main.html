@@ -33,8 +33,6 @@
         AppState.domElements.deployResultContainer = document.getElementById('deploy-result-container');
         // AppState.domElements.deployResult = document.getElementById('deploy-result'); // REMOVED
         AppState.domElements.deployResultContent = document.getElementById('deploy-result-content');
-        AppState.domElements.openEditorButton = document.getElementById('openEditorButton');
-        AppState.domElements.editorUrlMessage = document.getElementById('editorUrlMessage');
         AppState.domElements.addLibraryResultContainer = document.getElementById('add-library-result-container');
         AppState.domElements.addLibraryResult = document.getElementById('add-library-result');
         AppState.domElements.gcpSaveResultContainer = document.getElementById('gcp-save-result-container');
@@ -86,7 +84,9 @@
         const savedScriptId = localStorage.getItem('targetScriptId');
         if (savedScriptId) {
             UI.get('scriptIdSelect').value = savedScriptId;
-
+            // Explicitly trigger change event to update editor URL display
+            // and load files, OAuth scopes, and versions
+            UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
         }
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
         if (savedGcpProjectId) {
@@ -104,8 +104,6 @@
         UI.hide('fixApplyErrorsButton');
         UI.show('generatePolicyButton');
         UI.hide('regeneratePolicyButton');
-        UI.disable('openEditorButton');
-        UI.setText('editorUrlMessage', 'Select a Script ID to enable editor link.');
         UI.hide('versionResultContainer');
         UI.hide('filesListContainer');
         UI.disable('openWebAppButton');
@@ -125,7 +123,7 @@
         Handlers.initTabNavigation();
 
         // Register event listeners
-        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleScriptIdChangeForEditorButton);
+        UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetOAuthScopes);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetVersions); /* NEW: Automatically get versions on script ID change */

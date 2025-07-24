@@ -35,35 +35,26 @@
         loadProjectsIntoDropdown: (selectedId = null) => {
             const scriptIdSelect = UI.get('scriptIdSelect');
             scriptIdSelect.innerHTML = '<option value="">-- Select a Script ID --</option>';
-            console.log('Utils.loadProjectsIntoDropdown: Attempting to load projects into dropdown...');
             google.script.run
                 .withSuccessHandler(function(response) {
                     if (response.status === 'success') {
-                        console.log(`Utils.loadProjectsIntoDropdown: Successfully loaded ${response.projects.length} projects.`);
                         response.projects.forEach(project => {
                             const option = document.createElement('option');
                             option.value = project.id;
                             option.textContent = project.title;
                             scriptIdSelect.appendChild(option);
                         });
-                        if (selectedId && Array.from(scriptIdSelect.options).some(option => option.value === selectedId)) {
+                        if (selectedId) {
                             scriptIdSelect.value = selectedId;
-                            console.log(`Utils.loadProjectsIntoDropdown: Set dropdown value to saved ID "${selectedId}".`);
-                        } else if (selectedId) {
-                            console.warn(`Utils.loadProjectsIntoDropdown: Saved ID "${selectedId}" not found in loaded projects.`);
+                            scriptIdSelect.dispatchEvent(new Event('change'));
                         }
-                        // Always dispatch change event after dropdown is populated to update UI elements
-                        console.log('Utils.loadProjectsIntoDropdown: Dispatching change event to update UI.');
-                        scriptIdSelect.dispatchEvent(new Event('change'));
                     }
                     else {
                         alert('Failed to load Apps Script projects: ' + response.message);
-                        console.error('Utils.loadProjectsIntoDropdown: Failed to load projects:', response.message);
                     }
                 })
                 .withFailureHandler(function(error) {
                     alert('Error loading Apps Script projects: ' + error.message);
-                    console.error('Utils.loadProjectsIntoDropdown: Error calling listAppsScriptProjects:', error.message);
                 })
                 .listAppsScriptProjects();
         },
