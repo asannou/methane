@@ -1423,11 +1423,13 @@
          */
         handleOpenEditorButton: () => {
             const scriptId = Utils.getEffectiveScriptId();
+            console.log(`Handlers.handleOpenEditorButton: Clicked. scriptId: "${scriptId}"`);
             if (scriptId) {
                 const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
                 window.open(editorUrl, '_blank');
             } else {
                 UI.setText('editorUrlMessage', 'Error: Please select a Script ID first.');
+                console.warn('Handlers.handleOpenEditorButton: No script ID selected. Button should have been disabled.');
             }
         },
 
@@ -1436,6 +1438,7 @@
          */
         handleScriptIdChangeForEditorButton: () => {
             const scriptId = Utils.getEffectiveScriptId();
+            console.log(`Handlers.handleScriptIdChangeForEditorButton: Triggered. Effective Script ID: "${scriptId}"`);
             if (scriptId) {
                 UI.enable('openEditorButton');
                 UI.setText('editorUrlMessage', `Editor link ready for: ${scriptId}`);
@@ -1447,7 +1450,7 @@
             Handlers.handleGetFilesList(null); // Pass null as event since it's programmatic
             Handlers.handleGetOAuthScopes();
             Handlers.handleGetVersions();
-        },
+        }
 
         /**
          * Handle reverting to a specific script version.

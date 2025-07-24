@@ -86,11 +86,7 @@
         const savedScriptId = localStorage.getItem('targetScriptId');
         if (savedScriptId) {
             UI.get('scriptIdSelect').value = savedScriptId;
-            // Explicitly trigger change event to update editor URL display
-            // and load files, OAuth scopes, and versions
-                        // Explicitly trigger change event to update editor URL display
-            // and load files, OAuth scopes, and versions
-            UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
+
         }
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
         if (savedGcpProjectId) {
