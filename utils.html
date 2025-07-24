@@ -61,15 +61,35 @@
         updateEditorUrlDisplay: () => {
             const scriptId = Utils.getEffectiveScriptId();
             const editorUrlDisplayDiv = UI.get('editor-url-display');
-            UI.setHtml('editor-url-display', '');
+            UI.setHtml(editorUrlDisplayDiv, ''); 
             if (!scriptId) {
-                UI.setText('editor-url-display', 'Apps Script Editor URL: (Script ID needed)');
+                UI.setHtml(editorUrlDisplayDiv, '<p class="mb-0">Apps Script Editor URL: (Script ID needed)</p>');
                 return;
             }
-            UI.setHtml('editor-url-display', 'Apps Script Editor URL: <span class="spinner" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin: 0 5px;"></span> Loading...');
             Utils.saveScriptIdToLocalStorage(scriptId);
-            const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
-            UI.setHtml('editor-url-display', "Apps Script Editor URL: <a href=\"" + Utils.escapeHtml(editorUrl) + "\" target=\"_blank\">" + Utils.escapeHtml(editorUrl) + "</a>");
+            const editorUrl = `https://script.google.com/d/${scriptId}/edit`;
+            const buttonHtml = `
+                <div class="field is-grouped is-grouped-multiline is-align-items-center is-flex-wrap-wrap mb-0 editor-url-display-content">
+                    <div class="control">
+                        <button id="openEditorButton" class="button is-link is-small">
+                            <span class="icon is-small">
+                                <i class="fas fa-external-link-alt"></i>
+                            </span>
+                            <span>Open Apps Script Editor</span>
+                        </button>
+                    </div>
+                    <div class="control">
+                        <p class="is-size-7">ID: ${Utils.escapeHtml(scriptId)}</p>
+                    </div>
+                </div>
+            `;
+            UI.setHtml(editorUrlDisplayDiv, buttonHtml);
+            const openEditorButton = document.getElementById('openEditorButton'); 
+            if (openEditorButton) {
+                openEditorButton.addEventListener('click', () => {
+                    window.open(editorUrl, '_blank');
+                });
+            }
         },
         validateHtml: (htmlString, fileName) => {
             console.log(`HTML validation started for file: ${fileName}`);
