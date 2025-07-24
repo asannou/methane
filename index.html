@@ -32,6 +32,24 @@
             </div>
           </div>
         </div>
+
+        <h2 class="title is-4 mt-5">Create New Apps Script Project</h2>
+        <form id="create-script-form" class="box">
+          <p class="content">Create a new, empty Apps Script project. The new script will be automatically added to the "Target Apps Script Configuration" dropdown.</p>
+          <div class="field">
+            <label class="label" for="newScriptTitle">New Script Title:</label>
+            <div class="control">
+              <input type="text" id="newScriptTitle" name="newScriptTitle" class="input" placeholder="e.g., My New Project" required>
+            </div>
+          </div>
+          <div class="control mt-3">
+            <button type="submit" id="createNewScriptButton" class="button is-primary">Create New Script</button>
+          </div>
+          <div id="create-script-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Creation Result:</h3>
+            <div id="create-script-result" class="content"></div>
+          </div>
+        </form>
         <div id="editor-url-display" class="notification is-light is-info is-small mb-0"></div>
       </div>
 

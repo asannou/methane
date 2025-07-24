@@ -675,6 +675,53 @@ function _performDeployment(scriptId, accessToken, deploymentsApiUrl, versionNum
  * Lists Apps Script projects accessible to the user using Google Drive API.
  * @returns {object} An object containing 'status' and either 'projects' (Array<object>) or 'message'.
  */
+/**
+ * Creates a new, empty Apps Script project.
+ * The created script will initially have a Code.gs file with an empty function.
+ * Requires "https://www.googleapis.com/auth/script.projects" OAuth scope.
+ *
+ * @param {string} title - The title of the new Apps Script project.
+ * @returns {object} An object containing 'status' and either 'scriptId', 'scriptTitle', 'editorUrl' (on success) or 'message'.
+ */
+function createAppsScriptProject(title) {
+  if (!title || title.trim() === '') {
+    return { status: 'error', message: 'Script title cannot be empty.' };
+  }
+
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const createProjectUrl = 'https://script.googleapis.com/v1/projects';
+
+    const createProjectPayload = {
+      title: title.trim()
+    };
+
+    console.log(`Attempting to create a new Apps Script project with title: '${title}'`);
+    const response = _makeApiCall(createProjectUrl, 'post', accessToken, JSON.stringify(createProjectPayload), 'Failed to create new Apps Script project');
+    const newProject = JSON.parse(response.getContentText());
+
+    // The API response for projects.create does not directly provide the editor URL.
+    // We construct it.
+    const editorUrl = `https://script.google.com/d/${newProject.scriptId}/edit`;
+
+    return {
+      status: 'success',
+      message: `Successfully created new Apps Script project: '${newProject.title}' (ID: ${newProject.scriptId})`,
+      scriptId: newProject.scriptId,
+      scriptTitle: newProject.title,
+      editorUrl: editorUrl
+    };
+
+  } catch (e) {
+    console.error("Error creating new Apps Script project:", e);
+    return { status: 'error', message: `Error creating script: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
+  }
+}
+
+/**
+ * Lists Apps Script projects accessible to the user using Google Drive API.
+ * @returns {object} An object containing 'status' and either 'projects' (Array<object>) or 'message'.
+ */
 function listAppsScriptProjects() {
   try {
     // Using Drive API (Advanced Service) to list script files

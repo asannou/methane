@@ -60,6 +60,11 @@
         AppState.domElements.downloadAndAddFileButton = document.getElementById('downloadAndAddFileButton');
         AppState.domElements.downloadResultContainer = document.getElementById('download-result-container');
         AppState.domElements.downloadResult = document.getElementById('download-result');
+        // NEW Elements for creating new script
+        AppState.domElements.newScriptTitle = document.getElementById('newScriptTitle');
+        AppState.domElements.createNewScriptButton = document.getElementById('createNewScriptButton');
+        AppState.domElements.createScriptResultContainer = document.getElementById('create-script-result-container');
+        AppState.domElements.createScriptResult = document.getElementById('create-script-result');
 
         // Load theme from localStorage or system preference and apply
         const themeToggle = AppState.domElements.themeToggle; // Reference to the checkbox
@@ -119,6 +124,7 @@
 
         // Initial UI state setup for new elements
         UI.hide('downloadResultContainer');
+        UI.hide('createScriptResultContainer');
 
         Handlers.initTabNavigation();
 
@@ -163,5 +169,6 @@
         UI.get('getFilesListButton').addEventListener('click', Handlers.handleGetFilesList);
         AppState.domElements.themeToggle.addEventListener('change', Handlers.handleThemeToggle);
         UI.get('downloadAndAddFileButton').addEventListener('click', Handlers.handleDownloadAndAddFile);
+        UI.get('create-script-form').addEventListener('submit', Handlers.handleCreateNewScript);
     });
 </script>

@@ -1630,6 +1630,56 @@
         /**
          * Handle downloading a file from a URL and adding/updating it to the project.
          */
+        /**
+         * Handle creating a new Apps Script project.
+         * @param {Event} e - The submit event.
+         */
+        handleCreateNewScript: (e) => {
+            e.preventDefault();
+            const newScriptTitleInput = UI.get('newScriptTitle');
+            const newScriptTitle = newScriptTitleInput.value.trim();
+            const createButton = UI.get('createNewScriptButton');
+            const resultContainer = UI.get('create-script-result-container');
+            const resultDisplay = UI.get('create-script-result');
+
+            UI.showSpinnerInButton(createButton, 'Creating...');
+            UI.show(resultContainer);
+            UI.setText(resultDisplay, ''); // Clear previous result
+
+            if (!newScriptTitle) {
+                UI.hideSpinnerInButton(createButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: New script title cannot be empty.');
+                return;
+            }
+
+            UI.appendNotification(resultDisplay, 'is-info', 'Attempting to create new script...');
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(createButton);
+                    if (response.status === 'success') {
+                        UI.appendNotification(resultDisplay, 'is-success', response.message);
+                        UI.clearValue('newScriptTitle');
+                        // Update the scriptIdSelect dropdown and select the new script
+                        Utils.loadProjectsIntoDropdown(response.scriptId);
+                        // Open the new script in the editor
+                        if (response.editorUrl) {
+                            UI.appendNotification(resultDisplay, 'is-info', 'Opening new script in editor...', `<a href="${Utils.escapeHtml(response.editorUrl)}" target="_blank">Click here to open ${Utils.escapeHtml(response.scriptTitle)}</a>`);
+                            window.open(response.editorUrl, '_blank');
+                        }
+                    } else {
+                        UI.appendNotification(resultDisplay, 'is-danger', `Failed to create script: ${response.message}`, response.apiErrorDetails || response.fullErrorText);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(createButton);
+                    UI.appendNotification(resultDisplay, 'is-danger', `Error calling server function: ${error.message}`);
+                })
+                .createAppsScriptProject(newScriptTitle);
+        },
+        /**
+         * Handle downloading a file from a URL and adding/updating it to the project.
+         */
         handleDownloadAndAddFile: () => {
             const scriptId = Utils.getEffectiveScriptId();
             const fileUrl = UI.get('fileUrl').value.trim();
