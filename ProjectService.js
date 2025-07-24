@@ -597,7 +597,7 @@ function _deleteDeployment(scriptId, accessToken, deploymentId) {
  */
 function _cleanupOldVersions(scriptId, accessToken, versionsApiBaseUrl, deploymentsApiUrl) {
   console.log("Checking for old versions to clean up...");
-  const VERSION_CLEANUP_THRESHOLD = 195; // Retain latest N versions (Google Apps Script version limit is 200)
+  const VERSION_CLEANUP_THRESHOLD = 175; // Retain latest N versions (Google Apps Script version limit is 200)
 
   let allVersions = [];
   try {
