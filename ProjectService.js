@@ -216,7 +216,7 @@ function _formatContentByType(source, type) {
     case 'HTML':
       // Basic formatting for JS/HTML: normalize line endings and trim trailing whitespace.
       // This avoids aggressive re-indentation which might fight AI's formatting or introduce too many diffs.
-      let lines = source.replace(/\r\n/g, '\n').split('\n');
+      let lines = source.replace(/\r\n|\r/g, '\n').split('\n');
       lines = lines.map(line => line.trimEnd()); // Remove trailing whitespace
       return lines.join('\n');
     default:
