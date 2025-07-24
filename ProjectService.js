@@ -192,6 +192,40 @@ function _makeApiCall(url, method, accessToken, payload = null, errorMessagePref
 }
 
 /**
+ * Internal helper to format file content based on its type.
+ * Aims to improve consistency and readability for supported formats.
+ * @param {string} source - The source code content.
+ * @param {string} type - The file type (SERVER_JS, JSON, HTML).
+ * @returns {string} The formatted source code.
+ */
+function _formatContentByType(source, type) {
+  if (typeof source !== 'string' || source === null) {
+    return source; // Return as is if not a string
+  }
+
+  switch (type) {
+    case 'JSON':
+      try {
+        // Pretty-print JSON
+        return JSON.stringify(JSON.parse(source), null, 2);
+      } catch (e) {
+        console.warn(`JSON formatting failed for type '${type}': ${e.message}. Returning original source.`);
+        return source; // Return original if parsing fails
+      }
+    case 'SERVER_JS':
+    case 'HTML':
+      // Basic formatting for JS/HTML: normalize line endings and trim trailing whitespace.
+      // This avoids aggressive re-indentation which might fight AI's formatting or introduce too many diffs.
+      let lines = source.replace(/\r\n/g, '\n').split('\n');
+      lines = lines.map(line => line.trimEnd()); // Remove trailing whitespace
+      return lines.join('\n');
+    default:
+      // No formatting for other types or unknown types
+      return source;
+  }
+}
+
+/**
  * Applies a single proposed file change (update, add, or replace) to the files map.
  * @param {Map<string, object>} newProjectFilesMap - The map of current project files to update.
  * @param {object} proposedFile - The file object proposed by AI.
@@ -243,6 +277,8 @@ function _applyFileChangeToMap(newProjectFilesMap, proposedFile) {
       console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Skipping replacement. Proposed Old String (first 100 chars): "${oldString.substring(0, 100)}"...`);
     }
   } else { // Handle SERVER_JS, JSON, HTML types
+    // Apply formatting before setting the source
+    proposedFile.source = _formatContentByType(proposedFile.source, proposedFile.type);
     newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
   }
 }
