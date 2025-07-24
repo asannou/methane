@@ -90,10 +90,54 @@
             let hasChanges = false;
             const scrollSyncElements = [];
             const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
+
+            // Step 1: Create a temporary map to build the final proposed state
+            const finalProposedFilesMap = new Map();
+            // Initialize with all original files. These will be updated or removed.
+            originalFiles.forEach(file => {
+                finalProposedFilesMap.set(file.name, { ...file }); // Deep copy to avoid modifying original source directly
+            });
+
+            // Step 2: Apply proposed changes (REPLACE and SOURCE) to the finalProposedFilesMap
+            proposedFiles.forEach(proposedFile => {
+                const fileName = proposedFile.name;
+                
+                if (proposedFile.type === 'REPLACE') {
+                    const currentFileInMap = finalProposedFilesMap.get(fileName);
+
+                    if (!currentFileInMap) {
+                        console.warn(`REPLACE operation target file '${fileName}' not found in original project content. Skipping this specific REPLACE operation.`);
+                        return; // Cannot apply replace if file doesn't exist
+                    }
+
+                    const oldString = proposedFile.old_string;
+                    const newString = proposedFile.new_string;
+                    const isGlobalReplace = proposedFile.isGlobalReplace === true;
+
+                    if (typeof oldString !== 'string' || typeof newString !== 'string' || oldString === null || newString === null) {
+                        console.warn(`REPLACE operation for '${fileName}' has malformed old_string or new_string. Skipping.`);
+                        return;
+                    }
+
+                    let currentSource = currentFileInMap.source;
+                    if (isGlobalReplace) {
+                        currentFileInMap.source = currentSource.replaceAll(oldString, newString);
+                    } else {
+                        currentFileInMap.source = currentSource.replace(oldString, newString);
+                    }
+                    finalProposedFilesMap.set(fileName, currentFileInMap); // Update map with modified file
+                } else { // type is SERVER_JS, JSON, HTML (full file content update or new file)
+                    finalProposedFilesMap.set(fileName, { ...proposedFile }); // Overwrite or add the file
+                }
+            });
+
+            // Step 3: Handle deleted files. Remove them from finalProposedFilesMap for accurate comparison/display.
+            // Also, prepare deleted file display immediately.
             deletedFileNames.forEach(deletedFileName => {
                 const originalFile = originalFilesMap.get(deletedFileName);
                 if (originalFile) {
                     hasChanges = true;
+                    finalProposedFilesMap.delete(deletedFileName); // Remove from the map of proposed files
                     const ext = Utils.getFileExtension(originalFile.type);
                     const originalContentLines = Utils.getActualContentLines(originalFile.source);
                     const lineNumbersHtml = originalContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
@@ -112,73 +156,21 @@
                     console.warn(`File '${deletedFileName}' was marked for deletion but not found in original files. Skipping deletion display.`);
                 }
             });
-            proposedFiles.forEach(proposedFile => {
-                const originalFile = originalFilesMap.get(proposedFile.name);
-                let fileContentHtml = '';
-                if (proposedFile.type === 'REPLACE') {
-                    hasChanges = true;
-                    const originalSourceForReplace = originalFile ? originalFile.source : '';
-                    const originalFileTypeForReplace = originalFile ? Utils.getFileExtension(originalFile.type) : 'unknown';
-                    const oldString = proposedFile.old_string;
-                    const newString = proposedFile.new_string;
-                    const isGlobalReplace = proposedFile.isGlobalReplace === true;
-                    if (typeof oldString !== 'string' || typeof newString !== 'string' || oldString === null || newString === null) {
-                        console.warn(`REPLACE operation for '${proposedFile.name}' has malformed old_string or new_string. Cannot simulate replacement.`);
-                        fileContentHtml = `
-                            <div class="file-comparison is-replace">
-                                <h4 class="title is-5 full-width-panel">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
-                                <div class="notification is-danger is-light full-width-panel">
-                                    <p><strong>エラー:</strong> 置換操作のデータが不正なため、プレビューを生成できませんでした。</p>
-                                    <p class="is-size-7 mt-2"><strong>置換前:</strong> <code class="replacement-view replacement-old-inline">${Utils.escapeHtml(String(oldString))}</code></p>
-                                    <p class="is-size-7"><strong>置換後:</strong> <code class="replacement-view replacement-new-inline">${Utils.escapeHtml(String(newString))}</code></p>
-                                </div>
-                            </div>
-                        `;
-                        proposedFilesDisplay.innerHTML += fileContentHtml;
-                        return;
-                    }
-                    let simulatedNewSource = originalSourceForReplace;
-                    let replacementPerformed = false;
-                    if (originalSourceForReplace.includes(oldString)) {
-                        if (isGlobalReplace) {
-                            simulatedNewSource = originalSourceForReplace.replaceAll(oldString, newString);
-                            replacementPerformed = true;
-                        } else {
-                            simulatedNewSource = originalSourceForReplace.replace(oldString, newString);
-                            replacementPerformed = true;
-                        }
-                    } else {
-                        simulatedNewSource = originalSourceForReplace;
-                        console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Showing diff between original and original.`);
-                    }
-                    const diffsHtml = Utils.generateFormattedDiffPanels(originalSourceForReplace, simulatedNewSource);
-                    const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                    const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                    fileContentHtml = `
-                        <div class="file-comparison is-replace">
-                            <h4 class="title is-5 full-width-panel">REPLACE Operation Preview: ${Utils.escapeHtml(proposedFile.name)}.${originalFileTypeForReplace}</h4>
 
-                            <div class="original-file-panel">
-                                <h4 class="title is-5">変更前:</h4>
-                                <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
-                            </div>
-                            <div class="proposed-file-panel">
-                                <h4 class="title is-5">変更後:</h4>
-                                <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
-                            </div>
-                        </div>
-                    `;
-                    proposedFilesDisplay.innerHTML += fileContentHtml;
-                    scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
-                } else if (!originalFile) {
+            // Step 4: Generate diffs for modified and new files from finalProposedFilesMap
+            finalProposedFilesMap.forEach((finalFile, fileName) => {
+                const originalFile = originalFilesMap.get(fileName);
+                const ext = Utils.getFileExtension(finalFile.type);
+                let fileContentHtml = '';
+
+                if (!originalFile) { // New file
                     hasChanges = true;
-                    const ext = Utils.getFileExtension(proposedFile.type);
-                    const proposedContentLines = Utils.getActualContentLines(proposedFile.source);
+                    const proposedContentLines = Utils.getActualContentLines(finalFile.source);
                     const lineNumbersHtml = proposedContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
                     const contentHtml = proposedContentLines.map(line => `<div class="diff-line-added">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
                     fileContentHtml = `
                         <div class="file-comparison">
-                            <h4 class="title is-5 full-width-panel">NEW FILE: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
+                            <h4 class="title is-5 full-width-panel">NEW FILE: ${Utils.escapeHtml(fileName)}.${ext}</h4>
                             <div class="notification is-info is-light full-width-panel">これはAIによって提案された新しいファイルです。</div>
                             <div class="single-file-content-panel">
                                 <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
@@ -186,10 +178,9 @@
                         </div>
                     `;
                     proposedFilesDisplay.innerHTML += fileContentHtml;
-                } else if (originalFile.source !== proposedFile.source) {
+                } else if (originalFile.source !== finalFile.source) { // Modified file (including those modified by REPLACE operations)
                     hasChanges = true;
-                    const diffsHtml = Utils.generateFormattedDiffPanels(originalFile.source, proposedFile.source);
-                    const ext = Utils.getFileExtension(proposedFile.type);
+                    const diffsHtml = Utils.generateFormattedDiffPanels(originalFile.source, finalFile.source);
                     const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                     const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                     fileContentHtml = `
@@ -199,7 +190,7 @@
                                 <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
                             </div>
                             <div class="proposed-file-panel">
-                                <h4 class="title is-5">変更後: ${Utils.escapeHtml(proposedFile.name)}.${ext}</h4>
+                                <h4 class="title is-5">変更後: ${Utils.escapeHtml(finalFile.name)}.${ext}</h4>
                                 <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
                         </div>
@@ -207,6 +198,7 @@
                     proposedFilesDisplay.innerHTML += fileContentHtml;
                     scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
                 }
+                // Files that exist in both originalFilesMap and finalProposedFilesMap but have identical source are implicitly unchanged and not displayed.
             });
             if (!hasChanges) {
                 proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">選択されたスクリプトに対してAIからの変更提案はありません。これは、プロンプトがコード変更なしで完全に満たされたか、関連する変更が見つからなかったことを意味します。</p>`;
