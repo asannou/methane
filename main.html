@@ -70,7 +70,9 @@
         AppState.domElements.saveGeminiModelButton = document.getElementById('saveGeminiModelButton');
         AppState.domElements.geminiModelSaveResultContainer = document.getElementById('gemini-model-save-result-container');
         AppState.domElements.geminiModelSaveResult = document.getElementById('gemini-model-save-result');
-
+        // Elements for unified target script config
+        AppState.domElements.openEditorButton = document.getElementById('openEditorButton');
+        AppState.domElements.selectedScriptIdDisplay = document.getElementById('selectedScriptIdDisplay');
 
         // Load theme from localStorage or system preference and apply
         const themeToggle = AppState.domElements.themeToggle; // Reference to the checkbox
@@ -97,7 +99,7 @@
             UI.get('scriptIdSelect').value = savedScriptId;
             // Explicitly trigger change event to update editor URL display
             // and load files, OAuth scopes, and versions
-            UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
+            // No explicit dispatchEvent here as updateEditorUrlDisplay is called right after loadProjectsIntoDropdown
         }
         const savedGcpProjectId = localStorage.getItem('gcpProjectId');
         if (savedGcpProjectId) {
@@ -127,6 +129,8 @@
 
         // Initialize UI components
         Utils.loadProjectsIntoDropdown(savedScriptId);
+        Utils.updateEditorUrlDisplay(); // Call immediately after loading projects to set initial state
+
         UI.hide('policyContainer');
         UI.hide('proposalContainer');
         UI.hide('applyChangesNoDeployButton');
@@ -153,6 +157,7 @@
         UI.hide('downloadResultContainer');
         UI.hide('createScriptResultContainer');
         UI.hide('geminiModelSaveResultContainer'); // NEW
+        UI.disable('openEditorButton'); // Still disable by default.
 
         Handlers.initTabNavigation();
 
@@ -161,6 +166,17 @@
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetOAuthScopes);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetVersions); /* NEW: Automatically get versions on script ID change */
+        // NEW: Listener for openEditorButton
+        UI.get('openEditorButton').addEventListener('click', () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            if (scriptId) {
+                const editorUrl = `https://script.google.com/d/${scriptId}/edit`;
+                window.open(editorUrl, '_blank');
+            } else {
+                alert('Please select a Script ID first.');
+            }
+        });
+
         UI.get('prompt').addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
