@@ -32,6 +32,11 @@
                 localStorage.setItem('gcpProjectId', id);
             }
         },
+        saveGeminiModelNameToLocalStorage: (modelName) => { // NEW
+            if (modelName) {
+                localStorage.setItem('geminiModelName', modelName);
+            }
+        },
         loadProjectsIntoDropdown: (selectedId = null) => {
             const scriptIdSelect = UI.get('scriptIdSelect');
             scriptIdSelect.innerHTML = '<option value="">-- Select a Script ID --</option>';
@@ -73,7 +78,7 @@
 
             Utils.saveScriptIdToLocalStorage(scriptId);
             const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
-            
+
             // Create the button HTML
             const buttonHtml = `
                 <button id="openEditorButton" class="button is-small is-info">
@@ -127,7 +132,7 @@
             // Step 2: Apply proposed changes (REPLACE and SOURCE) to the finalProposedFilesMap
             proposedFiles.forEach(proposedFile => {
                 const fileName = proposedFile.name;
-                
+
                 if (proposedFile.type === 'REPLACE') {
                     const currentFileInMap = finalProposedFilesMap.get(fileName);
 

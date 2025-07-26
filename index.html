@@ -139,7 +139,7 @@
             <div id="log-result" class="log-display-container content"></div>
           </div>
         </form>
-        
+
         <h2 class="title is-4 mt-5">Automated Error Fix</h2>
         <form id="fix-errors-form" class="box">
           <p class="content">Allows AI to propose error fixes based on existing script logs. Proposed changes will appear in the "AI Operations" section under "AI Operations" tab.</p>
@@ -317,6 +317,30 @@
               <span class="theme-icon sun">☀️</span>
               <span class="theme-icon moon">🌙</span>
             </label>
+          </div>
+        </div>
+
+        <h2 class="title is-4 mt-5">Gemini Model Configuration</h2>
+        <div class="box">
+          <p class="content">Select the Gemini AI model to use for code generation. This setting is saved as a script property.</p>
+          <div class="field">
+            <label class="label" for="geminiModelSelect">Gemini Model:</label>
+            <div class="control is-expanded">
+              <div class="select is-fullwidth">
+                <select id="geminiModelSelect" name="geminiModelSelect">
+                  <option value="gemini-2.5-flash-preview-05-20">gemini-2.5-flash-preview-05-20 (Existing Default)</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash (Stable)</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro (Stable)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="control mt-3">
+            <button type="button" id="saveGeminiModelButton" class="button is-info">Save Gemini Model</button>
+          </div>
+          <div id="gemini-model-save-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Save Result:</h3>
+            <pre id="gemini-model-save-result" class="content"></pre>
           </div>
         </div>
 

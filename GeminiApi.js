@@ -1,5 +1,13 @@
 const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+
+/**
+ * Internal helper to construct the Gemini API base URL based on configured model.
+ * @returns {string} The base URL for Gemini content generation.
+ */
+function _getGeminiBaseUrl() {
+  const modelName = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL_NAME') || 'gemini-2.5-flash-preview-05-20'; // Default model as per policy
+  return `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+}
 
 /**
  * Gemini APIを呼び出す関数
@@ -61,7 +69,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
             "type": "ARRAY",
             "items": {
               "oneOf": [
-                { 
+                {
                   "type": "OBJECT",
                   "properties": {
                     "name": {
@@ -80,7 +88,7 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
                   },
                   "required": ["name", "type", "source"]
                 },
-                { 
+                {
                   "type": "OBJECT",
                   "properties": {
                     "name": {
@@ -133,8 +141,8 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   };
 
   console.log("Gemini APIにリクエストを送信します...");
-  console.log("リクエストペイロード（抜粋）:\n" + options.payload.substring(0, 2000) + (options.payload.length > 2000 ? "... (後略)" : "")); 
-  const response = UrlFetchApp.fetch(API_URL, options);
+  console.log("リクエストペイロード（抜粋）:\n" + options.payload.substring(0, 2000) + (options.payload.length > 2000 ? "... (後略)" : ""));
+  const response = UrlFetchApp.fetch(_getGeminiBaseUrl(), options);
   const responseCode = response.getResponseCode();
   const responseBody = response.getContentText();
 

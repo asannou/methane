@@ -40,7 +40,7 @@
             const revertAndDeployButton = UI.get('revertAndDeployButton');
             const revertButton = UI.get('revertVersionButton'); // Also disable revert
             const getVersionsButton = UI.get('getVersionsButton');
-            
+
             if (!scriptId) {
                 UI.setText('version-result', 'Error: Please select or enter a Script ID.');
                 UI.show('version-result-container');
@@ -120,7 +120,7 @@
 
                     UI.setText('version-result', `Error reverting and deploying: ${error.message}`);
                     UI.disable('openWebAppButton');
-                    UI.setText('openWebAppMessage', '');; 
+                    UI.setText('openWebAppMessage', '');;
                 });
             },
 
@@ -347,7 +347,7 @@
             UI.hide('applyAndDeployButton');
             UI.show('cancelAiOperationButton');
             UI.disable('prompt');
-            
+
             UI.hide('policyEditor');
             UI.setText('togglePolicyEditButton', 'Edit Policy');
             AppState.isPolicyEditing = false;
@@ -376,7 +376,7 @@
                     if (response.status === 'proposal') {
                         AppState.currentProposal = response;
                         UI.setText('proposal-purpose', response.purpose || 'No description provided.');
-                        
+
                         UI.setHtml('html-validation-warnings', '');
                         let hasHtmlErrors = false;
 
@@ -465,7 +465,7 @@
             UI.showSpinnerInButton(UI.get('regeneratePolicyButton'), 'Regenerating Policy...');
             UI.hide('generatePolicyButton');
             UI.hide('acceptPolicyButton');
-            
+
             UI.disable('prompt');
             UI.show('cancelAiOperationButton');
 
@@ -558,7 +558,7 @@
             Utils.saveScriptIdToLocalStorage(AppState.currentProposal.scriptId);
 
             UI.showSpinnerInButton(clickedButton, autoDeploy ? 'Applying & Deploying...' : 'Applying Changes...');
-            
+
             // Disable other related buttons
             if (clickedButton.id === 'applyChangesNoDeployButton') {
                 UI.disable('applyAndDeployButton');
@@ -638,7 +638,7 @@
                                     </ul>
                                 `;
                             }
-                            
+
                             deployMessageContainer.classList.add(messageClass);
                             deployMessageContainer.innerHTML = `
                                 <div class="message-header">
@@ -737,7 +737,7 @@
                     if (response.status === 'proposal') {
                         AppState.currentProposal = response;
                         UI.setText('proposal-purpose', response.purpose || 'No description provided.');
-                        
+
                         UI.setHtml('html-validation-warnings', '');
                         let hasHtmlErrors = false;
 
@@ -847,7 +847,7 @@
                     if (response.status === 'proposal') {
                         AppState.currentProposal = response;
                         UI.setText('proposal-purpose', response.purpose || 'No description provided.');
-                        
+
                         UI.setHtml('html-validation-warnings', '');
                         let hasHtmlErrors = false;
 
@@ -959,7 +959,7 @@
                     if (response.status === 'proposal') {
                         AppState.currentProposal = response;
                         UI.setText('proposal-purpose', response.purpose || 'No description provided.');
-                        
+
                         UI.setHtml('html-validation-warnings', '');
                         let hasHtmlErrors = false;
 
@@ -1041,12 +1041,12 @@
             UI.setHtml('apply-result-content', '');
             UI.hide('html-validation-warnings');
             UI.setHtml('html-validation-warnings', '');
-            
+
             // Clear previous proposal display
             UI.setHtml('proposed-files-display', '');
             UI.setText('proposal-purpose', '');
             UI.hide('proposal-container');
-            
+
             UI.show('propose-browser-error-logging-result-container');
             UI.setText('propose-browser-error-logging-result', 'Generating proposal for browser error logging...');
 
@@ -1075,7 +1075,7 @@
                         Handlers._switchToTabAndScroll('ai-operations-tab', 'proposal-container'); // Use the new helper
 
                         UI.setText('proposal-purpose', response.purpose || 'No description provided.');
-                        
+
                         UI.setHtml('html-validation-warnings', '');
                         let hasHtmlErrors = false;
 
@@ -1310,7 +1310,7 @@
             const scriptId = Utils.getEffectiveScriptId();
             const versionsSelect = UI.get('versionSelect');
             const getVersionsButton = UI.get('getVersionsButton');
-            
+
             UI.setHtml('versionSelect', '<option value="">-- Loading versions --</option>');
             UI.disable('versionSelect');
             UI.showSpinnerInButton(getVersionsButton, 'Getting Versions...');
@@ -1424,7 +1424,7 @@
             const selectedVersion = versionSelect.value;
             const revertButton = UI.get('revertVersionButton');
             const getVersionsButton = UI.get('getVersionsButton');
-            
+
             if (!scriptId) {
                 UI.setText('version-result', 'Error: Please select or enter a Script ID.');
                 UI.show('version-result-container');
@@ -1545,7 +1545,7 @@
                                         typeClass = 'is-unknown';
                                         typeText = 'UNKNOWN';
                                 }
-                                
+
                                 fileItem.classList.add(typeClass);
 
                                 fileItem.innerHTML = `
@@ -1730,7 +1730,8 @@
                         UI.clearValue('fileUrl');
                         UI.clearValue('newFileName');
                         UI.get('newFileType').value = 'SERVER_JS'; // Reset to default
-                    } else {
+                    }
+                    else {
                         UI.appendNotification(resultDisplay, 'is-danger', `Failed to download and add/update file: ${response.message}`, response.apiErrorDetails || response.fullErrorText);
                     }
                 })

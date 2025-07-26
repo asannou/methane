@@ -918,3 +918,36 @@ function listTargetScriptFiles(scriptId) {
     return { status: 'error', message: `File list retrieval error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null, fullErrorText: error.fullErrorText || null };
   }
 }
+
+/**
+ * Sets the Gemini API model name in script properties.
+ * @param {string} modelName - The name of the Gemini model (e.g., 'gemini-2.5-pro', 'gemini-2.5-flash').
+ * @returns {object} - Result object indicating success or failure.
+ */
+function setGeminiModelName(modelName) {
+  if (!modelName || modelName.trim() === '') {
+    return { status: 'error', message: 'Gemini Model Name cannot be empty.' };
+  }
+  try {
+    PropertiesService.getScriptProperties().setProperty('GEMINI_MODEL_NAME', modelName.trim());
+    return { status: 'success', message: `Gemini Model Name '${modelName.trim()}' set successfully.` };
+  } catch (e) {
+    console.error("Error setting Gemini Model Name:", e);
+    return { status: 'error', message: `Gemini Model Name setting error: ${e.message}` };
+  }
+}
+
+/**
+ * Retrieves the Gemini API model name from script properties.
+ * @returns {object} - Result object with status and the model name.
+ */
+function getGeminiModelName() {
+  try {
+    const modelName = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL_NAME');
+    // Return a default if not set, consistent with _getGeminiBaseUrl
+    return { status: 'success', modelName: modelName || 'gemini-2.5-flash-preview-05-20' };
+  } catch (e) {
+    console.error("Error retrieving Gemini Model Name:", e);
+    return { status: 'error', message: `Gemini Model Name retrieval error: ${e.message}` };
+  }
+}

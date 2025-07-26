@@ -65,6 +65,12 @@
         AppState.domElements.createNewScriptButton = document.getElementById('createNewScriptButton');
         AppState.domElements.createScriptResultContainer = document.getElementById('create-script-result-container');
         AppState.domElements.createScriptResult = document.getElementById('create-script-result');
+        // NEW Elements for Gemini Model configuration
+        AppState.domElements.geminiModelSelect = document.getElementById('geminiModelSelect');
+        AppState.domElements.saveGeminiModelButton = document.getElementById('saveGeminiModelButton');
+        AppState.domElements.geminiModelSaveResultContainer = document.getElementById('gemini-model-save-result-container');
+        AppState.domElements.geminiModelSaveResult = document.getElementById('gemini-model-save-result');
+
 
         // Load theme from localStorage or system preference and apply
         const themeToggle = AppState.domElements.themeToggle; // Reference to the checkbox
@@ -98,6 +104,27 @@
             UI.get('gcpProjectId').value = savedGcpProjectId;
         }
 
+        // NEW: Load Gemini model from localStorage and server
+        const savedGeminiModelName = localStorage.getItem('geminiModelName');
+        if (savedGeminiModelName) {
+            UI.get('geminiModelSelect').value = savedGeminiModelName;
+            AppState.geminiModelName = savedGeminiModelName; // Update AppState
+        } else {
+             // If not in localStorage, try to get from server properties to set default
+             google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.status === 'success' && response.modelName) {
+                        UI.get('geminiModelSelect').value = response.modelName;
+                        AppState.geminiModelName = response.modelName;
+                        Utils.saveGeminiModelNameToLocalStorage(response.modelName); // Save default to localStorage
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    console.error("Failed to retrieve default Gemini Model Name from server:", error);
+                })
+                .getGeminiModelName();
+        }
+
         // Initialize UI components
         Utils.loadProjectsIntoDropdown(savedScriptId);
         UI.hide('policyContainer');
@@ -125,6 +152,7 @@
         // Initial UI state setup for new elements
         UI.hide('downloadResultContainer');
         UI.hide('createScriptResultContainer');
+        UI.hide('geminiModelSaveResultContainer'); // NEW
 
         Handlers.initTabNavigation();
 
@@ -151,7 +179,7 @@
         UI.get('fix-errors-form').addEventListener('submit', Handlers.handleFixErrorsFormSubmit);
         UI.get('cancelFixErrorsButton').addEventListener('click', Handlers.handleCancelAiOperation);
         UI.get('regenerateProposalButton').addEventListener('click', Handlers.handleRegenerateProposal);
-        
+
         UI.get('proposeBrowserErrorLoggingButton').addEventListener('click', Handlers.handleProposeBrowserErrorLogging);
         UI.get('getOAuthScopesButton').addEventListener('click', Handlers.handleGetOAuthScopes);
 
@@ -170,5 +198,7 @@
         AppState.domElements.themeToggle.addEventListener('change', Handlers.handleThemeToggle);
         UI.get('downloadAndAddFileButton').addEventListener('click', Handlers.handleDownloadAndAddFile);
         UI.get('create-script-form').addEventListener('submit', Handlers.handleCreateNewScript);
+        // NEW Event Listener for Gemini Model configuration
+        UI.get('saveGeminiModelButton').addEventListener('click', Handlers.handleSaveGeminiModelName);
     });
 </script>
