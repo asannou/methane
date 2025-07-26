@@ -65,18 +65,42 @@
         },
         updateEditorUrlDisplay: () => {
             const scriptId = Utils.getEffectiveScriptId();
-            const openEditorButton = UI.get('openEditorButton');
-            const selectedScriptIdDisplay = UI.get('selectedScriptIdDisplay');
+            const editorUrlDisplayDiv = UI.get('editor-url-display');
+            editorUrlDisplayDiv.innerHTML = ''; // Clear previous content
 
             if (!scriptId) {
-                UI.hide(openEditorButton);
-                UI.setText(selectedScriptIdDisplay, 'Please select a Script ID above to view editor link.');
+                // If no script ID is selected, display a prompt
+                editorUrlDisplayDiv.innerHTML = `
+                    <p>Apps Script Editor: Please select a Script ID above.</p>
+                `;
                 return;
             }
 
             Utils.saveScriptIdToLocalStorage(scriptId);
-            UI.show(openEditorButton);
-            UI.setText(selectedScriptIdDisplay, `Script ID: ${Utils.escapeHtml(scriptId)}`);
+            const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
+
+            // Create the button HTML
+            const buttonHtml = `
+                <button id="openEditorButton" class="button is-small is-info">
+                    Open Apps Script Editor
+                </button>
+            `;
+
+            // Set the content of the display div
+            editorUrlDisplayDiv.innerHTML = `
+                <div class="is-flex is-align-items-center">
+                    ${buttonHtml}
+                    <span class="ml-3 is-size-7 has-text-grey-dark">Script ID: ${Utils.escapeHtml(scriptId)}</span>
+                </div>
+            `;
+
+            // Attach event listener to the newly created button
+            const openEditorButton = document.getElementById('openEditorButton');
+            if (openEditorButton) {
+                openEditorButton.addEventListener('click', () => {
+                    window.open(editorUrl, '_blank');
+                });
+            }
         },
         validateHtml: (htmlString, fileName) => {
             console.log(`HTML validation started for file: ${fileName}`);

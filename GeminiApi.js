@@ -6,6 +6,7 @@ const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_
  */
 function _getGeminiBaseUrl() {
   const modelName = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL_NAME') || 'gemini-2.5-flash-preview-05-20'; // Default model as per policy
+  console.log(`Using Gemini model: ${modelName}`);
   return `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
 }
 
