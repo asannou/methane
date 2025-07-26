@@ -1740,6 +1740,43 @@
                     UI.appendNotification(resultDisplay, 'is-danger', `Error calling server function: ${error.message}`);
                 })
                 .downloadAndAddFile(scriptId, fileUrl, newFileName, newFileType);
+        },
+        /**
+         * Handle saving the selected Gemini Model Name.
+         */
+        handleSaveGeminiModelName: () => {
+            const geminiModelSelect = UI.get('geminiModelSelect');
+            const modelName = geminiModelSelect.value.trim();
+            const saveButton = UI.get('saveGeminiModelButton');
+            const resultContainer = UI.get('gemini-model-save-result-container');
+            const resultDisplay = UI.get('gemini-model-save-result');
+
+            UI.showSpinnerInButton(saveButton, 'Saving...');
+            UI.show(resultContainer);
+            UI.setText(resultDisplay, ''); // Clear previous result
+
+            if (!modelName) {
+                UI.hideSpinnerInButton(saveButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: Gemini Model Name cannot be empty.');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(saveButton);
+                    if (response.status === 'success') {
+                        UI.appendNotification(resultDisplay, 'is-success', response.message);
+                        Utils.saveGeminiModelNameToLocalStorage(modelName); // Save to browser's LocalStorage
+                        AppState.geminiModelName = modelName; // Update AppState
+                    } else {
+                        UI.appendNotification(resultDisplay, 'is-danger', `Failed to save Gemini Model Name: ${response.message}`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(saveButton);
+                    UI.appendNotification(resultDisplay, 'is-danger', `Error saving Gemini Model Name: ${error.message}`);
+                })
+                .setGeminiModelName(modelName);
         }
     };
 </script>
