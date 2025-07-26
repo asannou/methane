@@ -131,13 +131,14 @@
 
             // Step 2: Apply proposed changes (REPLACE and SOURCE) to the finalProposedFilesMap
             proposedFiles.forEach(proposedFile => {
-                const fileName = proposedFile.name;
+                // Normalize file name by removing potential extensions (.gs, .html, .json) to handle AI response variations.
+                const normalizedFileName = proposedFile.name.replace(/\.(gs|html|json)$/i, '');
 
                 if (proposedFile.type === 'REPLACE') {
-                    const currentFileInMap = finalProposedFilesMap.get(fileName);
+                    const currentFileInMap = finalProposedFilesMap.get(normalizedFileName);
 
                     if (!currentFileInMap) {
-                        console.warn(`REPLACE operation target file '${fileName}' not found in original project content. Skipping this specific REPLACE operation.`);
+                        console.warn(`REPLACE operation target file '${proposedFile.name}' (normalized to '${normalizedFileName}') not found in original project content. Skipping this specific REPLACE operation.`);
                         return; // Cannot apply replace if file doesn't exist
                     }
 
@@ -146,7 +147,7 @@
                     const isGlobalReplace = proposedFile.isGlobalReplace === true;
 
                     if (typeof oldString !== 'string' || typeof newString !== 'string' || oldString === null || newString === null) {
-                        console.warn(`REPLACE operation for '${fileName}' has malformed old_string or new_string. Skipping.`);
+                        console.warn(`REPLACE operation for '${normalizedFileName}' has malformed old_string or new_string. Skipping.`);
                         return;
                     }
 
@@ -156,15 +157,16 @@
                     } else {
                         currentFileInMap.source = currentSource.replace(oldString, newString);
                     }
-                    finalProposedFilesMap.set(fileName, currentFileInMap); // Update map with modified file
+                    finalProposedFilesMap.set(normalizedFileName, currentFileInMap); // Update map with modified file
                 } else { // type is SERVER_JS, JSON, HTML (full file content update or new file)
-                    finalProposedFilesMap.set(fileName, { ...proposedFile }); // Overwrite or add the file
+                    finalProposedFilesMap.set(normalizedFileName, { ...proposedFile, name: normalizedFileName }); // Overwrite or add the file, ensuring name in map is normalized
                 }
             });
 
             // Step 3: Handle deleted files. Remove them from finalProposedFilesMap for accurate comparison/display.
             // Also, prepare deleted file display immediately.
-            deletedFileNames.forEach(deletedFileName => {
+            (deletedFileNames || []).forEach(rawDeletedFileName => {
+                const deletedFileName = rawDeletedFileName.replace(/\.(gs|html|json)$/i, '');
                 const originalFile = originalFilesMap.get(deletedFileName);
                 if (originalFile) {
                     hasChanges = true;
@@ -184,7 +186,7 @@
                     `;
                     proposedFilesDisplay.innerHTML += deletedHtml;
                 } else {
-                    console.warn(`File '${deletedFileName}' was marked for deletion but not found in original files. Skipping deletion display.`);
+                    console.warn(`File '${rawDeletedFileName}' (normalized to '${deletedFileName}') was marked for deletion but not found in original files. Skipping deletion display.`);
                 }
             });
 
