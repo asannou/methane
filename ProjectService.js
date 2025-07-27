@@ -278,9 +278,13 @@ function _applyFileChangeToMap(newProjectFilesMap, proposedFile) {
       console.warn(`REPLACE operation's old_string not found in file '${proposedFile.name}'. Skipping replacement. Proposed Old String (first 100 chars): "${oldString.substring(0, 100)}"...`);
     }
   } else { // Handle SERVER_JS, JSON, HTML types
+    // Normalize the filename to ensure it overwrites existing files correctly.
+    const normalizedFileName = proposedFile.name.replace(/\.(gs|html|json)$/i, '');
+    proposedFile.name = normalizedFileName; // Ensure the file object itself has the correct, normalized name.
+
     // Apply formatting before setting the source
     proposedFile.source = _formatContentByType(proposedFile.source, proposedFile.type);
-    newProjectFilesMap.set(proposedFile.name, proposedFile); // Update existing or add new
+    newProjectFilesMap.set(normalizedFileName, proposedFile); // Update existing or add new using the normalized key.
   }
 }
 
