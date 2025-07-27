@@ -237,7 +237,8 @@ function _applyFileChangeToMap(newProjectFilesMap, proposedFile) {
   }
 
   if (proposedFile.type === 'REPLACE') {
-    const currentFile = newProjectFilesMap.get(proposedFile.name);
+    const normalizedFileName = proposedFile.name.replace(/\.(gs|html|json)$/i, '');
+    const currentFile = newProjectFilesMap.get(normalizedFileName);
     if (!currentFile) {
       console.warn(`REPLACE operation target file '${proposedFile.name}' not found in current project. Skipping.`);
       return;
