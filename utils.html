@@ -178,7 +178,7 @@
                     const deletedHtml = `
                         <div class="file-comparison is-deleted">
                             <h4 class="title is-5 full-width-panel">DELETED: <span class="file-name-deleted">${Utils.escapeHtml(deletedFileName)}.${ext}</span></h4>
-                            <div class="deleted-message notification is-danger is-light full-width-panel">このファイルは削除が提案されています。元の内容は以下に示されています（取り消し線付き）：</div>
+                            <div class="deleted-message notification is-danger is-light full-width-panel">This file has been proposed for deletion. The original content is shown below (strikethrough):</div>
                             <div class="single-file-content-panel">
                                 <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
                             </div>
@@ -204,7 +204,7 @@
                     fileContentHtml = `
                         <div class="file-comparison">
                             <h4 class="title is-5 full-width-panel">NEW FILE: ${Utils.escapeHtml(fileName)}.${ext}</h4>
-                            <div class="notification is-info is-light full-width-panel">これはAIによって提案された新しいファイルです。</div>
+                            <div class="notification is-info is-light full-width-panel">This is a new file proposed by the AI.</div>
                             <div class="single-file-content-panel">
                                 <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
                             </div>
@@ -219,11 +219,11 @@
                     fileContentHtml = `
                         <div class="file-comparison">
                             <div class="original-file-panel">
-                                <h4 class="title is-5">変更前: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
+                                <h4 class="title is-5">Original: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
                                 <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
                             </div>
                             <div class="proposed-file-panel">
-                                <h4 class="title is-5">変更後: ${Utils.escapeHtml(finalFile.name)}.${ext}</h4>
+                                <h4 class="title is-5">Proposed: ${Utils.escapeHtml(finalFile.name)}.${ext}</h4>
                                 <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
                             </div>
                         </div>
@@ -234,7 +234,7 @@
                 // Files that exist in both originalFilesMap and finalProposedFilesMap but have identical source are implicitly unchanged and not displayed.
             });
             if (!hasChanges) {
-                proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">選択されたスクリプトに対してAIからの変更提案はありません。これは、プロンプトがコード変更なしで完全に満たされたか、関連する変更が見つからなかったことを意味します。</p>`;
+                proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">No changes were proposed by the AI for the selected script. This could mean the prompt was fully satisfied without code changes, or no relevant changes were found.</p>`;
             }
             setTimeout(() => {
                 scrollSyncElements.forEach(ids => {
