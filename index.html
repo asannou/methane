@@ -378,8 +378,11 @@
   <?!= include('utils'); ?>
   <?!= include('event_handlers'); ?>
   <script type="module">
-    import diff_match_patch from 'https://cdn.jsdelivr.net/npm/diff-match-patch@1.0.5/+esm';
+    import diff_match_patch, { DIFF_EQUAL, DIFF_INSERT, DIFF_DELETE } from 'https://cdn.jsdelivr.net/npm/diff-match-patch@1.0.5/+esm';
     window.diff_match_patch = diff_match_patch;
+    window.DIFF_EQUAL = DIFF_EQUAL;
+    window.DIFF_INSERT = DIFF_INSERT;
+    window.DIFF_DELETE = DIFF_DELETE;
   </script>
   <?!= include('main'); ?>
 </body>
