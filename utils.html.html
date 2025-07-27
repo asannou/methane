@@ -1,0 +1,417 @@
+<script>
+    const Utils = {
+        _isProgrammaticScroll: false,
+        _setupScrollSync: (element1, element2) => {
+            if (!element1 || !element2) {
+                console.warn("Cannot set up scroll sync: one or both elements are null.");
+                return;
+            }
+            const syncScroll = (scrollingElement, targetElement) => {
+                if (!Utils._isProgrammaticScroll) {
+                    Utils._isProgrammaticScroll = true;
+                    targetElement.scrollTop = scrollingElement.scrollTop;
+                    targetElement.scrollLeft = scrollingElement.scrollLeft;
+                    setTimeout(() => {
+                        Utils._isProgrammaticScroll = false;
+                    }, 50);
+                }
+            };
+            element1.addEventListener('scroll', () => syncScroll(element1, element2));
+            element2.addEventListener('scroll', () => syncScroll(element2, element1));
+        },
+        getEffectiveScriptId: () => {
+            return UI.get('scriptIdSelect').value.trim();
+        },
+        saveScriptIdToLocalStorage: (id) => {
+            if (id) {
+                localStorage.setItem('targetScriptId', id);
+            }
+        },
+        saveGcpProjectIdToLocalStorage: (id) => {
+            if (id) {
+                localStorage.setItem('gcpProjectId', id);
+            }
+        },
+        saveGeminiModelNameToLocalStorage: (modelName) => { // NEW
+            if (modelName) {
+                localStorage.setItem('geminiModelName', modelName);
+            }
+        },
+        loadProjectsIntoDropdown: (selectedId = null) => {
+            const scriptIdSelect = UI.get('scriptIdSelect');
+            scriptIdSelect.innerHTML = '<option value="">-- Select a Script ID --</option>';
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    if (response.status === 'success') {
+                        response.projects.forEach(project => {
+                            const option = document.createElement('option');
+                            option.value = project.id;
+                            option.textContent = project.title;
+                            scriptIdSelect.appendChild(option);
+                        });
+                        if (selectedId) {
+                            scriptIdSelect.value = selectedId;
+                            scriptIdSelect.dispatchEvent(new Event('change'));
+                        }
+                    }
+                    else {
+                        alert('Failed to load Apps Script projects: ' + response.message);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    alert('Error loading Apps Script projects: ' + error.message);
+                })
+                .listAppsScriptProjects();
+        },
+        updateEditorUrlDisplay: () => {
+            const scriptId = Utils.getEffectiveScriptId();
+            const editorUrlDisplayDiv = UI.get('editor-url-display');
+            editorUrlDisplayDiv.innerHTML = ''; // Clear previous content
+
+            if (!scriptId) {
+                // If no script ID is selected, display a prompt
+                editorUrlDisplayDiv.innerHTML = `
+                    <p>Apps Script Editor: Please select a Script ID above.</p>
+                `;
+                return;
+            }
+
+            Utils.saveScriptIdToLocalStorage(scriptId);
+            const editorUrl = "https://script.google.com/d/" + scriptId + "/edit";
+
+            // Create the button HTML
+            const buttonHtml = `
+                <button id="openEditorButton" class="button is-small is-info">
+                    Open Apps Script Editor
+                </button>
+            `;
+
+            // Set the content of the display div
+            editorUrlDisplayDiv.innerHTML = `
+                <div class="is-flex is-align-items-center">
+                    ${buttonHtml}
+                    <span class="ml-3 is-size-7 has-text-grey-dark">Script ID: ${Utils.escapeHtml(scriptId)}</span>
+                </div>
+            `;
+
+            // Attach event listener to the newly created button
+            const openEditorButton = document.getElementById('openEditorButton');
+            if (openEditorButton) {
+                openEditorButton.addEventListener('click', () => {
+                    window.open(editorUrl, '_blank');
+                });
+            }
+        },
+        validateHtml: (htmlString, fileName) => {
+            console.log(`HTML validation started for file: ${fileName}`);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlString, 'text/html');
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                const errorMessage = parseError.textContent;
+                console.error(`HTML validation failed in ${fileName}:`, errorMessage);
+                return { isValid: false, message: `Syntax error found in HTML file "${fileName}": ${errorMessage}` };
+            }
+            console.log(`HTML validation successful for file: ${fileName}`);
+            return { isValid: true };
+        },
+        displayFileComparison: (originalFiles, proposedFiles, deletedFileNames) => {
+            const proposedFilesDisplay = UI.get('proposed-files-display');
+            proposedFilesDisplay.innerHTML = '';
+            let hasChanges = false;
+            const scrollSyncElements = [];
+            const originalFilesMap = new Map(originalFiles.map(f => [f.name, f]));
+
+            // Step 1: Create a temporary map to build the final proposed state
+            const finalProposedFilesMap = new Map();
+            // Initialize with all original files. These will be updated or removed.
+            originalFiles.forEach(file => {
+                finalProposedFilesMap.set(file.name, { ...file }); // Deep copy to avoid modifying original source directly
+            });
+
+            // Step 2: Apply proposed changes (REPLACE and SOURCE) to the finalProposedFilesMap
+            proposedFiles.forEach(proposedFile => {
+                // Normalize file name by removing potential extensions (.gs, .html, .json) to handle AI response variations.
+                const normalizedFileName = proposedFile.name.replace(/\.(gs|html|json)$/i, '');
+
+                if (proposedFile.type === 'REPLACE') {
+                    const currentFileInMap = finalProposedFilesMap.get(normalizedFileName);
+
+                    if (!currentFileInMap) {
+                        console.warn(`REPLACE operation target file '${proposedFile.name}' (normalized to '${normalizedFileName}') not found in original project content. Skipping this specific REPLACE operation.`);
+                        return; // Cannot apply replace if file doesn't exist
+                    }
+
+                    const oldString = proposedFile.old_string;
+                    const newString = proposedFile.new_string;
+                    const isGlobalReplace = proposedFile.isGlobalReplace === true;
+
+                    if (typeof oldString !== 'string' || typeof newString !== 'string' || oldString === null || newString === null) {
+                        console.warn(`REPLACE operation for '${normalizedFileName}' has malformed old_string or new_string. Skipping.`);
+                        return;
+                    }
+
+                    let currentSource = currentFileInMap.source;
+                    if (isGlobalReplace) {
+                        currentFileInMap.source = currentSource.replaceAll(oldString, newString);
+                    } else {
+                        currentFileInMap.source = currentSource.replace(oldString, newString);
+                    }
+                    finalProposedFilesMap.set(normalizedFileName, currentFileInMap); // Update map with modified file
+                } else { // type is SERVER_JS, JSON, HTML (full file content update or new file)
+                    finalProposedFilesMap.set(normalizedFileName, { ...proposedFile, name: normalizedFileName }); // Overwrite or add the file, ensuring name in map is normalized
+                }
+            });
+
+            // Step 3: Handle deleted files. Remove them from finalProposedFilesMap for accurate comparison/display.
+            // Also, prepare deleted file display immediately.
+            (deletedFileNames || []).forEach(rawDeletedFileName => {
+                const deletedFileName = rawDeletedFileName.replace(/\.(gs|html|json)$/i, '');
+                const originalFile = originalFilesMap.get(deletedFileName);
+                if (originalFile) {
+                    hasChanges = true;
+                    finalProposedFilesMap.delete(deletedFileName); // Remove from the map of proposed files
+                    const ext = Utils.getFileExtension(originalFile.type);
+                    const originalContentLines = Utils.getActualContentLines(originalFile.source);
+                    const lineNumbersHtml = originalContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
+                    const contentHtml = originalContentLines.map(line => `<div class="diff-line-removed">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
+                    const deletedHtml = `
+                        <div class="file-comparison is-deleted">
+                            <h4 class="title is-5 full-width-panel">DELETED: <span class="file-name-deleted">${Utils.escapeHtml(deletedFileName)}.${ext}</span></h4>
+                            <div class="deleted-message notification is-danger is-light full-width-panel">This file is proposed for deletion. The original content is shown below (strikethrough):</div>
+                            <div class="single-file-content-panel">
+                                <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
+                            </div>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += deletedHtml;
+                } else {
+                    console.warn(`File '${rawDeletedFileName}' (normalized to '${deletedFileName}') was marked for deletion but not found in original files. Skipping deletion display.`);
+                }
+            });
+
+            // Step 4: Generate diffs for modified and new files from finalProposedFilesMap
+            finalProposedFilesMap.forEach((finalFile, fileName) => {
+                const originalFile = originalFilesMap.get(fileName);
+                const ext = Utils.getFileExtension(finalFile.type);
+                let fileContentHtml = '';
+
+                if (!originalFile) { // New file
+                    hasChanges = true;
+                    const proposedContentLines = Utils.getActualContentLines(finalFile.source);
+                    const lineNumbersHtml = proposedContentLines.map((_, i) => `<div>${i + 1}</div>`).join('');
+                    const contentHtml = proposedContentLines.map(line => `<div class="diff-line-added">${Utils.escapeHtml(line) || '&nbsp;'}</div>`).join('');
+                    fileContentHtml = `
+                        <div class="file-comparison">
+                            <h4 class="title is-5 full-width-panel">NEW FILE: ${Utils.escapeHtml(fileName)}.${ext}</h4>
+                            <div class="notification is-info is-light full-width-panel">This is a new file proposed by the AI.</div>
+                            <div class="single-file-content-panel">
+                                <pre><div class="line-numbers-col">${lineNumbersHtml}</div><div class="code-content-col">${contentHtml}</div></pre>
+                            </div>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += fileContentHtml;
+                } else if (originalFile.source !== finalFile.source) { // Modified file (including those modified by REPLACE operations)
+                    hasChanges = true;
+                    const diffsHtml = Utils.generateFormattedDiffPanels(originalFile.source, finalFile.source);
+                    const originalPreId = `original-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                    const proposedPreId = `proposed-pre-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                    fileContentHtml = `
+                        <div class="file-comparison">
+                            <div class="original-file-panel">
+                                <h4 class="title is-5">Before: ${Utils.escapeHtml(originalFile.name)}.${ext}</h4>
+                                <pre id="${originalPreId}"><div class="line-numbers-col">${diffsHtml.originalLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.originalCodeContentHtml}</div></pre>
+                            </div>
+                            <div class="proposed-file-panel">
+                                <h4 class="title is-5">After: ${Utils.escapeHtml(finalFile.name)}.${ext}</h4>
+                                <pre id="${proposedPreId}"><div class="line-numbers-col">${diffsHtml.proposedLineNumbersHtml}</div><div class="code-content-col">${diffsHtml.proposedCodeContentHtml}</div></pre>
+                            </div>
+                        </div>
+                    `;
+                    proposedFilesDisplay.innerHTML += fileContentHtml;
+                    scrollSyncElements.push({ originalId: originalPreId, proposedId: proposedPreId });
+                }
+                // Files that exist in both originalFilesMap and finalProposedFilesMap but have identical source are implicitly unchanged and not displayed.
+            });
+            if (!hasChanges) {
+                proposedFilesDisplay.innerHTML = `<p class="notification is-info is-light">There are no proposed changes from the AI for the selected script. This could mean the prompt was fully satisfied without code changes, or no relevant changes were found.</p>`;
+            }
+            setTimeout(() => {
+                scrollSyncElements.forEach(ids => {
+                    const originalPre = document.getElementById(ids.originalId);
+                    const proposedPre = document.getElementById(ids.proposedId);
+                    if (originalPre && proposedPre) {
+                        Utils._setupScrollSync(originalPre, proposedPre);
+                    } else {
+                        console.warn(`Could not find pre elements for scroll sync with IDs: ${ids.originalId}, ${ids.proposedId}`);
+                    }
+                });
+            }, 0);
+            return hasChanges;
+        },
+        generateFormattedDiffPanels: (originalSource, proposedSource) => {
+            const dmp = new diff_match_patch();
+            let diffs = dmp.diff_main(originalSource, proposedSource);
+            dmp.diff_cleanupSemantic(diffs);
+            const originalLinesHtml = [];
+            const proposedLinesHtml = [];
+            const originalLineNumbers = [];
+            const proposedLineNumbers = [];
+            let currentOriginalLineNumber = 1;
+            let currentProposedLineNumber = 1;
+            const OMIT_THRESHOLD = 5;
+            const CONTEXT_LINES = 2;
+            let consecutiveEqualLinesCount = 0;
+            let equalLinesBufferOriginal = [];
+            let equalLinesBufferProposed = [];
+            let equalLineNumbersBufferOriginal = [];
+            let equalLineNumbersBufferProposed = [];
+            const flushEqualLines = () => {
+                if (consecutiveEqualLinesCount > 0) {
+                    if (consecutiveEqualLinesCount > OMIT_THRESHOLD) {
+                        for (let k = 0; k < Math.min(CONTEXT_LINES, equalLinesBufferOriginal.length); k++) {
+                            originalLinesHtml.push(equalLinesBufferOriginal[k]);
+                            proposedLinesHtml.push(equalLinesBufferProposed[k]);
+                            originalLineNumbers.push(equalLineNumbersBufferOriginal[k]);
+                            proposedLineNumbers.push(equalLineNumbersBufferProposed[k]);
+                        }
+                        originalLinesHtml.push(`<div class="diff-line-omitted">...</div>`);
+                        proposedLinesHtml.push(`<div class="diff-line-omitted">...</div>`);
+                        originalLineNumbers.push(`<div class="diff-line-omitted">...</div>`);
+                        proposedLineNumbers.push(`<div class="diff-line-omitted">...</div>`);
+                        const startIndexForEndContext = Math.max(CONTEXT_LINES, equalLinesBufferOriginal.length - CONTEXT_LINES);
+                        for (let k = startIndexForEndContext; k < equalLinesBufferOriginal.length; k++) {
+                            originalLinesHtml.push(equalLinesBufferOriginal[k]);
+                            proposedLinesHtml.push(equalLinesBufferProposed[k]);
+                            originalLineNumbers.push(equalLineNumbersBufferOriginal[k]);
+                            proposedLineNumbers.push(equalLineNumbersBufferProposed[k]);
+                        }
+                    } else {
+                        originalLinesHtml.push(...equalLinesBufferOriginal);
+                        proposedLinesHtml.push(...equalLinesBufferProposed);
+                        originalLineNumbers.push(...equalLineNumbersBufferOriginal);
+                        proposedLineNumbers.push(...equalLineNumbersBufferProposed);
+                    }
+                    consecutiveEqualLinesCount = 0;
+                    equalLinesBufferOriginal = [];
+                    equalLinesBufferProposed = [];
+                    equalLineNumbersBufferOriginal = [];
+                    equalLineNumbersBufferProposed = [];
+                }
+            };
+            let currentOriginalLineContentChars = [];
+            let currentProposedLineContentChars = [];
+            let lineContainsInsert = false;
+            let lineContainsDelete = false;
+            let currentOriginalLineRawText = [];
+            let currentProposedLineRawText = [];
+            for (let i = 0; i < diffs.length; ++i) {
+                const type = diffs[i][0];
+                const text = diffs[i][1];
+                const textParts = text.split('\n');
+                for (let j = 0; j < textParts.length; ++j) {
+                    const part = Utils.escapeHtml(textParts[j]);
+                    const rawPart = textParts[j];
+                    const isLastPartInDiffSegment = (j === textParts.length - 1);
+                    if (type === DIFF_EQUAL) {
+                        currentOriginalLineContentChars.push(part);
+                        currentProposedLineContentChars.push(part);
+                        currentOriginalLineRawText.push(rawPart);
+                        currentProposedLineRawText.push(rawPart);
+                    } else if (type === DIFF_INSERT) {
+                        currentProposedLineContentChars.push(`<ins class="diff-char-added">${part}</ins>`);
+                        currentOriginalLineContentChars.push('');
+                        currentProposedLineRawText.push(rawPart);
+                        currentOriginalLineRawText.push('');
+                        lineContainsInsert = true;
+                    } else {
+                        currentOriginalLineContentChars.push(`<del class="diff-char-removed">${part}</del>`);
+                        currentProposedLineContentChars.push('');
+                        currentOriginalLineRawText.push(rawPart);
+                        currentProposedLineRawText.push('');
+                        lineContainsDelete = true;
+                    }
+                    const isLogicalLineEnd = !isLastPartInDiffSegment || (i === diffs.length - 1 && j === textParts.length - 1);
+                    if (isLogicalLineEnd) {
+                        const originalFullHtmlLine = currentOriginalLineContentChars.join('');
+                        const proposedFullHtmlLine = currentProposedLineContentChars.join('');
+                        const originalRawLine = currentOriginalLineRawText.join('');
+                        const proposedRawLine = currentProposedLineRawText.join('');
+                        let lineStatusClass = 'equal';
+                        if (originalRawLine === proposedRawLine) {
+                            lineStatusClass = 'equal';
+                        } else if (lineContainsInsert && lineContainsDelete) {
+                            lineStatusClass = 'modified';
+                        } else if (lineContainsInsert) {
+                            lineStatusClass = 'added';
+                        } else if (lineContainsDelete) {
+                            lineStatusClass = 'removed';
+                        }
+                        if (lineStatusClass === 'equal') {
+                            consecutiveEqualLinesCount++;
+                            equalLineNumbersBufferOriginal.push(`<div>${currentOriginalLineNumber}</div>`);
+                            equalLinesBufferOriginal.push(`<div class="diff-line-equal">${originalFullHtmlLine || '&nbsp;'}</div>`);
+                            equalLineNumbersBufferProposed.push(`<div>${currentProposedLineNumber}</div>`);
+                            equalLinesBufferProposed.push(`<div class="diff-line-equal">${proposedFullHtmlLine || '&nbsp;'}</div>`);
+                        } else {
+                            flushEqualLines();
+                            originalLineNumbers.push(`<div>${currentOriginalLineNumber}</div>`);
+                            originalLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${originalFullHtmlLine || '&nbsp;'}</div>`);
+                            proposedLineNumbers.push(`<div>${currentProposedLineNumber}</div>`);
+                            proposedLinesHtml.push(`<div class="diff-line-${lineStatusClass}">${proposedFullHtmlLine || '&nbsp;'}</div>`);
+                        }
+                        currentOriginalLineNumber++;
+                        currentProposedLineNumber++;
+                        currentOriginalLineContentChars = [];
+                        currentProposedLineContentChars = [];
+                        currentOriginalLineRawText = [];
+                        currentProposedLineRawText = [];
+                        lineContainsInsert = false;
+                        lineContainsDelete = false;
+                    }
+                }
+            }
+            flushEqualLines();
+            return {
+                originalLineNumbersHtml: originalLineNumbers.join(''),
+                originalCodeContentHtml: originalLinesHtml.join(''),
+                proposedLineNumbersHtml: proposedLineNumbers.join(''),
+                proposedCodeContentHtml: proposedLinesHtml.join('')
+            };
+        },
+        getActualContentLines: (text) => {
+            if (text === null || text === undefined) {
+                return [];
+            }
+            return text.split('\n');
+        },
+        generateLineNumbersHtml: (source) => {
+            const lines = Utils.getActualContentLines(source);
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                html += `<div>${i + 1}</div>`;
+            }
+            return html;
+        },
+        generateSourceHtml: (source) => {
+            const lines = Utils.getActualContentLines(source);
+            let html = '';
+            for (let i = 0; i < lines.length; i++) {
+                html += `<div class="diff-line-equal">${Utils.escapeHtml(lines[i]) || '&nbsp;'}</div>`;
+            }
+            return html;
+        },
+        getFileExtension: (type) => {
+            switch (type) {
+                case 'SERVER_JS': return 'gs';
+                case 'JSON': return 'json';
+                default: return 'html';
+            }
+        },
+        escapeHtml: (text) => {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+    };
+</script>
