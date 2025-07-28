@@ -334,64 +334,144 @@ function _ensureAppsscriptJsonFallback(currentFilesPayload, originalProjectFiles
 }
 
 /**
- * Google Cloud PlatformプロジェクトIDを設定します。
+ * Retrieves the configured GCP Project ID from the target script's methane.json file.
+ * @param {string} targetScriptId - The ID of the Apps Script to retrieve the ID for.
+ * @returns {object} - Object with status and the gcpProjectId.
+ */
+function getGcpProjectId(targetScriptId) {
+  if (!targetScriptId || targetScriptId.trim() === '') {
+    return { status: 'error', message: 'Target Script ID not specified.' };
+  }
+  try {
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
+    
+    const getResponse = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content to get GCP ID');
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    const configFile = projectContent.files.find(file => file.name === 'methane' && file.type === 'JSON');
+    
+    if (configFile && configFile.source) {
+      const config = JSON.parse(configFile.source);
+      if (config.gcpProjectId) {
+        return { status: 'success', gcpProjectId: config.gcpProjectId };
+      }
+    }
+    
+    return { status: 'success', gcpProjectId: null }; // Not found but not an error
+    
+  } catch (e) {
+      console.error(`Error retrieving GCP Project ID for script ${targetScriptId}:`, e);
+      if (e.message && e.message.includes("404")) {
+        return { status: 'error', message: `Script ID ${targetScriptId} not found or access denied.` };
+      }
+      return { status: 'error', message: `Could not read configuration from script ${targetScriptId}.` };
+  }
+}
+
+/**
+ * Google Cloud PlatformプロジェクトIDをターゲットスクリプトの`methane.json`に設定します。
+ * @param {string} targetScriptId - 設定を保存するターゲットスクリプトのID
  * @param {string} gcpProjectId - 設定するGCPプロジェクトID
  * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
  */
-function setGcpProjectId(gcpProjectId) {
+function setGcpProjectId(targetScriptId, gcpProjectId) {
+  if (!targetScriptId || targetScriptId.trim() === '') {
+    return { status: 'error', message: 'Target Script ID is not specified.' };
+  }
   if (!gcpProjectId || gcpProjectId.trim() === '') {
     return { status: 'error', message: 'GCP Project ID cannot be empty.' };
   }
   try {
-    PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId.trim());
-    return { status: 'success', message: `GCP Project ID '${gcpProjectId.trim()}' set successfully.` };
+    const accessToken = ScriptApp.getOAuthToken();
+    const contentUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}/content`;
+
+    const getResponse = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content for update');
+    const projectContent = JSON.parse(getResponse.getContentText());
+
+    const filesMap = new Map(projectContent.files.map(f => [f.name, f]));
+    let configFile = filesMap.get('methane');
+    let config = {};
+
+    if (configFile) {
+      try {
+        config = JSON.parse(configFile.source || '{}');
+      } catch (e) {
+        console.warn("Could not parse existing methane.json. It will be overwritten. Error: " + e.message);
+        config = {};
+      }
+    }
+
+    config.gcpProjectId = gcpProjectId.trim();
+
+    const newConfigFile = {
+      name: 'methane',
+      type: 'JSON',
+      source: JSON.stringify(config, null, 2)
+    };
+
+    filesMap.set('methane', newConfigFile);
+
+    const finalPayload = { files: Array.from(filesMap.values()) };
+
+    _makeApiCall(contentUrl, 'put', accessToken, JSON.stringify(finalPayload), 'Failed to update methane.json config');
+
+    return { status: 'success', message: `GCP Project ID '${gcpProjectId.trim()}' saved to methane.json in script ${targetScriptId}.` };
   } catch (e) {
     console.error("GCPプロジェクトIDの設定中にエラーが発生しました:", e);
-    return { status: 'error', message: `GCP Project ID setting error: ${e.message}` };
+    return { status: 'error', message: `GCP Project ID setting error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
   }
 }
 
 /**
  * 指定されたApps ScriptのログをCloud Loggingから取得する関数
- * @param {string} targetScriptId - ログ取得のコンテキストに使用されるApps ScriptのID（ログフィルタリングには使用されません）。
- * @returns {Array<object>|string} - フォーマットされたログオブジェクトの配列、またはエラーメッセージ
+ * @param {string} targetScriptId - ログ取得のコンテキストに使用されるApps ScriptのID。
+ * @returns {object|string} - 成功時は { logs: Array<object>, gcpProjectId: string }、失敗時はエラーメッセージ文字列。
  */
 function getScriptLogs(targetScriptId) {
   const accessToken = ScriptApp.getOAuthToken();
-  const currentScriptId = ScriptApp.getScriptId();
 
   try {
-    let gcpProjectId = PropertiesService.getScriptProperties().getProperty('GCP_PROJECT_ID');
+    let gcpProjectId = null;
 
+    // 1. Try to get GCP ID from target's methane.json
+    try {
+      const gcpIdResponse = getGcpProjectId(targetScriptId);
+      if (gcpIdResponse.status === 'success' && gcpIdResponse.gcpProjectId) {
+        gcpProjectId = gcpIdResponse.gcpProjectId;
+        console.log(`GCP Project ID '${gcpProjectId}' found in target script's methane.json.`);
+      }
+    } catch (e) {
+      console.warn(`Could not read methane.json from target script ${targetScriptId}. Will proceed to metadata lookup. Error: ${e.message}`);
+    }
+
+    // 2. If not found, try from metadata (of the target script)
     if (!gcpProjectId) {
-      console.log("Script propertiesにGCPプロジェクトIDが見つかりません。メタデータから取得を試みます。");
-      const currentScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${currentScriptId}`;
-      const metadataResponse = _makeApiCall(currentScriptMetadataUrl, 'get', accessToken, null, 'Failed to retrieve current script metadata');
-
+      console.log(`GCP Project ID not in methane.json for script ${targetScriptId}. Trying metadata lookup.`);
+      const targetScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}`;
+      const metadataResponse = _makeApiCall(targetScriptMetadataUrl, 'get', accessToken, null, `Failed to retrieve metadata for target script ${targetScriptId}`);
       const metadata = JSON.parse(metadataResponse.getContentText());
 
       if (!metadata || typeof metadata.name !== 'string' || !metadata.name.startsWith('projects/')) {
-        console.error("Received metadata:", JSON.stringify(metadata, null, 2));
-        const userGuidance = "Could not identify the GCP Project ID for the script. This can happen if the current Apps Script project is not linked to a standard Google Cloud project. Please explicitly link a Google Cloud Platform project from the Apps Script editor's 'Project settings' (gear icon) or set it manually in the web UI.";
+        const userGuidance = `Could not identify the GCP Project ID for script ${targetScriptId}. This can happen if the script is not linked to a standard Google Cloud project. Please link a GCP project from the Apps Script editor's 'Project settings' or set it manually in the Methane UI.`;
         throw new Error(userGuidance);
       }
 
       const gcpProjectIdMatch = metadata.name.match(/^projects\/([^\/]+)\/scripts\/.+$/);
       if (!gcpProjectIdMatch || !gcpProjectIdMatch[1]) {
-        throw new Error("Could not correctly extract the current script's GCP Project ID from metadata.");
+        throw new Error("Could not extract the GCP Project ID from target script's metadata.");
       }
       gcpProjectId = gcpProjectIdMatch[1];
-      PropertiesService.getScriptProperties().setProperty('GCP_PROJECT_ID', gcpProjectId);
-      console.log("メタデータからGCPプロジェクトIDを取得し、保存しました:", gcpProjectId);
-    } else {
-      console.log("Script propertiesからGCPプロジェクトIDを取得しました:", gcpProjectId);
+      console.log(`GCP Project ID '${gcpProjectId}' found via metadata. Saving to methane.json for future use.`);
+
+      // 3. Save it back to methane.json for next time
+      setGcpProjectId(targetScriptId, gcpProjectId);
     }
 
+    // 4. Fetch logs using the now-known gcpProjectId
     const loggingApiUrl = 'https://logging.googleapis.com/v2/entries:list';
     const requestBody = {
-      "resourceNames": [
-        `projects/${gcpProjectId}`
-      ],
+      "resourceNames": [`projects/${gcpProjectId}`],
       "orderBy": "timestamp desc",
       "pageSize": 50
     };
@@ -400,47 +480,49 @@ function getScriptLogs(targetScriptId) {
     const response = _makeApiCall(loggingApiUrl, 'post', accessToken, JSON.stringify(requestBody), 'Cloud Logging API error');
 
     const logsData = JSON.parse(response.getContentText());
-    if (!logsData.entries || logsData.entries.length === 0) {
-      return []; // Return empty array if no logs are found
+    const logEntries = [];
+    if (logsData.entries && logsData.entries.length > 0) {
+      logsData.entries.forEach(entry => {
+        const timestamp = new Date(entry.timestamp).toLocaleString();
+        let logPayload = '';
+        if (entry.textPayload) {
+          logPayload = entry.textPayload;
+        } else if (entry.jsonPayload) {
+          let payload = entry.jsonPayload;
+          if (payload && typeof payload.message !== 'undefined') {
+            logPayload = typeof payload.message === 'object' ? JSON.stringify(payload.message, null, 2) : String(payload.message);
+          } else {
+            let tempPayload = { ...payload };
+            if (tempPayload.serviceContext) {
+              delete tempPayload.serviceContext;
+            }
+            logPayload = JSON.stringify(tempPayload, null, 2);
+          }
+        } else if (entry.protoPayload) {
+          let payload = entry.protoPayload;
+          if (payload && typeof payload.message !== 'undefined') {
+            logPayload = typeof payload.message === 'object' ? JSON.stringify(payload.message, null, 2) : String(payload.message);
+          } else {
+            let tempPayload = { ...payload };
+            if (tempPayload.serviceContext) {
+              delete tempPayload.serviceContext;
+            }
+            logPayload = JSON.stringify(tempPayload, null, 2);
+          }
+        }
+        logEntries.push({
+          timestamp: timestamp,
+          severity: entry.severity || 'INFO',
+          message: logPayload
+        });
+      });
     }
 
-    const logEntries = [];
-    logsData.entries.forEach(entry => {
-      const timestamp = new Date(entry.timestamp).toLocaleString();
-      let logPayload = '';
-      if (entry.textPayload) {
-        logPayload = entry.textPayload;
-      } else if (entry.jsonPayload) {
-        let payload = entry.jsonPayload;
-        if (payload && typeof payload.message !== 'undefined') {
-          logPayload = typeof payload.message === 'object' ? JSON.stringify(payload.message, null, 2) : String(payload.message);
-        } else {
-          let tempPayload = { ...payload };
-          if (tempPayload.serviceContext) {
-            delete tempPayload.serviceContext;
-          }
-          logPayload = JSON.stringify(tempPayload, null, 2);
-        }
-      } else if (entry.protoPayload) {
-        let payload = entry.protoPayload;
-        if (payload && typeof payload.message !== 'undefined') {
-          logPayload = typeof payload.message === 'object' ? JSON.stringify(payload.message, null, 2) : String(payload.message);
-        } else {
-          let tempPayload = { ...payload };
-          if (tempPayload.serviceContext) {
-            delete tempPayload.serviceContext;
-          }
-          logPayload = JSON.stringify(tempPayload, null, 2);
-        }
-      }
-      logEntries.push({
-        timestamp: timestamp,
-        severity: entry.severity || 'INFO',
-        message: logPayload
-      });
-    });
-
-    return logEntries;
+    // 5. Return new object structure
+    return {
+      logs: logEntries,
+      gcpProjectId: gcpProjectId
+    };
 
   } catch (e) {
     console.error("Error retrieving logs:", e);

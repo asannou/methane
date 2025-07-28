@@ -186,20 +186,22 @@ function fixErrorsFromLogs(targetScriptId) {
 
   try {
     // 1. ログを取得
-    const logs = getScriptLogs(targetScriptId);
+    const logResult = getScriptLogs(targetScriptId);
     let logsForAiPrompt;
 
-    if (Array.isArray(logs)) {
-        if (logs.length === 0) {
-            logsForAiPrompt = `No Apps Script logs found for the specified Script ID: ${targetScriptId}.\n`;
-        } else {
-            // Convert structured logs back to a simple string for the AI prompt
-            // Assuming `getScriptLogs` now returns [{timestamp: string, severity: string, message: string}, ...]
-            logsForAiPrompt = `--- Latest Logs for GCP Project: ${PropertiesService.getScriptProperties().getProperty('GCP_PROJECT_ID') || 'Unknown Project'} ---\n`; // Add project ID context
-            logsForAiPrompt += logs.map(log => `[${log.timestamp}] ${log.severity}: ${log.message}`).join('\n');
-        }
-    } else { // It's an error message string returned by getScriptLogs
-        return { status: 'error', message: logs};
+    // getScriptLogs returns an error string on failure
+    if (typeof logResult === 'string') {
+        return { status: 'error', message: logResult };
+    }
+
+    // On success, it returns an object { logs: [], gcpProjectId: '' }
+    const { logs, gcpProjectId } = logResult;
+
+    if (logs.length === 0) {
+        logsForAiPrompt = `No Apps Script logs found for the specified Script ID: ${targetScriptId}.\n`;
+    } else {
+        logsForAiPrompt = `--- Latest Logs for GCP Project: ${gcpProjectId || 'Unknown Project'} ---\n`;
+        logsForAiPrompt += logs.map(log => `[${log.timestamp}] ${log.severity}: ${log.message}`).join('\n');
     }
 
     // 2. 対象スクリプトの全ファイル内容を取得

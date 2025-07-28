@@ -99,10 +99,6 @@
             // and load files, OAuth scopes, and versions
             UI.get('scriptIdSelect').dispatchEvent(new Event('change'));
         }
-        const savedGcpProjectId = localStorage.getItem('gcpProjectId');
-        if (savedGcpProjectId) {
-            UI.get('gcpProjectId').value = savedGcpProjectId;
-        }
 
         // NEW: Load Gemini model from localStorage and server
         const savedGeminiModelName = localStorage.getItem('geminiModelName');
@@ -160,6 +156,7 @@
         UI.get('scriptIdSelect').addEventListener('change', Utils.updateEditorUrlDisplay);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetFilesList);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetOAuthScopes);
+        UI.get('scriptIdSelect').addEventListener('change', Handlers.handleLoadGcpProjectId);
         UI.get('scriptIdSelect').addEventListener('change', Handlers.handleGetVersions); /* NEW: Automatically get versions on script ID change */
         UI.get('prompt').addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
