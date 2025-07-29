@@ -334,7 +334,7 @@ function _ensureAppsscriptJsonFallback(currentFilesPayload, originalProjectFiles
 }
 
 /**
- * Retrieves the configured GCP Project ID from the target script's methane.json file.
+ * Retrieves the configured GCP Project ID from the target script's _methane.gs file.
  * @param {string} targetScriptId - The ID of the Apps Script to retrieve the ID for.
  * @returns {object} - Object with status and the gcpProjectId.
  */
@@ -349,12 +349,12 @@ function getGcpProjectId(targetScriptId) {
     const getResponse = _makeApiCall(contentUrl, 'get', accessToken, null, 'Failed to retrieve script content to get GCP ID');
     const projectContent = JSON.parse(getResponse.getContentText());
 
-    const configFile = projectContent.files.find(file => file.name === 'methane' && file.type === 'JSON');
+    const configFile = projectContent.files.find(file => file.name === '_methane' && file.type === 'SERVER_JS');
     
     if (configFile && configFile.source) {
-      const config = JSON.parse(configFile.source);
-      if (config.gcpProjectId) {
-        return { status: 'success', gcpProjectId: config.gcpProjectId };
+      const gcpProjectIdMatch = configFile.source.match(/gcpProjectId:\s*["']([^"]+)["']/);
+      if (gcpProjectIdMatch && gcpProjectIdMatch[1]) {
+        return { status: 'success', gcpProjectId: gcpProjectIdMatch[1] };
       }
     }
     
@@ -370,7 +370,7 @@ function getGcpProjectId(targetScriptId) {
 }
 
 /**
- * Google Cloud PlatformプロジェクトIDをターゲットスクリプトの`methane.json`に設定します。
+ * Google Cloud PlatformプロジェクトIDをターゲットスクリプトの`_methane.gs`に設定します。
  * @param {string} targetScriptId - 設定を保存するターゲットスクリプトのID
  * @param {string} gcpProjectId - 設定するGCPプロジェクトID
  * @returns {object} - 処理結果 (成功/失敗) を示すオブジェクト
@@ -390,33 +390,40 @@ function setGcpProjectId(targetScriptId, gcpProjectId) {
     const projectContent = JSON.parse(getResponse.getContentText());
 
     const filesMap = new Map(projectContent.files.map(f => [f.name, f]));
-    let configFile = filesMap.get('methane');
-    let config = {};
-
-    if (configFile) {
-      try {
-        config = JSON.parse(configFile.source || '{}');
-      } catch (e) {
-        console.warn("Could not parse existing methane.json. It will be overwritten. Error: " + e.message);
-        config = {};
-      }
-    }
-
-    config.gcpProjectId = gcpProjectId.trim();
+    
+    // As per policy, we always overwrite _methane.gs with a new version.
+    const newConfigFileSource = `/**
+ * @fileoverview This file contains configuration settings for the methane tool.
+ * It is automatically generated and updated by methane.
+ * Do not modify this file manually unless you know what you are doing.
+ * @const
+ */
+const METHANE_CONFIG = {
+  // The GCP Project ID associated with this Apps Script project for Cloud Logging.
+  gcpProjectId: "${gcpProjectId.trim()}"
+};
+`;
 
     const newConfigFile = {
-      name: 'methane',
-      type: 'JSON',
-      source: JSON.stringify(config, null, 2)
+      name: '_methane',
+      type: 'SERVER_JS',
+      source: newConfigFileSource
     };
 
-    filesMap.set('methane', newConfigFile);
+    filesMap.set('_methane', newConfigFile);
+
+    // As per policy, transitioning from methane.json is not supported.
+    // By using a filesMap from the get response and then overwriting the project with
+    // a put request, any methane.json file is implicitly removed if it's not in our final map.
+    if (filesMap.has('methane')) {
+      filesMap.delete('methane');
+    }
 
     const finalPayload = { files: Array.from(filesMap.values()) };
 
-    _makeApiCall(contentUrl, 'put', accessToken, JSON.stringify(finalPayload), 'Failed to update methane.json config');
+    _makeApiCall(contentUrl, 'put', accessToken, JSON.stringify(finalPayload), 'Failed to update _methane.gs config');
 
-    return { status: 'success', message: `GCP Project ID '${gcpProjectId.trim()}' saved to methane.json in script ${targetScriptId}.` };
+    return { status: 'success', message: `GCP Project ID '${gcpProjectId.trim()}' saved to _methane.gs in script ${targetScriptId}.` };
   } catch (e) {
     console.error("GCPプロジェクトIDの設定中にエラーが発生しました:", e);
     return { status: 'error', message: `GCP Project ID setting error: ${e.message}`, apiErrorDetails: e.apiErrorDetails || null, fullErrorText: e.fullErrorText || null };
@@ -434,20 +441,20 @@ function getScriptLogs(targetScriptId) {
   try {
     let gcpProjectId = null;
 
-    // 1. Try to get GCP ID from target's methane.json
+    // 1. Try to get GCP ID from target's _methane.gs
     try {
       const gcpIdResponse = getGcpProjectId(targetScriptId);
       if (gcpIdResponse.status === 'success' && gcpIdResponse.gcpProjectId) {
         gcpProjectId = gcpIdResponse.gcpProjectId;
-        console.log(`GCP Project ID '${gcpProjectId}' found in target script's methane.json.`);
+        console.log(`GCP Project ID '${gcpProjectId}' found in target script's _methane.gs.`);
       }
     } catch (e) {
-      console.warn(`Could not read methane.json from target script ${targetScriptId}. Will proceed to metadata lookup. Error: ${e.message}`);
+      console.warn(`Could not read _methane.gs from target script ${targetScriptId}. Will proceed to metadata lookup. Error: ${e.message}`);
     }
 
     // 2. If not found, try from metadata (of the target script)
     if (!gcpProjectId) {
-      console.log(`GCP Project ID not in methane.json for script ${targetScriptId}. Trying metadata lookup.`);
+      console.log(`GCP Project ID not in _methane.gs for script ${targetScriptId}. Trying metadata lookup.`);
       const targetScriptMetadataUrl = `https://script.googleapis.com/v1/projects/${targetScriptId}`;
       const metadataResponse = _makeApiCall(targetScriptMetadataUrl, 'get', accessToken, null, `Failed to retrieve metadata for target script ${targetScriptId}`);
       const metadata = JSON.parse(metadataResponse.getContentText());
@@ -462,9 +469,9 @@ function getScriptLogs(targetScriptId) {
         throw new Error("Could not extract the GCP Project ID from target script's metadata.");
       }
       gcpProjectId = gcpProjectIdMatch[1];
-      console.log(`GCP Project ID '${gcpProjectId}' found via metadata. Saving to methane.json for future use.`);
+      console.log(`GCP Project ID '${gcpProjectId}' found via metadata. Saving to _methane.gs for future use.`);
 
-      // 3. Save it back to methane.json for next time
+      // 3. Save it back to _methane.gs for next time
       setGcpProjectId(targetScriptId, gcpProjectId);
     }
 
