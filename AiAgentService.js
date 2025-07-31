@@ -63,7 +63,16 @@ aiPrompt += "## あなたのタスク\n上記指示に対する変更方針をJS
   const responseBody = response.getContentText();
 
   if (responseCode !== 200) {
-    throw new Error(`Gemini APIエラー (Status: ${responseCode}): ${responseBody}`);
+    const error = new Error(`Gemini APIエラー (Status: ${responseCode})`);
+    try {
+      const errorDetails = JSON.parse(responseBody);
+      error.apiErrorDetails = errorDetails;
+      error.message += `: ${errorDetails.error?.message || responseBody}`;
+    } catch (e) {
+      error.message += `: ${responseBody}`;
+      error.apiErrorDetails = { rawResponse: responseBody };
+    }
+    throw error;
   }
 
   const jsonResponse = JSON.parse(responseBody);
@@ -116,8 +125,8 @@ function generateProposalPolicy(formObject) {
     return { status: 'policy', policy: policyText, scriptId: scriptId, userPrompt: userPrompt };
 
   } catch (error) {
-    console.error("方針生成中にエラーが発生しました:", error);
-    return { status: 'error', message: `Policy generation error: ${error.message}` };
+    console.error("方針生成中にエラーが発生しました:", error.message, error.apiErrorDetails || '');
+    return { status: 'error', message: `Policy generation error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null };
   }
 }
 
@@ -166,8 +175,8 @@ function processPrompt(formObject) {
     };
 
   } catch (error) {
-    console.error("AI提案生成中にエラーが発生しました:", error);
-    return { status: 'error', message: `AI proposal generation error: ${error.message}` };
+    console.error("AI提案生成中にエラーが発生しました:", error.message, error.apiErrorDetails || '');
+    return { status: 'error', message: `AI proposal generation error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null };
   }
 }
 
@@ -247,7 +256,7 @@ function fixErrorsFromLogs(targetScriptId) {
     };
 
   } catch (error) {
-    console.error("エラー修正提案生成中にエラーが発生しました:", error);
-    return { status: 'error', message: `Error fix proposal generation error: ${error.message}` };
+    console.error("エラー修正提案生成中にエラーが発生しました:", error.message, error.apiErrorDetails || '');
+    return { status: 'error', message: `Error fix proposal generation error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null };
   }
 }

@@ -148,7 +148,16 @@ function callGenerativeAI(userPrompt, projectContent, policy = null) {
   const responseBody = response.getContentText();
 
   if (responseCode !== 200) {
-    throw new Error(`Gemini APIエラー (Status: ${responseCode}): ${responseBody}`);
+    const error = new Error(`Gemini APIエラー (Status: ${responseCode})`);
+    try {
+      const errorDetails = JSON.parse(responseBody);
+      error.apiErrorDetails = errorDetails;
+      error.message += `: ${errorDetails.error?.message || responseBody}`;
+    } catch (e) {
+      error.message += `: ${responseBody}`;
+      error.apiErrorDetails = { rawResponse: responseBody };
+    }
+    throw error;
   }
 
   let jsonResponse;

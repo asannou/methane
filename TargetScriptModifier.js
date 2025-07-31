@@ -59,7 +59,7 @@ function proposeBrowserErrorLoggingChanges(targetScriptId) {
     };
 
   } catch (error) {
-    console.error("ブラウザエラーログ機能の提案中にエラーが発生しました:", error);
-    return { status: 'error', message: `Browser error logging proposal error: ${error.message}` };
+    console.error("ブラウザエラーログ機能の提案中にエラーが発生しました:", error.message, error.apiErrorDetails || '');
+    return { status: 'error', message: `Browser error logging proposal error: ${error.message}`, apiErrorDetails: error.apiErrorDetails || null };
   }
 }

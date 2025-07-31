@@ -276,7 +276,8 @@
                         UI.hide('generatePolicyButton');
                         UI.enable('prompt');
                     } else if (response.status === 'error') {
-                        UI.setText('ai-policy', 'Error: ' + response.message);
+                        UI.setHtml('ai-policy', ''); // Clear the main display area
+                        UI.appendNotification('ai-policy', 'is-danger', 'Error generating policy:', response.message, response.apiErrorDetails);
                         UI.show('policy-container');
                         UI.enable('prompt');
                         UI.show('generatePolicyButton');
@@ -292,7 +293,8 @@
                     UI.hideSpinnerInButton(UI.get('generatePolicyButton'));
                     UI.enable('prompt');
                     UI.hide('cancelAiOperationButton');
-                    UI.setText('ai-policy', 'Error generating policy: ' + error.message);
+                    UI.setHtml('ai-policy', ''); // Clear
+                    UI.appendNotification('ai-policy', 'is-danger', 'Error generating policy (uncaught):', error.message);
                     UI.show('policy-container');
                     UI.show('generatePolicyButton');
                     UI.hide('regeneratePolicyButton');
@@ -407,7 +409,7 @@
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
                     } else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to generate proposal.', response.message);
+                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to generate proposal.', response.message, response.apiErrorDetails);
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -519,7 +521,8 @@
                         UI.hide('generatePolicyButton');
                     }
                     else if (response.status === 'error') {
-                        UI.setText('ai-policy', 'Error: ' + response.message);
+                        UI.setHtml('ai-policy', ''); // Clear the main display area
+                        UI.appendNotification('ai-policy', 'is-danger', 'Error regenerating policy:', response.message, response.apiErrorDetails);
                         UI.show('policy-container');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -535,7 +538,8 @@
                     UI.enable('prompt');
                     UI.hide('cancelAiOperationButton');
 
-                    UI.setText('ai-policy', 'Error regenerating policy: ' + error.message);
+                    UI.setHtml('ai-policy', ''); // Clear
+                    UI.appendNotification('ai-policy', 'is-danger', 'Error regenerating policy (uncaught):', error.message);
                     UI.show('policy-container');
                     UI.show('regeneratePolicyButton');
                     UI.hide('generatePolicyButton');
@@ -769,7 +773,7 @@
                         UI.hide('generatePolicyButton');
                     }
                     else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to regenerate proposal.', response.message);
+                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to regenerate proposal.', response.message, response.apiErrorDetails);
                         UI.show('apply-result-container');
                         UI.show('regenerateProposalButton');
                         UI.show('regeneratePolicyButton');
@@ -880,7 +884,7 @@
                         UI.hide('generatePolicyButton');
                     }
                     else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message);
+                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message, response.apiErrorDetails);
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -992,7 +996,7 @@
                         UI.hide('generatePolicyButton');
                     }
                     else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message);
+                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to get error fix proposal.', response.message, response.apiErrorDetails);
                         UI.show('apply-result-container');
                         UI.show('regeneratePolicyButton');
                         UI.hide('generatePolicyButton');
@@ -1112,7 +1116,7 @@
                         UI.hide('regeneratePolicyButton'); // Regenerate proposal handles its own button
                         UI.hide('generatePolicyButton'); // Start over button
                     } else if (response.status === 'error') {
-                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to generate proposal.', response.message);
+                        UI.appendNotification('apply-result-content', 'is-danger', 'Failed to generate proposal.', response.message, response.apiErrorDetails);
                         UI.show('apply-result-container');
                         UI.show('generatePolicyButton'); // Restore original AI button
                     }
