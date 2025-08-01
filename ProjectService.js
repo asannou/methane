@@ -297,11 +297,15 @@ function _applyFileChangeToMap(newProjectFilesMap, proposedFile) {
 function _deleteFilesFromMap(newProjectFilesMap, deletedFileNames, originalProjectFiles) {
   if (deletedFileNames && Array.isArray(deletedFileNames)) {
     deletedFileNames.forEach(fileName => {
-      if (newProjectFilesMap.has(fileName)) {
-        newProjectFilesMap.delete(fileName);
-        console.log(`File marked for deletion and removed from map: ${fileName}`);
+      // Normalize the filename by removing common Apps Script extensions.
+      // This handles cases where the AI might propose "OldFile.gs" instead of just "OldFile".
+      const normalizedFileName = fileName.replace(/\.(gs|html|json)$/i, '');
+
+      if (newProjectFilesMap.has(normalizedFileName)) {
+        newProjectFilesMap.delete(normalizedFileName);
+        console.log(`File marked for deletion and removed from map: ${fileName} (normalized to ${normalizedFileName})`);
       } else {
-        console.warn(`File '${fileName}' was marked for deletion but not found in current map. Skipping deletion.`);
+        console.warn(`File '${fileName}' (normalized to '${normalizedFileName}') was marked for deletion but not found in current map. Skipping deletion.`);
       }
     });
   }
