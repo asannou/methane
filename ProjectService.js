@@ -1067,3 +1067,17 @@ function setGeminiApiKey(apiKey) {
     return { status: 'error', message: `Gemini API Key setting error: ${e.message}` };
   }
 }
+
+/**
+ * Retrieves the Gemini API key from script properties.
+ * @returns {object} - Result object with status and the API key.
+ */
+function getGeminiApiKey() {
+  try {
+    const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    return { status: 'success', apiKey: apiKey || '' };
+  } catch (e) {
+    console.error("Error retrieving Gemini API Key:", e);
+    return { status: 'error', message: `Gemini API Key retrieval error: ${e.message}` };
+  }
+}

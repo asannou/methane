@@ -1846,6 +1846,8 @@
                     if (response.status === 'success') {
                         UI.appendNotification(resultDisplay, 'is-success', response.message);
                         apiKeyInput.value = ''; // Clear input on success for security
+                        apiKeyInput.type = 'password';
+                        UI.get('apiKeyVisibilityIcon').textContent = '👁️';
                     } else {
                         UI.appendNotification(resultDisplay, 'is-danger', `Failed to save API Key: ${response.message}`);
                     }
@@ -1855,6 +1857,21 @@
                     UI.appendNotification(resultDisplay, 'is-danger', `Error saving API Key: ${error.message}`);
                 })
                 .setGeminiApiKey(apiKey);
+        },
+
+        /**
+         * Handle toggling the visibility of the Gemini API Key.
+         */
+        handleToggleApiKeyVisibility: () => {
+            const apiKeyInput = UI.get('geminiApiKey');
+            const iconSpan = UI.get('apiKeyVisibilityIcon');
+            if (apiKeyInput.type === 'password') {
+                apiKeyInput.type = 'text';
+                iconSpan.textContent = '🙈';
+            } else {
+                apiKeyInput.type = 'password';
+                iconSpan.textContent = '👁️';
+            }
         }
     };
 </script>

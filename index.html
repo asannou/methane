@@ -374,8 +374,15 @@
           <p class="content">Set your Gemini API key. This key will be stored as a script property and is required for all AI operations. You can get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</p>
           <div class="field">
             <label class="label" for="geminiApiKey">Gemini API Key:</label>
-            <div class="control">
-              <input type="password" id="geminiApiKey" name="geminiApiKey" class="input" placeholder="Enter your API key">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input type="password" id="geminiApiKey" name="geminiApiKey" class="input" placeholder="Enter your API key">
+              </div>
+              <div class="control">
+                <button type="button" id="toggleApiKeyVisibility" class="button" aria-label="Toggle API Key visibility">
+                  <span id="apiKeyVisibilityIcon">👁️</span>
+                </button>
+              </div>
             </div>
           </div>
           <div class="control mt-3">

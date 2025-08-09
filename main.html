@@ -75,6 +75,8 @@
         AppState.domElements.saveGeminiApiKeyButton = document.getElementById('saveGeminiApiKeyButton');
         AppState.domElements.geminiApiKeySaveResultContainer = document.getElementById('gemini-api-key-save-result-container');
         AppState.domElements.geminiApiKeySaveResult = document.getElementById('gemini-api-key-save-result');
+        AppState.domElements.toggleApiKeyVisibility = document.getElementById('toggleApiKeyVisibility');
+        AppState.domElements.apiKeyVisibilityIcon = document.getElementById('apiKeyVisibilityIcon');
 
 
         // Load theme from localStorage or system preference and apply
@@ -125,6 +127,22 @@
                 })
                 .getGeminiModelName();
         }
+
+        // NEW: Load Gemini API Key from server to pre-fill the input
+        google.script.run
+            .withSuccessHandler(function(response) {
+                if (response.status === 'success' && response.apiKey) {
+                    const apiKeyInput = UI.get('geminiApiKey');
+                    apiKeyInput.value = response.apiKey;
+                    apiKeyInput.placeholder = 'API Key is set. Click to view or edit.';
+                } else if(response.status === 'error') {
+                     console.error("Failed to retrieve Gemini API Key from server:", response.message);
+                }
+            })
+            .withFailureHandler(function(error) {
+                console.error("Failed to retrieve Gemini API Key from server:", error);
+            })
+            .getGeminiApiKey();
 
         // Initialize UI components
         Utils.loadProjectsIntoDropdown(savedScriptId);
@@ -205,5 +223,6 @@
         UI.get('saveGeminiModelButton').addEventListener('click', Handlers.handleSaveGeminiModelName);
         // NEW Event Listener for Gemini API Key configuration
         UI.get('saveGeminiApiKeyButton').addEventListener('click', Handlers.handleSaveGeminiApiKey);
+        UI.get('toggleApiKeyVisibility').addEventListener('click', Handlers.handleToggleApiKeyVisibility);
     });
 </script>
