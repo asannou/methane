@@ -70,6 +70,11 @@
         AppState.domElements.saveGeminiModelButton = document.getElementById('saveGeminiModelButton');
         AppState.domElements.geminiModelSaveResultContainer = document.getElementById('gemini-model-save-result-container');
         AppState.domElements.geminiModelSaveResult = document.getElementById('gemini-model-save-result');
+        // NEW Elements for Gemini API Key configuration
+        AppState.domElements.geminiApiKey = document.getElementById('geminiApiKey');
+        AppState.domElements.saveGeminiApiKeyButton = document.getElementById('saveGeminiApiKeyButton');
+        AppState.domElements.geminiApiKeySaveResultContainer = document.getElementById('gemini-api-key-save-result-container');
+        AppState.domElements.geminiApiKeySaveResult = document.getElementById('gemini-api-key-save-result');
 
 
         // Load theme from localStorage or system preference and apply
@@ -149,6 +154,7 @@
         UI.hide('downloadResultContainer');
         UI.hide('createScriptResultContainer');
         UI.hide('geminiModelSaveResultContainer'); // NEW
+        UI.hide('geminiApiKeySaveResultContainer'); // NEW
 
         Handlers.initTabNavigation();
 
@@ -197,5 +203,7 @@
         UI.get('create-script-form').addEventListener('submit', Handlers.handleCreateNewScript);
         // NEW Event Listener for Gemini Model configuration
         UI.get('saveGeminiModelButton').addEventListener('click', Handlers.handleSaveGeminiModelName);
+        // NEW Event Listener for Gemini API Key configuration
+        UI.get('saveGeminiApiKeyButton').addEventListener('click', Handlers.handleSaveGeminiApiKey);
     });
 </script>

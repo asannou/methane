@@ -1049,3 +1049,21 @@ function getGeminiModelName() {
     return { status: 'error', message: `Gemini Model Name retrieval error: ${e.message}` };
   }
 }
+
+/**
+ * Sets the Gemini API key in script properties.
+ * @param {string} apiKey - The Gemini API key.
+ * @returns {object} - Result object indicating success or failure.
+ */
+function setGeminiApiKey(apiKey) {
+  if (!apiKey || apiKey.trim() === '') {
+    return { status: 'error', message: 'Gemini API Key cannot be empty.' };
+  }
+  try {
+    PropertiesService.getScriptProperties().setProperty('GEMINI_API_KEY', apiKey.trim());
+    return { status: 'success', message: `Gemini API Key saved successfully.` };
+  } catch (e) {
+    console.error("Error setting Gemini API Key:", e);
+    return { status: 'error', message: `Gemini API Key setting error: ${e.message}` };
+  }
+}

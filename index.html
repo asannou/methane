@@ -368,6 +368,24 @@
             <pre id="gcp-save-result" class="content"></pre>
           </div>
         </div>
+
+        <h2 class="title is-4 mt-5">Gemini API Key Configuration</h2>
+        <div class="box">
+          <p class="content">Set your Gemini API key. This key will be stored as a script property and is required for all AI operations. You can get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.</p>
+          <div class="field">
+            <label class="label" for="geminiApiKey">Gemini API Key:</label>
+            <div class="control">
+              <input type="password" id="geminiApiKey" name="geminiApiKey" class="input" placeholder="Enter your API key">
+            </div>
+          </div>
+          <div class="control mt-3">
+            <button type="button" id="saveGeminiApiKeyButton" class="button is-info">Save API Key</button>
+          </div>
+          <div id="gemini-api-key-save-result-container" class="box mt-4" style="display:none;">
+            <h3 class="title is-5">Save Result:</h3>
+            <pre id="gemini-api-key-save-result" class="content"></pre>
+          </div>
+        </div>
       </div>
     </div>
   </section>

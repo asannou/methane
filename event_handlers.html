@@ -1819,6 +1819,42 @@
                     UI.appendNotification(resultDisplay, 'is-danger', `Error saving Gemini Model Name: ${error.message}`);
                 })
                 .setGeminiModelName(modelName);
+        },
+        /**
+         * Handle saving the Gemini API Key.
+         */
+        handleSaveGeminiApiKey: () => {
+            const apiKeyInput = UI.get('geminiApiKey');
+            const apiKey = apiKeyInput.value.trim();
+            const saveButton = UI.get('saveGeminiApiKeyButton');
+            const resultContainer = UI.get('gemini-api-key-save-result-container');
+            const resultDisplay = UI.get('gemini-api-key-save-result');
+
+            UI.showSpinnerInButton(saveButton, 'Saving...');
+            UI.show(resultContainer);
+            UI.setText(resultDisplay, ''); // Clear previous result
+
+            if (!apiKey) {
+                UI.hideSpinnerInButton(saveButton);
+                UI.appendNotification(resultDisplay, 'is-danger', 'Error: Gemini API Key cannot be empty.');
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    UI.hideSpinnerInButton(saveButton);
+                    if (response.status === 'success') {
+                        UI.appendNotification(resultDisplay, 'is-success', response.message);
+                        apiKeyInput.value = ''; // Clear input on success for security
+                    } else {
+                        UI.appendNotification(resultDisplay, 'is-danger', `Failed to save API Key: ${response.message}`);
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    UI.hideSpinnerInButton(saveButton);
+                    UI.appendNotification(resultDisplay, 'is-danger', `Error saving API Key: ${error.message}`);
+                })
+                .setGeminiApiKey(apiKey);
         }
     };
 </script>
